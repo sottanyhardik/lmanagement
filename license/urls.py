@@ -49,5 +49,4 @@ urlpatterns = [
          name='report_glass'),
     path('report/pickle/<slug:status>', login_required(views.PickleReportView.as_view()),
          name='report_pickle'),
-
 ]

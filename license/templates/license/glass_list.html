@@ -50,6 +50,7 @@
                                         <th>Modifiers namely QTY</th>
                                         <th>Other Special Additives PD</th>
                                         <th>Other Special Additives QTY</th>
+                                        <th>PP PD</th>
                                         <th>PP QTY</th>
                                         </thead>
                                     {% else %}
@@ -82,7 +83,8 @@
                                                 <td>{{ object.get_modifiers_namely.balance_quantity }}</td>
                                                 <td>{{ object.get_other_special_additives.item }}</td>
                                                 <td>{{ object.get_other_special_additives.balance_quantity }}</td>
-                                                <td>{{ object.get_pp }}</td>
+                                                <td>{{ object.get_glass_packing.item }}</td>
+                                                <td>{{ object.get_glass_packing.balance_quantity }}</td>
                                             </tr>
                                         {% endfor %}
                                     {% else %}

@@ -45,12 +45,12 @@ def license_path(instance, filename):
 class LicenseDetailsModel(models.Model):
     scheme_code = models.CharField(choices=SCHEME_CODE_CHOICES, max_length=10, default=DFIA)
     notification_number = models.CharField(choices=NOTIFICATION_NORM_CHOICES, max_length=10, default=N2023)
-    license_number = models.CharField(max_length=50, unique=True)
+    license_number = models.CharField(max_length=50, unique=True, db_index=True)
     license_date = models.DateField(null=True, blank=True)
     license_expiry_date = models.DateField(null=True, blank=True)
     file_number = models.CharField(max_length=30, null=True, blank=True)
-    exporter = models.ForeignKey('core.CompanyModel', on_delete=models.CASCADE, null=True, blank=True)
-    port = models.ForeignKey('core.PortModel', on_delete=models.CASCADE, null=True, blank=True)
+    exporter = models.ForeignKey('core.CompanyModel', on_delete=models.CASCADE, null=True, blank=True, db_index=True)
+    port = models.ForeignKey('core.PortModel', on_delete=models.CASCADE, null=True, blank=True, db_index=True)
     registration_number = models.CharField(max_length=10, null=True, blank=True)
     registration_date = models.DateField(null=True, blank=True)
     user_comment = models.TextField(null=True, blank=True)
@@ -71,10 +71,10 @@ class LicenseDetailsModel(models.Model):
     fob = models.IntegerField(default=0, null=True, blank=True)
     created_on = models.DateField(auto_created=True, null=True, blank=True)
     created_by = models.ForeignKey('auth.User', on_delete=models.PROTECT, null=True, blank=True,
-                                   related_name='dfia_created')
+                                   related_name='dfia_created', db_index=True)
     modified_on = models.DateField(auto_now=True)
     modified_by = models.ForeignKey('auth.User', on_delete=models.PROTECT, null=True, blank=True,
-                                    related_name='dfia_updated')
+                                    related_name='dfia_updated', db_index=True)
     cheese_unit = models.FloatField(default=0)
     juice_unit = models.FloatField(default=0)
     wpc_unit = models.FloatField(default=0)
@@ -91,6 +91,25 @@ class LicenseDetailsModel(models.Model):
 
     class Meta:
         ordering = ('license_expiry_date',)
+
+    def __init__(self, *args, **kwargs):
+        super().__init__(*args, **kwargs)
+        self.balance_cif = None
+        self._import_license = None
+
+    def calculate_required_cif(self, quantity, rate):
+        if quantity and quantity > 100:
+            if self.balance_cif is None:
+                self.balance_cif = self.get_balance_cif
+            required_cif = quantity * rate
+            balance_cif = self.balance_cif
+            if required_cif <= balance_cif:
+                return required_cif
+            else:
+                if balance_cif > 0:
+                    return balance_cif
+        return 0
+
 
     @property
     def get_norm_class(self):
@@ -164,35 +183,52 @@ class LicenseDetailsModel(models.Model):
         return self.export_license.all().aggregate(sum=Sum('cif_inr'))['sum']
 
     @property
-    def get_chickpeas_obj(self):
-        return self.import_license.filter(
-            Q(item__name__icontains='Chickpeas') | Q(item__name__icontains='Green Peas') | Q(
-                item__name__icontains='Lentils'))
+    def import_license_prefetched(self):
+        if not self._import_license:
+            from django.db.models import Prefetch
+            self._import_license = self.import_license.all().prefetch_related(Prefetch(
+                'item',
+                queryset=Item.objects.only('name')
+            )).only('balance_quantity')
+        return self._import_license
 
     @property
     def get_glass_formers(self):
-        object = self.import_license.filter(item__name__icontains='Glass Formers')
-        if object.first():
-            return object.first()
-        else:
-            return None
+        glass_formers = [license for license in self.import_license_prefetched if
+                         'glass formers' in license.item.name.lower()]
+        return glass_formers[0] if glass_formers else None
+
+    def get_intermediates_namely(self):
+        intermediates = [license for license in self.import_license_prefetched
+                         if 'intermediates namely' in license.item.name.lower()
+                         or 'aluminium oxide' in license.item.name.lower()]
+        return intermediates[0] if intermediates else None
 
     @property
-    def get_intermediates_namely(self):
-        object = self.import_license.filter(
-            Q(item__name__icontains='Intermediates namely') | Q(item__name__icontains='Aluminium Oxide'))
-        if object.first():
-            return object.first()
-        else:
-            return None
+    def get_modifiers_namely(self):
+        matched_objects = [
+            license for license in self.import_license_prefetched
+            if 'modifiers namely' in license.item.name.lower()
+        ]
+        return matched_objects[0] if matched_objects else None
 
     @property
     def get_other_special_additives(self):
-        object = self.import_license.filter(item__name__icontains='Other Special Additives')
-        if object.first():
-            return object.first()
-        else:
-            return None
+        additives = [license for license in self.import_license_prefetched
+                     if 'other special additives' in license.item.name.lower()]
+        return additives[0] if additives else None
+
+    @property
+    def get_glass_packing(self):
+        packing_material = [license for license in self.import_license_prefetched
+                     if 'packing material' in license.item.name.lower()]
+        return {'item':packing_material[0].item, 'balance_quantity':packing_material[0].balance_quantity} if packing_material else None
+
+    @property
+    def get_chickpeas_obj(self):
+        return self.import_license_prefetched.filter(
+            Q(item__name__icontains='Chickpeas') | Q(item__name__icontains='Green Peas') | Q(
+                item__name__icontains='Lentils'))
 
     @property
     def get_hot_rolled(self):
@@ -205,14 +241,6 @@ class LicenseDetailsModel(models.Model):
     @property
     def get_bearing(self):
         object = self.import_license.filter(item__name__icontains='Bearing')
-        if object.first():
-            return object.first()
-        else:
-            return None
-
-    @property
-    def get_modifiers_namely(self):
-        object = self.import_license.filter(item__name__icontains='Modifiers namely')
         if object.first():
             return object.first()
         else:
@@ -665,16 +693,6 @@ class LicenseDetailsModel(models.Model):
             return -1
 
     @property
-    def get_pp_pd(self):
-        all = self.import_license.filter(
-            item__head__name__icontains='pp'
-        )
-        if all.first():
-            return all.first().item.name
-        else:
-            return 'Missing'
-
-    @property
     def get_pp(self):
         return self.import_license.filter(
             item__head__name__icontains='pp'
@@ -718,26 +736,24 @@ class LicenseDetailsModel(models.Model):
         else:
             return 'Missing'
 
+    def _get_first_pp_item(self):
+        if not hasattr(self, '_first_pp_item'):
+            self._first_pp_item = self.get_pp_qs.first()
+        return self._first_pp_item
+
     @property
     def get_pp_qs(self):
-        all = self.import_license.filter(Q(hs_code__hs_code__istartswith='3902'))
-        return all
+        return self.import_license.filter(Q(hs_code__hs_code__istartswith='3902'))
 
     @property
     def get_pp_pd(self):
-        all = self.get_pp_qs
-        if all.first():
-            return all.first().item.name
-        else:
-            return 'Missing'
+        first_item = self._get_first_pp_item()
+        return first_item.item.name if first_item else 'Missing'
 
     @property
     def get_pp_hsn(self):
-        all = self.get_pp_qs
-        if all.first():
-            return str(all.first().hs_code)
-        else:
-            return 'Missing'
+        first_item = self._get_first_pp_item()
+        return str(first_item.hs_code) if first_item else 'Missing'
 
     @property
     def get_paper_and_paper(self):
@@ -842,8 +858,8 @@ class LicenseDetailsModel(models.Model):
                     item__head__name__icontains='starch') | Q(
                     item__head__name__icontains='Coco'))
         for dimport in imports:
-            if dimport.alloted_value:
-                credit = credit - dimport.debited_value - int(dimport.alloted_value)
+            if dimport.allotted_value:
+                credit = credit - dimport.debited_value - int(dimport.allotted_value)
             else:
                 credit = credit - dimport.debited_value
         if credit > 0:
@@ -864,8 +880,8 @@ class LicenseDetailsModel(models.Model):
         else:
             imports = []
         for dimport in imports:
-            if dimport.alloted_value:
-                credit = credit - dimport.debited_value - int(dimport.alloted_value)
+            if dimport.allotted_value:
+                credit = credit - dimport.debited_value - int(dimport.allotted_value)
             else:
                 credit = credit - dimport.debited_value
         if credit > 0:
@@ -875,63 +891,59 @@ class LicenseDetailsModel(models.Model):
 
     @property
     def get_per_black_pepper_cif(self):
-        lic = LicenseExportItemModel.objects.filter(license=self)
-        credit = LicenseExportItemModel.objects.filter(license=self).aggregate(Sum('cif_fc'))['cif_fc__sum']
-        if 'E132' in str(lic[0].norm_class):
-            credit = credit * .03
-            imports = LicenseImportItemsModel.objects.filter(license=self).filter(
-                Q(item__name__icontains='pepper'))
+        license_export_items = LicenseExportItemModel.objects.filter(license=self)
+        credit = license_export_items.aggregate(Sum('cif_fc')).get('cif_fc__sum', 0)
+        if 'E132' in str(license_export_items.first().norm_class if license_export_items else ''):
+            credit *= 0.03
+            license_import_items = LicenseImportItemsModel.objects.filter(
+                license=self,
+                item__name__icontains='pepper'
+            ).only('debited_value', 'allotted_value')
+            credit -= sum(
+                d_import.debited_value + int(d_import.allotted_value or 0)
+                for d_import in license_import_items
+            )
         else:
-            imports = []
-        for dimport in imports:
-            if dimport.alloted_value:
-                credit = credit - dimport.debited_value - int(dimport.alloted_value)
-            else:
-                credit = credit - dimport.debited_value
-        if credit > 0:
-            return round_down(credit)
-        else:
-            return 0
+            credit = 0
+
+        return max(round_down(credit), 0)
 
     @property
     def get_starch_per_cif(self):
-        lic = LicenseExportItemModel.objects.filter(license=self)
-        credit = LicenseExportItemModel.objects.filter(license=self).aggregate(Sum('cif_fc'))['cif_fc__sum']
-        if 'E1' in str(lic[0].norm_class):
-            credit = credit * .05
-            imports = LicenseImportItemsModel.objects.filter(license=self).filter(
-                Q(item__name__icontains='emulsifier'))
+        license_export_items = LicenseExportItemModel.objects.filter(license=self)
+        credit = license_export_items.aggregate(Sum('cif_fc')).get('cif_fc__sum', 0)
+
+        if 'E1' in str(license_export_items.first().norm_class if license_export_items else ''):
+            credit *= 0.05
+            license_import_items = LicenseImportItemsModel.objects.filter(
+                license=self,
+                item__name__icontains='emulsifier'
+            ).only('debited_value', 'allotted_value')
+
+            credit -= sum(
+                d_import.debited_value + int(d_import.allotted_value or 0)
+                for d_import in license_import_items
+            )
         else:
-            imports = []
-        for dimport in imports:
-            if dimport.alloted_value:
-                credit = credit - dimport.debited_value - int(dimport.alloted_value)
-            else:
-                credit = credit - dimport.debited_value
-        if credit > 0:
-            return round_down(credit)
-        else:
-            return 0
+            credit = 0
+
+        return max(round_down(credit), 0)
 
     @property
     def get_cmc_cif(self):
-        lic = LicenseExportItemModel.objects.filter(license=self)
-        credit = LicenseExportItemModel.objects.filter(license=self).aggregate(Sum('cif_fc'))['cif_fc__sum']
-        if 'E132' in str(lic[0].norm_class):
-            credit = credit * .05
-            imports = LicenseImportItemsModel.objects.filter(license=self).filter(
-                Q(item__name__icontains='Additives'))
+        license_items = LicenseExportItemModel.objects.filter(license=self)
+
+        if 'E132' in str(license_items.first().norm_class):
+            credit = 0.05 * license_items.aggregate(Sum('cif_fc'))['cif_fc__sum']
+            license_import_items = LicenseImportItemsModel.objects.filter(license=self,
+                                                                          item__name__icontains='Additives')
+
+            for license_import in license_import_items:
+                credit -= (license_import.debited_value + int(license_import.allotted_value or 0))
         else:
-            imports = []
-        for dimport in imports:
-            if dimport.alloted_value:
-                credit = credit - dimport.debited_value - int(dimport.alloted_value)
-            else:
-                credit = credit - dimport.debited_value
-        if credit > 0:
-            return round_down(credit)
-        else:
-            return 0
+            credit = 0  # if the condition isn't satisfied, then the credit should be set to 0.
+
+        return max(round_down(credit), 0)
 
     def get_balance_value(self):
         if self.get_norm_class == 'E5':
@@ -1089,7 +1101,7 @@ class LicenseImportItemsModel(models.Model):
         return round(total, 0)
 
     @property
-    def alloted_value(self):
+    def allotted_value(self):
         return self.allotment_details.filter(allotment__bill_of_entry__bill_of_entry_number__isnull=True,
                                              allotment__type=ALLOTMENT).aggregate(
             Sum('cif_fc'))['cif_fc__sum']
