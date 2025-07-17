@@ -21,11 +21,10 @@ from .scripts.ledger import fetch_page_data, create_object
 
 
 class DashboardView(TemplateView):
-    template_name = 'blank.html'
+    template_name = 'index.html'
 
     def get_context_data(self, **kwargs):
         context = super(DashboardView, self).get_context_data(**kwargs)
-        context['page_title'] = "Dashboard"
         return context
 
 

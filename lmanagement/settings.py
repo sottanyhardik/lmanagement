@@ -9,10 +9,10 @@ https://docs.djangoproject.com/en/2.2/topics/settings/
 For the full list of settings and their values, see
 https://docs.djangoproject.com/en/2.2/ref/settings/
 """
+from decouple import config
 
 import os
 import django as django
-
 from urllib.parse import quote
 
 django.utils.http.urlquote = quote
@@ -56,6 +56,7 @@ INSTALLED_APPS = [
     'shipping_bill.apps.ShippingBillConfig',
     'django.contrib.humanize',
     'mathfilters',
+    'django_vite',
 ]
 
 MIDDLEWARE = [
@@ -143,9 +144,10 @@ STATIC_URL = '/static/'
 
 STATICFILES_DIRS = [
     os.path.join(BASE_DIR, "static"),
+    os.path.join(BASE_DIR, "frontend", "dist"),
 ]
 
-STATIC_ROOT = os.path.join(BASE_DIR, "static_cdn", "static_root")
+STATIC_ROOT = os.path.join(BASE_DIR, "static_cdn")
 
 MEDIA_URL = '/media/'
 
@@ -220,3 +222,11 @@ DEFAULT_AUTO_FIELD = 'django.db.models.AutoField'
 
 EXPIRY_DAY = 60
 # INTERNAL_IPS = ALLOWED_HOSTS
+
+DJANGO_VITE = {
+    "default": {
+        "manifest_path": os.path.join(BASE_DIR,'frontend', 'dist', '.vite','manifest.json'),
+    }
+}
+DJANGO_VITE_DEV_MODE = False
+DJANGO_VITE_DEV_SERVER_PORT = 5173
