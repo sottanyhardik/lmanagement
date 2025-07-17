@@ -1,0 +1,61 @@
+import { useState } from 'react';
+import { toast } from 'react-toastify';
+import './LoginPage.css';
+
+const ForgotPassword = () => {
+  const [email, setEmail] = useState('');
+
+  const handleSubmit = async (e) => {
+    e.preventDefault();
+    try {
+      const response = await fetch('http://localhost:8000/api/password/forgot/', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ email }),
+      });
+
+      if (response.ok) {
+        toast.success('📩 Password reset email sent');
+      } else {
+        toast.error('❌ Failed to send reset email');
+      }
+    } catch (error) {
+      toast.error('❌ Network error');
+    }
+  };
+
+  return (
+    <div className="login-background">
+      <div className="login-card animate-fade-in">
+        <div className="logo-header justify-content-center">
+          <img src="/Logo.png" alt="Logo" className="logo-img" />
+          <div className="logo-text text-center">License<br />Manager</div>
+        </div>
+        <form onSubmit={handleSubmit}>
+          <div className="mb-3">
+            <input
+              type="email"
+              className="form-control input-lg"
+              placeholder="Enter your email"
+              value={email}
+              onChange={(e) => setEmail(e.target.value)}
+              required
+            />
+          </div>
+          <div className="form-options-row mb-3">
+            <div className="form-check m-0">
+  </div>
+  <a href="/login" className="forgot-link">
+    🔙 Back to Login
+  </a>
+</div>
+          <button type="submit" className="login-button btn btn-lg w-100">
+            Send Reset Link
+          </button>
+        </form>
+      </div>
+    </div>
+  );
+};
+
+export default ForgotPassword;
