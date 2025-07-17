@@ -1,0 +1,156 @@
+/* Custom theme overrides for navbar */
+.navbar-custom {
+    background-color: #e16123 !important;
+}
+
+/* Logo image */
+.dashboard-logo-img {
+    width: 40px;
+    height: 40px;
+}
+
+/* Logo text */
+.dashboard-logo-text {
+    font-weight: bold;
+    font-size: 1.1rem;
+    line-height: 1.2;
+    color: #242424;
+}
+
+/* User section */
+.user-name {
+    color: #ffffff;
+}
+
+/* Logout button */
+.logout-btn {
+    border-color: #ffffff;
+    color: #ffffff;
+}
+
+.logout-btn:hover {
+    background-color: #ffffff;
+    color: #e16123 !important;
+}
+
+/* Enable nested dropdown menu positioning */
+/* Main dropdown menu */
+.dropdown-menu {
+    background-color: var(--dropdown-bg);
+    border: none;
+}
+
+/* Submenu wrapper */
+.dropdown-submenu {
+    position: relative;
+}
+
+/* Nested submenu */
+.dropdown-submenu > .dropdown-menu {
+    display: none;
+    position: absolute;
+    left: 100%;
+    top: 0;
+    margin-top: 0;
+    background-color: var(--dropdown-bg);
+}
+
+/* Show submenu on hover */
+.dropdown-submenu:hover > .dropdown-menu {
+    display: block;
+}
+
+/* Arrow indicator */
+.dropdown-submenu > .dropdown-item::after {
+    content: ' ▸';
+    float: right;
+}
+
+/* Prevent submenu from staying open when leaving area */
+.dropdown-menu .dropdown-submenu:hover .dropdown-menu {
+    display: block;
+}
+
+.dropdown-menu .dropdown-submenu:not(:hover) .dropdown-menu {
+    display: none;
+}
+
+.dropdown-toggle::after {
+    display: none !important;
+}
+
+.dropdown-submenu > .dropdown-item {
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+}
+
+.dropdown-submenu > .dropdown-item::after {
+    content: '▸';
+    color: var(--primary-color);
+    font-weight: bold;
+}
+
+/* Dropdown styling */
+.user-dropdown {
+    background-color: #242424;
+    border-radius: 8px;
+    border: none;
+    min-width: 180px;
+    box-shadow: 0 8px 16px rgba(0, 0, 0, 0.15);
+}
+
+.user-dropdown .dropdown-item {
+    color: #e16123;
+    font-weight: 500;
+    display: flex;
+    align-items: center;
+    gap: 0.6rem;
+    padding: 0.5rem 1rem;
+}
+
+.user-dropdown .dropdown-item:hover {
+    background-color: rgba(225, 97, 35, 0.1);
+    outline: 1px solid #e16123;
+    color: #ffffff;
+}
+
+.user-dropdown .dropdown-item svg {
+    font-size: 1rem;
+    flex-shrink: 0;
+}
+
+/* Responsive tweaks */
+@media (max-width: 768px) {
+    .navbar .nav-link span {
+        display: none;
+    }
+
+    .user-dropdown {
+        position: static !important;
+        transform: none !important;
+        box-shadow: none;
+        background: #242424;
+        width: 100%;
+    }
+}
+
+.navbar .dropdown-toggle::after {
+    display: none !important;
+}
+
+.navbar .nav-item,
+.navbar .dropdown,
+.navbar .dropdown-menu li {
+    list-style: none !important;
+}
+
+.navbar .nav-item::marker,
+.navbar .dropdown-menu li::marker {
+    display: none !important;
+}
+
+.navbar .nav-item::before,
+.navbar .dropdown li::before {
+    content: none !important;
+}

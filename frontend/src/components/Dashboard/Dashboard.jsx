@@ -1,23 +1,16 @@
-import { useContext } from 'react';
-import { useNavigate } from 'react-router-dom';
-import { AuthContext } from '../../context/AuthContext';
-import { toast } from 'react-toastify';
+import React, {useContext} from 'react';
+import AuthContext from '../../context/AuthContext';
+import './Dashboard.css';
 
 const Dashboard = () => {
-  const { logout } = useContext(AuthContext);
-  const navigate = useNavigate();
+    const {user} = useContext(AuthContext);
 
-  const handleLogout = () => {
-    logout();
-    navigate('/');
-  };
-
-  return (
-    <div className="p-4">
-      <h1>Dashboard</h1>
-      <button className="btn btn-danger mt-3" onClick={handleLogout}>Logout</button>
-    </div>
-  );
+    return (
+        <div className="dashboard">
+            <h1>Welcome, {user?.username}!</h1>
+            <p>This is your dashboard.</p>
+        </div>
+    );
 };
 
 export default Dashboard;

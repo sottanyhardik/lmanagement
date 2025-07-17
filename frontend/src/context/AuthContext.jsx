@@ -1,85 +1,116 @@
-import { createContext, useState, useEffect } from 'react';
-import { jwtDecode } from 'jwt-decode';
-import { useNavigate } from 'react-router-dom';
-import { toast } from 'react-toastify';
+// AuthContext.jsx with full user profile support
+import React, {createContext, useEffect, useState} from 'react';
+import {useNavigate} from 'react-router-dom';
+import {jwtDecode} from 'jwt-decode';
+import {toast} from 'react-toastify';
 
-export const AuthContext = createContext();
+const AuthContext = createContext();
 
-export const AuthProvider = ({ children }) => {
-  const navigate = useNavigate();
+export const AuthProvider = ({children}) => {
+    const [authTokens, setAuthTokens] = useState(() =>
+        localStorage.getItem('authTokens')
+            ? JSON.parse(localStorage.getItem('authTokens'))
+            : null
+    );
 
-  const [authTokens, setAuthTokens] = useState(() =>
-    localStorage.getItem('authTokens')
-      ? JSON.parse(localStorage.getItem('authTokens'))
-      : null
-  );
+    const [user, setUser] = useState(() =>
+        localStorage.getItem('authTokens')
+            ? jwtDecode(JSON.parse(localStorage.getItem('authTokens')).access)
+            : null
+    );
 
-  const [user, setUser] = useState(() =>
-    authTokens ? jwtDecode(authTokens.access) : null
-  );
+    const [userProfile, setUserProfile] = useState(null);
+    const navigate = useNavigate();
 
-  const [loading, setLoading] = useState(true);
+    const fetchUserProfile = async (accessToken) => {
+        try {
+            const response = await fetch(`${import.meta.env.VITE_API_BASE_URL}/users/me/`, {
+                headers: {
+                    Authorization: `Bearer ${accessToken}`,
+                },
+            });
 
-  // Login and store tokens
-  const login = (access, refresh) => {
-    const tokens = { access, refresh };
-    setAuthTokens(tokens);
-    setUser(jwtDecode(access));
-    localStorage.setItem('authTokens', JSON.stringify(tokens));
-    toast.success('✅ Logged in');
-  };
+            if (response.ok) {
+                const profile = await response.json();
+                setUserProfile(profile);
+            } else {
+                console.error('Failed to fetch user profile');
+            }
+        } catch (error) {
+            console.error('Profile fetch error:', error);
+        }
+    };
 
-  // Logout user
-  const logout = () => {
-    setAuthTokens(null);
-    setUser(null);
-    localStorage.removeItem('authTokens');
-    navigate('/login');
-    toast.info('👋 Logged out');
-  };
+    const loginUser = async ({username, password}) => {
+        try {
+            const response = await fetch(`${import.meta.env.VITE_API_BASE_URL}/token/`, {
+                method: 'POST',
+                headers: {'Content-Type': 'application/json'},
+                body: JSON.stringify({username, password}),
+            });
 
-  // Refresh access token using refresh token
-  const refreshToken = async () => {
-    try {
-      const response = await fetch('http://localhost:8000/api/token/refresh/', {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ refresh: authTokens?.refresh }),
-      });
+            const data = await response.json();
 
-      if (response.ok) {
-        const data = await response.json();
-        const updatedTokens = { access: data.access, refresh: authTokens.refresh };
-        setAuthTokens(updatedTokens);
-        setUser(jwtDecode(data.access));
-        localStorage.setItem('authTokens', JSON.stringify(updatedTokens));
-      } else {
-        logout();
-      }
-    } catch (err) {
-      console.error('Token refresh error:', err);
-      logout();
-    }
-  };
+            if (response.ok) {
+                setAuthTokens(data);
+                setUser(jwtDecode(data.access));
+                localStorage.setItem('authTokens', JSON.stringify(data));
 
-  // Setup token refresh interval
-  useEffect(() => {
-    if (authTokens) {
-      const interval = setInterval(() => {
-        refreshToken();
-      }, 1000 * 60 * 4); // Every 4 mins
+                await fetchUserProfile(data.access);
+                navigate('/dashboard');
+            } else {
+                toast.error('❌ Invalid username or password');
+            }
+        } catch (error) {
+            toast.error('❌ Network error during login');
+        }
+    };
 
-      return () => clearInterval(interval);
-    }
-  }, [authTokens]);
+    const logoutUser = () => {
+        setAuthTokens(null);
+        setUser(null);
+        setUserProfile(null);
+        localStorage.removeItem('authTokens');
+        setTimeout(() => navigate('/login', {replace: true}), 0);
+    };
 
-  useEffect(() => {
-    setLoading(false);
-  }, []);
+    const updateToken = async () => {
+        if (!authTokens?.refresh) return;
 
-  return (
-    <AuthContext.Provider value={{ user, authTokens, login, logout }}>
-      {loading ? <div className="text-center mt-5">Loading...</div> : children}
-    </AuthContext.Provider>
-  );
+        try {
+            const response = await fetch(`${import.meta.env.VITE_API_BASE_URL}/token/refresh/`, {
+                method: 'POST',
+                headers: {'Content-Type': 'application/json'},
+                body: JSON.stringify({refresh: authTokens.refresh}),
+            });
+
+            if (response.ok) {
+                const data = await response.json();
+                const newTokens = {...authTokens, access: data.access};
+                setAuthTokens(newTokens);
+                setUser(jwtDecode(data.access));
+                localStorage.setItem('authTokens', JSON.stringify(newTokens));
+                await fetchUserProfile(data.access);
+            } else {
+                logoutUser();
+            }
+        } catch {
+            logoutUser();
+        }
+    };
+
+    useEffect(() => {
+        if (!authTokens) return;
+        updateToken();
+        const interval = setInterval(updateToken, 1000 * 60 * 4);
+        return () => clearInterval(interval);
+    }, []);
+
+    return (
+        <AuthContext.Provider value={{user, userProfile, authTokens, loginUser, logoutUser}}>
+            {children}
+        </AuthContext.Provider>
+    );
 };
+
+export default AuthContext;
