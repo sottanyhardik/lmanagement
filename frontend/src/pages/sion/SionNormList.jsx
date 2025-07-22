@@ -20,7 +20,8 @@ const SionNormList = () => {
     const [sortField, setSortField] = useState('');
     const [sortOrder, setSortOrder] = useState(''); // 'asc' or 'desc'
     const [filters, setFilters] = useState({item: '', head_norm: null});
-
+    const [newNorm, setNewNorm] = useState(null);
+    const [newErrors, setNewErrors] = useState({});
     const fetchData = async (pageNum = page) => {
         setLoading(true);
         try {
@@ -212,7 +213,122 @@ const SionNormList = () => {
                 >
                     Clear Filters
                 </Button>
+                <Button
+                    variant={newNorm ? 'outline-danger' : 'primary'}
+                    onClick={() => {
+                        if (newNorm) {
+                            setNewNorm(null); // Collapse if already adding
+                        } else {
+                            setNewNorm({
+                                norm_class: '',
+                                head_norm_id: null,
+                                head_norm_id_obj: null,
+                                description: '',
+                                export_norm: [{description: '', quantity: '', unit: ''}],
+                                import_norm: [{description: '', quantity: '', unit: '', condition: ''}]
+                            });
+                            setExpandedCards({}); // collapse all existing edits
+                            setNewErrors({});
+                        }
+                    }}
+                >
+                    {newNorm ? 'Cancel New' : 'Add New'}
+                </Button>
             </div>
+            {newNorm && (
+                <Card className="mb-3 border-success">
+                    <Card.Header className="bg-success text-white">
+                        <strong>New Norm</strong>
+                    </Card.Header>
+                    <div className="p-3">
+                        <NormForm
+                            normData={newNorm}
+                            onChange={(field, value) => {
+                                setNewNorm(prev => ({...prev, [field]: value}));
+                                setNewErrors(prev => ({...prev, [field]: undefined}));
+                            }}
+                            onImportChange={(i, field, value) => {
+                                const updated = [...newNorm.import_norm];
+                                updated[i][field] = value;
+                                setNewNorm(prev => ({...prev, import_norm: updated}));
+                            }}
+                            onAddImportRow={() =>
+                                setNewNorm(prev => ({
+                                    ...prev,
+                                    import_norm: [...prev.import_norm, {
+                                        description: '',
+                                        quantity: '',
+                                        unit: '',
+                                        condition: ''
+                                    }]
+                                }))
+                            }
+                            onDeleteImportRow={(i) =>
+                                setNewNorm(prev => {
+                                    const updated = [...prev.import_norm];
+                                    updated.splice(i, 1);
+                                    return {...prev, import_norm: updated};
+                                })
+                            }
+                            onExportChange={(i, field, value) => {
+                                const updated = [...newNorm.export_norm];
+                                updated[i][field] = value;
+                                setNewNorm(prev => ({...prev, export_norm: updated}));
+                            }}
+                            onAddExportRow={() =>
+                                setNewNorm(prev => ({
+                                    ...prev,
+                                    export_norm: [...prev.export_norm, {description: '', quantity: '', unit: ''}]
+                                }))
+                            }
+                            onDeleteExportRow={(i) =>
+                                setNewNorm(prev => {
+                                    const updated = [...prev.export_norm];
+                                    updated.splice(i, 1);
+                                    return {...prev, export_norm: updated};
+                                })
+                            }
+                            errors={{
+                                get: (path) => newErrors[path] || ''
+                            }}
+                        />
+                        <Button
+                            className="mt-3 me-2"
+                            size="sm"
+                            variant="success"
+                            onClick={async () => {
+                                try {
+                                    const payload = {
+                                        norm_class: newNorm.norm_class,
+                                        head_norm_id: newNorm.head_norm_id?.id || newNorm.head_norm_id,
+                                        description: newNorm.description,
+                                        export_norm: newNorm.export_norm,
+                                        import_norm: newNorm.import_norm
+                                    };
+                                    await axios.post('/api/sion-classes/', payload);
+                                    toast.success('New norm added');
+                                    setNewNorm(null);
+                                    fetchData(1);
+                                } catch (err) {
+                                    const parsed = parseFormErrors(err);
+                                    setNewErrors(parsed);
+                                    toast.error('Please fix form errors');
+                                }
+                            }}
+                        >
+                            Save
+                        </Button>
+                        <Button
+                            className="mt-3"
+                            size="sm"
+                            variant="outline-secondary"
+                            onClick={() => setNewNorm(null)}
+                        >
+                            Cancel
+                        </Button>
+                    </div>
+                </Card>
+            )}
 
             {loading ? (
                 <Spinner animation="border" variant="primary"/>
@@ -221,6 +337,7 @@ const SionNormList = () => {
                     const isEditing = !!editStates[norm.id];
                     const data = isEditing ? editStates[norm.id] : norm;
                     return (
+
                         <Card key={norm.id} className="mb-3">
                             <Card.Header onClick={() => toggleCard(norm.id)} style={{cursor: 'pointer'}}>
                                 <Row>

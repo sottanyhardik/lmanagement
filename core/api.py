@@ -71,8 +71,9 @@ class SionNormClassViewSet(viewsets.ModelViewSet):
     filterset_class = SionNormClassFilter
     filterset_fields = ['norm_class', 'head_norm', 'export_norm__description', 'import_norm__description']  # ✅
 
-    search_fields = ['norm_class', 'description', 'export_norm__description', 'import_norm__description']
+    search_fields = ['norm_class', 'description']
     ordering_fields = ['norm_class']
+    ordering = ['-modified_on']  # Default: newest first
 
     # permission_classes = [IsAuthenticated]
 
