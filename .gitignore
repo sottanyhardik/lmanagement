@@ -147,3 +147,4 @@ License Report *
 *.pdf
 *.xlsx
 *.sql
+db_update_*

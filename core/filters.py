@@ -5,7 +5,6 @@ from . import models as core_models
 
 
 class CompanyFilter(django_filters.FilterSet):
-
     class Meta:
         model = core_models.CompanyModel
         fields = ('iec', 'name')
@@ -28,7 +27,7 @@ class CompanyFilter(django_filters.FilterSet):
 class SionNormClassFilter(django_filters.FilterSet):
     class Meta:
         model = core_models.SionNormClassModel
-        fields = ('norm_class', 'item')
+        fields = ('norm_class', 'description')
         filter_overrides = {
             models.CharField: {
                 'filter_class': django_filters.CharFilter,

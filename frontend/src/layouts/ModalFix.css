@@ -1,0 +1,35 @@
+/* ModalFix.css */
+.ReactModal__Overlay {
+    background-color: rgba(0, 0, 0, 0.5) !important;
+    z-index: 1050;
+    position: fixed;
+    top: 0;
+    left: 0;
+    right: 0;
+    bottom: 0;
+}
+
+.ReactModal__Content {
+    position: relative;
+    top: 20%;
+    margin: auto;
+    width: 90%;
+    max-width: 500px;
+    background: #fff;
+    border-radius: 10px;
+    padding: 20px;
+    outline: none;
+    box-shadow: 0 4px 10px rgba(0, 0, 0, 0.25);
+    animation: fadeIn 0.2s ease-in-out;
+}
+
+@keyframes fadeIn {
+    from {
+        opacity: 0;
+        transform: translateY(-10px);
+    }
+    to {
+        opacity: 1;
+        transform: translateY(0);
+    }
+}

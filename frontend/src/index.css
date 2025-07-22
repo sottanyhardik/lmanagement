@@ -2,7 +2,9 @@
 
 :root {
     --primary-color: #e16123;
-    --primary-hover: #c9521d;
+    --bs-pagination-active-bg: #e16123;
+    --primary-hover: #cc541f;
+    --primary-text: #ffffff;
     --bg-dark: #242424;
     --text-light: #ffffff;
     --card-bg: #f7f7f7;
@@ -11,6 +13,7 @@
     --bs-dropdown-link-active-bg: #242424 !important;
 }
 
+/* Global Base Styles */
 body {
     margin: 0;
     font-family: 'Segoe UI', sans-serif;
@@ -18,6 +21,7 @@ body {
     color: var(--bg-dark);
 }
 
+/* Links */
 a {
     color: var(--primary-color);
     text-decoration: none;
@@ -28,56 +32,74 @@ a:hover {
     text-decoration: underline;
 }
 
-.btn-primary {
-    background-color: var(--primary-color);
-    border-color: var(--primary-color);
-}
-
-.btn-primary:hover,
-.btn-primary:focus {
-    background-color: var(--primary-hover);
-    border-color: var(--primary-hover);
-}
-
+a,
 .text-primary {
     color: var(--primary-color) !important;
 }
 
-.bg-dark-custom {
-    background-color: var(--bg-dark) !important;
-    color: var(--text-light);
+/* Typography */
+.text-primary {
+    color: var(--primary-color) !important;
 }
 
+/* Buttons */
+.btn-primary {
+    background-color: var(--primary-color);
+    border-color: var(--primary-color);
+    color: var(--primary-text);
+}
+
+.btn-primary:hover,
+.btn-primary:focus,
+.btn-primary:active {
+    background-color: var(--primary-hover);
+    border-color: var(--primary-hover);
+    color: var(--primary-text);
+}
+
+.btn-outline-primary {
+    color: var(--primary-color);
+    border-color: var(--primary-color);
+    background-color: transparent;
+}
+
+.btn-outline-primary:hover,
+.btn-outline-primary:focus,
+.btn-outline-primary:active {
+    color: var(--primary-text);
+    background-color: var(--primary-color);
+    border-color: var(--primary-color);
+}
+
+/* Inputs and Form Controls */
+input,
+select,
+textarea {
+    border-radius: 6px;
+}
+
+input:focus,
+select:focus,
+textarea:focus {
+    border-color: var(--primary-color);
+    box-shadow: 0 0 0 0.1rem rgba(225, 97, 35, 0.25);
+    outline: none;
+}
+
+/* Cards */
 .card {
     border-radius: 0.75rem;
     background-color: var(--card-bg);
     box-shadow: 0 4px 16px rgba(0, 0, 0, 0.1);
 }
 
-input, select, textarea {
-    border-radius: 6px;
+/* Custom Dark Background (e.g., Navbar) */
+.bg-dark-custom {
+    background-color: var(--bg-dark) !important;
+    color: var(--text-light);
 }
 
-/* Navbar Dropdown Theme */
-.dropdown-menu {
-    background-color: var(--dropdown-bg);
-    border: none;
-}
-
-.dropdown-item {
-    color: var(--primary-color) !important;
-    background-color: transparent;
-    font-weight: 500;
-}
-
-
-.dropdown-item:hover,
-.dropdown-item:focus {
-    background-color: transparent;
-    outline: 1px solid var(--primary-color);
-    color: var(--primary-hover) !important;
-}
-
+/* Navbar */
 .navbar .nav-link {
     color: var(--text-light) !important;
     font-weight: 500;
@@ -90,4 +112,28 @@ input, select, textarea {
     outline: 1px solid var(--primary-color);
     border-radius: 4px;
     font-weight: bold;
+}
+
+/* Dropdowns */
+.dropdown-menu {
+    background-color: var(--dropdown-bg);
+    border: none;
+}
+
+.dropdown-item {
+    color: var(--primary-color) !important;
+    background-color: transparent;
+    font-weight: 500;
+}
+
+.dropdown-item:hover,
+.dropdown-item:focus {
+    background-color: transparent;
+    outline: 1px solid var(--primary-color);
+}
+
+/* Badge */
+.badge-primary {
+    background-color: var(--primary-color);
+    color: var(--primary-text);
 }

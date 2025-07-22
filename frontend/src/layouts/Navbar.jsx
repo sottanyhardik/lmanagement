@@ -67,6 +67,13 @@ const Navbar = () => {
                                     className="me-2"/> Company</NavLink></li>
                                 <li><NavLink className="dropdown-item" to="/master/port"><FaWarehouse
                                     className="me-2"/> Port</NavLink></li>
+                                <li><NavLink className="dropdown-item" to="/master/hs-codes"><FaBuilding
+                                    className="me-2"/> HS Code</NavLink></li>
+                                <li><NavLink className="dropdown-item" to="/master/item-heads"><FaBuilding
+                                    className="me-2"/> Item Head</NavLink></li>
+                                <li><NavLink className="dropdown-item" to="/master/item-names"><FaBuilding
+                                    className="me-2"/> Item Name</NavLink></li>
+
                                 <li><NavLink className="dropdown-item" to="/master/sion"><FaListAlt
                                     className="me-2"/> SION Norms</NavLink></li>
                             </ul>

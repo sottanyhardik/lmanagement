@@ -1,51 +1,53 @@
-/* Custom theme overrides for navbar */
+/* Navbar Theme Overrides (based on index.css variables) */
+
+/* Navbar background */
 .navbar-custom {
-    background-color: #e16123 !important;
+    background-color: var(--primary-color) !important;
 }
 
-/* Logo image */
+/* Logo */
 .dashboard-logo-img {
     width: 40px;
     height: 40px;
 }
 
-/* Logo text */
 .dashboard-logo-text {
     font-weight: bold;
     font-size: 1.1rem;
     line-height: 1.2;
-    color: #242424;
+    color: var(--bg-dark);
 }
 
 /* User section */
 .user-name {
-    color: #ffffff;
+    color: var(--text-light);
 }
 
 /* Logout button */
 .logout-btn {
-    border-color: #ffffff;
-    color: #ffffff;
+    border-color: var(--text-light);
+    color: var(--text-light);
 }
 
 .logout-btn:hover {
-    background-color: #ffffff;
-    color: #e16123 !important;
+    background-color: var(--text-light);
+    color: var(--primary-color) !important;
 }
 
-/* Enable nested dropdown menu positioning */
-/* Main dropdown menu */
+/* Base dropdown menu */
 .dropdown-menu {
     background-color: var(--dropdown-bg);
     border: none;
+    border-radius: 8px;
+    min-width: 180px;
+    box-shadow: 0 8px 16px rgba(0, 0, 0, 0.15);
 }
 
-/* Submenu wrapper */
+/* Nested submenu support */
 .dropdown-submenu {
     position: relative;
 }
 
-/* Nested submenu */
 .dropdown-submenu > .dropdown-menu {
     display: none;
     position: absolute;
@@ -55,28 +57,8 @@
     background-color: var(--dropdown-bg);
 }
 
-/* Show submenu on hover */
 .dropdown-submenu:hover > .dropdown-menu {
     display: block;
-}
-
-/* Arrow indicator */
-.dropdown-submenu > .dropdown-item::after {
-    content: ' ▸';
-    float: right;
-}
-
-/* Prevent submenu from staying open when leaving area */
-.dropdown-menu .dropdown-submenu:hover .dropdown-menu {
-    display: block;
-}
-
-.dropdown-menu .dropdown-submenu:not(:hover) .dropdown-menu {
-    display: none;
-}
-
-.dropdown-toggle::after {
-    display: none !important;
 }
 
 .dropdown-submenu > .dropdown-item {
@@ -91,36 +73,45 @@
     font-weight: bold;
 }
 
-/* Dropdown styling */
-.user-dropdown {
-    background-color: #242424;
-    border-radius: 8px;
-    border: none;
-    min-width: 180px;
-    box-shadow: 0 8px 16px rgba(0, 0, 0, 0.15);
-}
-
-.user-dropdown .dropdown-item {
-    color: #e16123;
+/* Dropdown item base */
+.dropdown-item {
+    color: var(--primary-color);
     font-weight: 500;
     display: flex;
     align-items: center;
     gap: 0.6rem;
     padding: 0.5rem 1rem;
+    background-color: transparent;
 }
 
-.user-dropdown .dropdown-item:hover {
+/* Hover & focus */
+.dropdown-item:hover,
+.dropdown-item:focus {
     background-color: rgba(225, 97, 35, 0.1);
-    outline: 1px solid #e16123;
-    color: #ffffff;
+    outline: 1px solid var(--primary-color);
+    color: var(--text-light) !important;
 }
 
-.user-dropdown .dropdown-item svg {
+/* Fix bootstrap blue active state */
+
+/* Icons in menu */
+.dropdown-item svg {
     font-size: 1rem;
     flex-shrink: 0;
 }
 
-/* Responsive tweaks */
+.dropdown-item:hover,
+.dropdown-item:focus {
+    background-color: var(--primary-color);
+    color: var(--primary-color) !important;
+}
+
+/* Hide dropdown toggle arrow */
+.dropdown-toggle::after {
+    display: none !important;
+}
+
+/* Mobile tweaks */
 @media (max-width: 768px) {
     .navbar .nav-link span {
         display: none;
@@ -130,15 +121,12 @@
         position: static !important;
         transform: none !important;
         box-shadow: none;
-        background: #242424;
+        background: var(--bg-dark);
         width: 100%;
     }
 }
 
-.navbar .dropdown-toggle::after {
-    display: none !important;
-}
-
+/* List item resets */
 .navbar .nav-item,
 .navbar .dropdown,
 .navbar .dropdown-menu li {
@@ -146,11 +134,16 @@
 }
 
 .navbar .nav-item::marker,
-.navbar .dropdown-menu li::marker {
-    display: none !important;
-}
-
+.navbar .dropdown-menu li::marker,
 .navbar .nav-item::before,
 .navbar .dropdown li::before {
     content: none !important;
+}
+
+.dropdown-item.active,
+.dropdown-item:active {
+    background-color: var(--primary-color) !important;
+    color: var(--primary-text) !important;
+    font-weight: bold;
+    text-underline-offset: 0.2rem;
 }

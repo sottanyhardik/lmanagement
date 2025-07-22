@@ -9,11 +9,11 @@ https://docs.djangoproject.com/en/2.2/topics/settings/
 For the full list of settings and their values, see
 https://docs.djangoproject.com/en/2.2/ref/settings/
 """
-from decouple import config
-
 import os
-import django as django
 from urllib.parse import quote
+
+import django as django
+from decouple import config
 
 django.utils.http.urlquote = quote
 
@@ -63,7 +63,7 @@ INSTALLED_APPS = [
 ]
 
 MIDDLEWARE = [
-'corsheaders.middleware.CorsMiddleware',
+    'corsheaders.middleware.CorsMiddleware',
     'django.middleware.security.SecurityMiddleware',
     'django.contrib.sessions.middleware.SessionMiddleware',
     'django.middleware.common.CommonMiddleware',
@@ -229,21 +229,31 @@ EXPIRY_DAY = 60
 
 DJANGO_VITE = {
     "default": {
-        "manifest_path": os.path.join(BASE_DIR,'frontend', 'dist', '.vite','manifest.json'),
+        "manifest_path": os.path.join(BASE_DIR, 'frontend', 'dist', '.vite', 'manifest.json'),
     }
 }
 DJANGO_VITE_DEV_MODE = False
 DJANGO_VITE_DEV_SERVER_PORT = 5173
-
-
-REST_FRAMEWORK = {
-    'DEFAULT_AUTHENTICATION_CLASSES': (
-        'rest_framework_simplejwt.authentication.JWTAuthentication',
-    ),
-}
 
 CORS_ALLOWED_ORIGINS = [
     "http://localhost:5173",  # your React dev server
 ]
 
 EMAIL_BACKEND = 'django.core.mail.backends.console.EmailBackend'
+
+REST_FRAMEWORK = {
+    'DEFAULT_AUTHENTICATION_CLASSES': [
+        'rest_framework_simplejwt.authentication.JWTAuthentication',
+    ],
+
+    'DEFAULT_PAGINATION_CLASS': 'rest_framework.pagination.PageNumberPagination',
+    'PAGE_SIZE': 2,  # default page size
+    'DEFAULT_FILTER_BACKENDS': [
+        'rest_framework.filters.SearchFilter',
+        'rest_framework.filters.OrderingFilter',
+        'django_filters.rest_framework.DjangoFilterBackend',
+    ],
+    'DEFAULT_RENDERER_CLASSES': [
+        'rest_framework.renderers.JSONRenderer',  # remove BrowsableAPIRenderer
+    ],
+}

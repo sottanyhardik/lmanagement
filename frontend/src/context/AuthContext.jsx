@@ -1,8 +1,8 @@
-// AuthContext.jsx with full user profile support
 import React, {createContext, useEffect, useState} from 'react';
 import {useNavigate} from 'react-router-dom';
 import {jwtDecode} from 'jwt-decode';
 import {toast} from 'react-toastify';
+import axiosInstance from '../api/axiosInstance';
 
 const AuthContext = createContext();
 
@@ -22,47 +22,33 @@ export const AuthProvider = ({children}) => {
     const [userProfile, setUserProfile] = useState(null);
     const navigate = useNavigate();
 
-    const fetchUserProfile = async (accessToken) => {
+    const fetchUserProfile = async () => {
         try {
-            const response = await fetch(`${import.meta.env.VITE_API_BASE_URL}/users/me/`, {
-                headers: {
-                    Authorization: `Bearer ${accessToken}`,
-                },
-            });
-
-            if (response.ok) {
-                const profile = await response.json();
-                setUserProfile(profile);
-            } else {
-                console.error('Failed to fetch user profile');
-            }
+            const response = await axiosInstance.get('/api/users/me/');
+            setUserProfile(response.data);
         } catch (error) {
-            console.error('Profile fetch error:', error);
+            console.error('❌ Failed to fetch user profile:', error.response?.data || error.message);
         }
     };
 
     const loginUser = async ({username, password}) => {
         try {
-            const response = await fetch(`${import.meta.env.VITE_API_BASE_URL}/token/`, {
-                method: 'POST',
-                headers: {'Content-Type': 'application/json'},
-                body: JSON.stringify({username, password}),
-            });
+            const response = await axiosInstance.post('/api/token/', {username, password});
 
-            const data = await response.json();
+            const data = response.data;
+            setAuthTokens(data);
+            setUser(jwtDecode(data.access));
+            localStorage.setItem('authTokens', JSON.stringify(data));
 
-            if (response.ok) {
-                setAuthTokens(data);
-                setUser(jwtDecode(data.access));
-                localStorage.setItem('authTokens', JSON.stringify(data));
-
-                await fetchUserProfile(data.access);
-                navigate('/dashboard');
-            } else {
-                toast.error('❌ Invalid username or password');
-            }
+            await fetchUserProfile();
+            navigate('/dashboard');
         } catch (error) {
-            toast.error('❌ Network error during login');
+            const status = error.response?.status;
+            if (status === 401) {
+                toast.error('❌ Invalid username or password');
+            } else {
+                toast.error('❌ Login failed');
+            }
         }
     };
 
@@ -78,23 +64,17 @@ export const AuthProvider = ({children}) => {
         if (!authTokens?.refresh) return;
 
         try {
-            const response = await fetch(`${import.meta.env.VITE_API_BASE_URL}/token/refresh/`, {
-                method: 'POST',
-                headers: {'Content-Type': 'application/json'},
-                body: JSON.stringify({refresh: authTokens.refresh}),
+            const response = await axiosInstance.post('/api/token/refresh/', {
+                refresh: authTokens.refresh,
             });
 
-            if (response.ok) {
-                const data = await response.json();
-                const newTokens = {...authTokens, access: data.access};
-                setAuthTokens(newTokens);
-                setUser(jwtDecode(data.access));
-                localStorage.setItem('authTokens', JSON.stringify(newTokens));
-                await fetchUserProfile(data.access);
-            } else {
-                logoutUser();
-            }
-        } catch {
+            const data = response.data;
+            const newTokens = {...authTokens, access: data.access};
+            setAuthTokens(newTokens);
+            setUser(jwtDecode(data.access));
+            localStorage.setItem('authTokens', JSON.stringify(newTokens));
+            await fetchUserProfile();
+        } catch (error) {
             logoutUser();
         }
     };

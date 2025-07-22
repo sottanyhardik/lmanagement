@@ -1,7 +1,19 @@
 from django.contrib.auth.decorators import login_required
-from django.urls import path, include
+from django.urls import path
+from rest_framework.routers import DefaultRouter
 
 from . import views
+from .api import CompanyViewSet, PortViewSet, ItemHeadViewSet, ItemNameViewSet, HSCodeViewSet, SionNormClassViewSet, \
+    HeadSIONNormsViewSet  # ✅
+
+router = DefaultRouter()
+router.register(r'api/companies', CompanyViewSet, basename='company')
+router.register(r'api/ports', PortViewSet, basename='port')
+router.register(r'api/item-heads', ItemHeadViewSet, basename='item_head')
+router.register(r'api/item-names', ItemNameViewSet, basename='item_name')
+router.register(r'api/hs-codes', HSCodeViewSet, basename='hs_code')
+router.register(r'api/sion-classes', SionNormClassViewSet, basename='sion_norms')
+router.register(r'api/head-norms', HeadSIONNormsViewSet, basename='head_norms')
 
 urlpatterns = [
     # ex: /polls/
@@ -22,6 +34,7 @@ urlpatterns = [
     path('ledger_complete/', login_required(views.LedgerSuccess.as_view()), name='ledger-complete'),
     path('meis/upload/', login_required(views.UploadMEISView.as_view()), name='meis-upload'),
     path('meis/generate/', login_required(views.GenerateTransferLetterMEISView.as_view()), name='generate_tl'),
-    # this url is to update transfer dfia status on server
     path('api/update-license-transfer/', views.save_license_transfer, name='save_license_transfer'),
 ]
+
+urlpatterns = router.urls

@@ -10,12 +10,30 @@ from django.contrib.auth.models import AbstractUser
 
 from django.contrib.auth.models import AbstractUser  ## A new class is imported. ##
 from django.core.validators import RegexValidator
-from django.db import models
 
 alpha = RegexValidator(r'^[a-zA-Z ]*$', 'Only alpha characters are allowed.')
 
+from django.db import models
+from django.contrib.auth.models import User
 
-class CompanyModel(models.Model):
+
+class AuditModel(models.Model):
+    created_on = models.DateTimeField(auto_now_add=True)
+    created_by = models.ForeignKey(
+        User, null=True, blank=True, on_delete=models.SET_NULL,
+        related_name="%(class)s_created"
+    )
+    modified_on = models.DateTimeField(auto_now=True)
+    modified_by = models.ForeignKey(
+        User, null=True, blank=True, on_delete=models.SET_NULL,
+        related_name="%(class)s_updated"
+    )
+
+    class Meta:
+        abstract = True
+
+
+class CompanyModel(AuditModel):
     iec = models.CharField(max_length=10, unique=True)
     pan = models.CharField(max_length=20, null=True, blank=True)
     name = models.CharField(max_length=255, null=True, blank=True)
@@ -44,7 +62,7 @@ class CompanyModel(models.Model):
         ordering = ['name']
 
 
-class PortModel(models.Model):
+class PortModel(AuditModel):
     code = models.CharField(max_length=10, unique=True)
     name = models.CharField(max_length=255, null=True, blank=True)
 
@@ -56,7 +74,7 @@ class PortModel(models.Model):
         return "{0}".format(self.code)
 
 
-class ItemHeadModel(models.Model):
+class ItemHeadModel(AuditModel):
     name = models.CharField(max_length=255, unique=True)
     unit_rate = models.FloatField(default=0)
     is_restricted = models.BooleanField(default=False)
@@ -66,7 +84,7 @@ class ItemHeadModel(models.Model):
         return self.name
 
 
-class ItemNameModel(models.Model):
+class ItemNameModel(AuditModel):
     head = models.ForeignKey('core.ItemHeadModel', on_delete=models.CASCADE, related_name='items', null=True,
                              blank=True)
     name = models.CharField(max_length=255, unique=True)
@@ -80,7 +98,7 @@ class ItemNameModel(models.Model):
         return reverse('item-list')
 
 
-class HSCodeModel(models.Model):
+class HSCodeModel(AuditModel):
     hs_code = models.CharField(max_length=8, unique=True)
     product_description = models.TextField(null=True, blank=True)
     unit_price = models.FloatField(default=0)
@@ -99,32 +117,19 @@ class HSCodeModel(models.Model):
 
 class HeadSIONNormsModel(models.Model):
     name = models.CharField(max_length=255)
-    url = models.URLField(null=True, blank=True)
-    is_fetch = models.BooleanField(default=False)
-    tpages = models.IntegerField(default=1)
-    tcurrent = models.IntegerField(default=1)
 
     def __str__(self):
         return self.name
 
 
-class SionNormClassModel(models.Model):
+class SionNormClassModel(AuditModel):
     head_norm = models.ForeignKey('core.HeadSIONNormsModel', on_delete=models.CASCADE, related_name='sion_head')
-    item = models.ForeignKey('core.ItemNameModel', related_name='norm_class', on_delete=models.CASCADE, null=True,
-                             blank=True)
-    norm_class = models.CharField(max_length=10)
-    url = models.URLField(null=True, blank=True, help_text="Please Enter Exim Guru URL")
-    is_fetch = models.BooleanField(default=False)
-    created_on = models.DateField(auto_created=True)
-    created_by = models.ForeignKey('auth.User', on_delete=models.CASCADE, null=True, blank=True,
-                                   related_name='sion_created')
-    modified_on = models.DateField(auto_now=True)
-    modified_by = models.ForeignKey('auth.User', on_delete=models.CASCADE, null=True, blank=True,
-                                    related_name='sion_updated')
-
+    description = models.CharField(max_length=255)
+    norm_class = models.CharField(max_length=10, unique=True)
+    
     def __str__(self):
-        if self.item:
-            return "{0} | {1}".format(self.norm_class, self.item.name)
+        if self.description:
+            return "{0} | {1}".format(self.norm_class, self.description)
         else:
             return "{0}".format(self.norm_class)
 
@@ -133,16 +138,14 @@ class SionNormClassModel(models.Model):
 
 
 class SIONExportModel(models.Model):
-    norm_class = models.OneToOneField('core.SionNormClassModel', on_delete=models.CASCADE, related_name='export_norm')
-    item = models.ForeignKey('core.ItemNameModel', related_name='sion_export', on_delete=models.CASCADE, null=True,
-                             blank=True)
+    norm_class = models.ForeignKey('core.SionNormClassModel', on_delete=models.CASCADE, related_name='export_norm')
+    description = models.CharField(max_length=255)
     quantity = models.FloatField(default=0.0)
     unit = models.CharField(max_length=255, null=True, blank=True)
-    hs_code = models.ManyToManyField('core.HSCodeModel', blank=True, related_name='export_norms')
 
     def __str__(self):
-        if self.item:
-            return "{0} | {1}".format(self.norm_class, self.item)
+        if self.description:
+            return "{0} | {1}".format(self.norm_class, self.description)
         else:
             return "{0}".format(self.norm_class)
 
@@ -150,24 +153,22 @@ class SIONExportModel(models.Model):
 class SIONImportModel(models.Model):
     sr_no = models.IntegerField(default=0)
     norm_class = models.ForeignKey('core.SionNormClassModel', on_delete=models.CASCADE, related_name='import_norm')
-    item = models.ForeignKey('core.ItemNameModel', related_name='sion_import', on_delete=models.CASCADE, null=True,
-                             blank=True)
+    description = models.CharField(max_length=255)
     quantity = models.FloatField(default=0.0)
     unit = models.CharField(max_length=255, null=True, blank=True)
     condition = models.CharField(max_length=255, null=True, blank=True)
-    hs_code = models.ManyToManyField('core.HSCodeModel', blank=True, related_name='import_norms')
 
     class Meta:
         ordering = ['sr_no']
 
     def __str__(self):
-        if self.item:
-            return "{0} | {1}".format(self.norm_class, self.item)
+        if self.description:
+            return "{0} | {1}".format(self.norm_class, self.description)
         else:
             return "{0}".format(self.norm_class)
 
 
-class HSCodeDutyModel(models.Model):
+class HSCodeDutyModel(AuditModel):
     hs_code = models.CharField(max_length=8, unique=True)
     basic_custom_duty = models.FloatField(default=0)
     additional_duty_of_customs = models.FloatField(default=0)
@@ -192,7 +193,7 @@ class HSCodeDutyModel(models.Model):
                           self.product_descriptions.all().values('product_description')])
 
 
-class ProductDescriptionModel(models.Model):
+class ProductDescriptionModel(AuditModel):
     hs_code = models.ForeignKey('core.HSCodeDutyModel', on_delete=models.PROTECT, related_name='product_descriptions')
     product_description = models.TextField()
 
@@ -200,7 +201,7 @@ class ProductDescriptionModel(models.Model):
         return self.product_description
 
 
-class TransferLetterModel(models.Model):
+class TransferLetterModel(AuditModel):
     name = models.CharField(max_length=255)
     tl = models.FileField(upload_to='tl')
 
@@ -208,7 +209,7 @@ class TransferLetterModel(models.Model):
         return self.name
 
 
-class MEISMODEL(models.Model):
+class MEISMODEL(AuditModel):
     exporter = models.CharField(max_length=255)
     importer = models.CharField(max_length=255)
     cif_inr = models.CharField(max_length=255)
@@ -220,7 +221,7 @@ class MEISMODEL(models.Model):
         return self.dfia_no
 
 
-class UnitPriceModel(models.Model):
+class UnitPriceModel(AuditModel):
     name = models.CharField(max_length=255)
     unit_price = models.FloatField(default=0)
     label = models.CharField(max_length=255, default='')
