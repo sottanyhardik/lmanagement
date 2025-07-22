@@ -4,6 +4,8 @@ import {Button, Card, Col, Collapse, Container, Row, Spinner} from 'react-bootst
 import {toast} from 'react-toastify';
 import NormForm from './NormForm';
 import {parseFormErrors} from '../../utils/parseFormErrors';
+import AsyncHeadNormSelect from './AsyncHeadNormSelect';
+
 
 const SionNormList = () => {
     const [norms, setNorms] = useState([]);
@@ -11,11 +13,28 @@ const SionNormList = () => {
     const [expandedCards, setExpandedCards] = useState({});
     const [editStates, setEditStates] = useState({});
     const [errors, setErrors] = useState({});
-    const fetchData = async () => {
+    const [page, setPage] = useState(1);
+    const [pageSize] = useState(10); // Or any default page size
+    const [totalPages, setTotalPages] = useState(1);
+    const [searchQuery, setSearchQuery] = useState('');
+    const [sortField, setSortField] = useState('');
+    const [sortOrder, setSortOrder] = useState(''); // 'asc' or 'desc'
+    const [filters, setFilters] = useState({item: '', head_norm: null});
+
+    const fetchData = async (pageNum = page) => {
         setLoading(true);
         try {
-            const res = await axios.get('/api/sion-classes/');
+            const params = {
+                page: pageNum,
+                page_size: pageSize,
+                search: searchQuery,
+                ordering: sortOrder === 'desc' ? `-${sortField}` : sortField,
+                ...(filters.head_norm ? {head_norm: filters.head_norm.id} : {}),
+                ...(filters.item ? {item: filters.item} : {}),
+            };
+            const res = await axios.get('/api/sion-classes/', {params});
             setNorms(res.data.results);
+            setTotalPages(pageSize);
         } catch (err) {
             console.error('Failed to fetch norms', err);
         } finally {
@@ -25,7 +44,7 @@ const SionNormList = () => {
 
     useEffect(() => {
         fetchData();
-    }, []);
+    }, [page, searchQuery, filters, sortField, sortOrder]);
 
     const toggleCard = (id) => {
         setExpandedCards(prev => ({[id]: !prev[id]}));
@@ -128,7 +147,6 @@ const SionNormList = () => {
             await axios.patch(`/api/sion-classes/${id}/`, payload);
             toast.success('Norm updated');
             cancelEditing(id);
-            fetchData();
         } catch (err) {
             const parsed = parseFormErrors(err);
             const errorMap = {};
@@ -145,6 +163,56 @@ const SionNormList = () => {
     return (
         <Container className="mt-4">
             <h3 className="mb-4">SION Norms List</h3>
+            <div className="d-flex flex-wrap align-items-center mb-3 gap-3">
+                <input
+                    type="text"
+                    placeholder="Search..."
+                    className="form-control w-auto"
+                    value={searchQuery}
+                    onChange={e => {
+                        setPage(1);
+                        setSearchQuery(e.target.value);
+                    }}
+                />
+
+                <AsyncHeadNormSelect
+                    value={filters.head_norm}
+                    onChange={(selected) => {
+                        setPage(1);
+                        setFilters(prev => ({...prev, head_norm: selected}));
+                    }}
+                />
+
+                <select
+                    className="form-select w-auto"
+                    value={`${sortField}:${sortOrder}`}
+                    onChange={e => {
+                        const [field, order] = e.target.value.split(':');
+                        setPage(1);
+                        setSortField(field);
+                        setSortOrder(order);
+                    }}
+                >
+                    <option value=":">Sort By</option>
+                    <option value="norm_class:asc">Norm Class ↑</option>
+                    <option value="norm_class:desc">Norm Class ↓</option>
+                    <option value="description:asc">Description ↑</option>
+                    <option value="description:desc">Description ↓</option>
+                </select>
+                <Button
+                    variant="outline-secondary"
+                    size="sm"
+                    onClick={() => {
+                        setFilters({item: '', head_norm: null});
+                        setSearchQuery('');
+                        setSortField('');
+                        setSortOrder('');
+                        setPage(1);
+                    }}
+                >
+                    Clear Filters
+                </Button>
+            </div>
 
             {loading ? (
                 <Spinner animation="border" variant="primary"/>
@@ -235,6 +303,27 @@ const SionNormList = () => {
                         </Card>
                     );
                 })
+            )}
+            {!loading && totalPages > 1 && (
+                <div className="d-flex justify-content-center mt-4">
+                    <Button
+                        variant="outline-primary"
+                        className="me-2"
+                        disabled={page === 1}
+                        onClick={() => setPage(prev => prev - 1)}
+                    >
+                        Previous
+                    </Button>
+                    <span className="align-self-center">Page {page} of {totalPages}</span>
+                    <Button
+                        variant="outline-primary"
+                        className="ms-2"
+                        disabled={page === totalPages}
+                        onClick={() => setPage(prev => prev + 1)}
+                    >
+                        Next
+                    </Button>
+                </div>
             )}
         </Container>
     );
