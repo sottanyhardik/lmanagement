@@ -137,3 +137,7 @@ textarea:focus {
     background-color: var(--primary-color);
     color: var(--primary-text);
 }
+
+.card, .collapse {
+    transition: all 0.3s ease-in-out;
+}

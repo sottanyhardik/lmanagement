@@ -5,6 +5,7 @@ import {toast} from 'react-toastify';
 import NormForm from './NormForm';
 import {parseFormErrors} from '../../utils/parseFormErrors';
 import AsyncHeadNormSelect from './AsyncHeadNormSelect';
+import {FaPlus} from 'react-icons/fa';
 
 
 const SionNormList = () => {
@@ -135,6 +136,25 @@ const SionNormList = () => {
         handleEditChange(id, 'export_norm', updated);
     };
 
+    const handleAddNewClick = () => {
+        if (newNorm) {
+            // Clicking again cancels the add-new form
+            setNewNorm(null);
+        } else {
+            // Collapse all other cards and open the new one
+            setExpandedCards({});
+            setNewNorm({
+                norm_class: '',
+                head_norm_id: null,
+                head_norm_id_obj: null,
+                description: '',
+                export_norm: [{description: '', quantity: '', unit: ''}],
+                import_norm: [{description: '', quantity: '', unit: '', condition: ''}]
+            });
+            setNewErrors({});
+        }
+    };
+
     const saveChanges = async (id) => {
         try {
             const data = editStates[id];
@@ -163,78 +183,55 @@ const SionNormList = () => {
 
     return (
         <Container className="mt-4">
-            <h3 className="mb-4">SION Norms List</h3>
-            <div className="d-flex flex-wrap align-items-center mb-3 gap-3">
-                <input
-                    type="text"
-                    placeholder="Search..."
-                    className="form-control w-auto"
-                    value={searchQuery}
-                    onChange={e => {
-                        setPage(1);
-                        setSearchQuery(e.target.value);
-                    }}
-                />
-
-                <AsyncHeadNormSelect
-                    value={filters.head_norm}
-                    onChange={(selected) => {
-                        setPage(1);
-                        setFilters(prev => ({...prev, head_norm: selected}));
-                    }}
-                />
-
-                <select
-                    className="form-select w-auto"
-                    value={`${sortField}:${sortOrder}`}
-                    onChange={e => {
-                        const [field, order] = e.target.value.split(':');
-                        setPage(1);
-                        setSortField(field);
-                        setSortOrder(order);
-                    }}
-                >
-                    <option value=":">Sort By</option>
-                    <option value="norm_class:asc">Norm Class ↑</option>
-                    <option value="norm_class:desc">Norm Class ↓</option>
-                    <option value="description:asc">Description ↑</option>
-                    <option value="description:desc">Description ↓</option>
-                </select>
-                <Button
-                    variant="outline-secondary"
-                    size="sm"
-                    onClick={() => {
+            <div className="d-flex flex-wrap justify-content-between align-items-center mb-4">
+                <h2 className="fw-semibold text-primary">SION Norms</h2>
+                <div className="d-flex flex-wrap gap-2 align-items-center">
+                    <input
+                        type="text"
+                        className="form-control form-control-sm"
+                        placeholder="Search..."
+                        value={searchQuery}
+                        onChange={e => {
+                            setPage(1);
+                            setSearchQuery(e.target.value);
+                        }}
+                    />
+                    <AsyncHeadNormSelect
+                        value={filters.head_norm}
+                        onChange={(selected) => {
+                            setPage(1);
+                            setFilters(prev => ({...prev, head_norm: selected}));
+                        }}
+                    />
+                    <select
+                        className="form-select form-select-sm"
+                        value={`${sortField}:${sortOrder}`}
+                        onChange={e => {
+                            const [field, order] = e.target.value.split(':');
+                            setPage(1);
+                            setSortField(field);
+                            setSortOrder(order);
+                        }}
+                    >
+                        <option value=":">Sort By</option>
+                        <option value="created_at:desc">Newest</option>
+                        <option value="modified_at:desc">Recently Modified</option>
+                    </select>
+                    <Button size="sm" variant="outline-secondary" onClick={() => {
                         setFilters({item: '', head_norm: null});
                         setSearchQuery('');
                         setSortField('');
                         setSortOrder('');
                         setPage(1);
-                    }}
-                >
-                    Clear Filters
-                </Button>
-                <Button
-                    variant={newNorm ? 'outline-danger' : 'primary'}
-                    onClick={() => {
-                        if (newNorm) {
-                            setNewNorm(null); // Collapse if already adding
-                        } else {
-                            setNewNorm({
-                                norm_class: '',
-                                head_norm_id: null,
-                                head_norm_id_obj: null,
-                                description: '',
-                                export_norm: [{description: '', quantity: '', unit: ''}],
-                                import_norm: [{description: '', quantity: '', unit: '', condition: ''}]
-                            });
-                            setExpandedCards({}); // collapse all existing edits
-                            setNewErrors({});
-                        }
-                    }}
-                >
-                    {newNorm ? 'Cancel New' : 'Add New'}
-                </Button>
+                    }}>
+                        Reset
+                    </Button>
+                    <Button size="sm" variant="primary" onClick={handleAddNewClick}>
+                        <FaPlus className="me-1"/> Add New
+                    </Button>
+                </div>
             </div>
+
             {newNorm && (
                 <Card className="mb-3 border-success">
                     <Card.Header className="bg-success text-white">
@@ -338,8 +335,9 @@ const SionNormList = () => {
                     const data = isEditing ? editStates[norm.id] : norm;
                     return (
 
-                        <Card key={norm.id} className="mb-3">
-                            <Card.Header onClick={() => toggleCard(norm.id)} style={{cursor: 'pointer'}}>
+                        <Card key={norm.id} className="mb-3 shadow-sm border-0 rounded-3">
+                            <Card.Header className="bg-light fw-semibold" onClick={() => toggleCard(norm.id)}
+                                         style={{cursor: 'pointer'}}>
                                 <Row>
                                     <Col>{norm.norm_class}</Col>
                                     <Col>{norm.description}</Col>
@@ -352,7 +350,7 @@ const SionNormList = () => {
                                 </Row>
                             </Card.Header>
                             <Collapse in={!!expandedCards[norm.id]}>
-                                <div className="p-3">
+                                <div className="p-3 border-top border-primary-subtle bg-light-subtle">
                                     {isEditing ? (
                                         <>
                                             <NormForm
@@ -422,23 +420,23 @@ const SionNormList = () => {
                 })
             )}
             {!loading && totalPages > 1 && (
-                <div className="d-flex justify-content-center mt-4">
+                <div className="d-flex justify-content-center align-items-center gap-3 mt-4">
                     <Button
                         variant="outline-primary"
-                        className="me-2"
+                        size="sm"
                         disabled={page === 1}
                         onClick={() => setPage(prev => prev - 1)}
                     >
-                        Previous
+                        ← Previous
                     </Button>
-                    <span className="align-self-center">Page {page} of {totalPages}</span>
+                    <span className="fw-medium">Page {page} of {totalPages}</span>
                     <Button
                         variant="outline-primary"
-                        className="ms-2"
+                        size="sm"
                         disabled={page === totalPages}
                         onClick={() => setPage(prev => prev + 1)}
                     >
-                        Next
+                        Next →
                     </Button>
                 </div>
             )}
