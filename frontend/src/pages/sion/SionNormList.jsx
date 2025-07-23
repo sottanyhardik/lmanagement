@@ -5,7 +5,7 @@ import {toast} from 'react-toastify';
 import NormForm from './NormForm';
 import {parseFormErrors} from '../../utils/parseFormErrors';
 import AsyncHeadNormSelect from './AsyncHeadNormSelect';
-import {FaPlus} from 'react-icons/fa';
+import ListControls from '../../components/ListControls';
 
 
 const SionNormList = () => {
@@ -15,7 +15,7 @@ const SionNormList = () => {
     const [editStates, setEditStates] = useState({});
     const [errors, setErrors] = useState({});
     const [page, setPage] = useState(1);
-    const [pageSize] = useState(10); // Or any default page size
+    const [pageSize] = useState(2); // Or any default page size
     const [totalPages, setTotalPages] = useState(1);
     const [searchQuery, setSearchQuery] = useState('');
     const [sortField, setSortField] = useState('');
@@ -36,7 +36,7 @@ const SionNormList = () => {
             };
             const res = await axios.get('/api/sion-classes/', {params});
             setNorms(res.data.results);
-            setTotalPages(pageSize);
+            setTotalPages(Math.ceil(res.data.count / pageSize));
         } catch (err) {
             console.error('Failed to fetch norms', err);
         } finally {
@@ -48,8 +48,12 @@ const SionNormList = () => {
         fetchData();
     }, [page, searchQuery, filters, sortField, sortOrder]);
 
+    useEffect(() => {
+        document.title = "Sion Norms".toUpperCase();
+    },);
+
     const toggleCard = (id) => {
-        setExpandedCards(prev => ({[id]: !prev[id]}));
+        setExpandedCards({[id]: !expandedCards[id]});
     };
 
     const startEditing = (id, norm) => {
@@ -140,6 +144,8 @@ const SionNormList = () => {
         if (newNorm) {
             // Clicking again cancels the add-new form
             setNewNorm(null);
+            setPage(1);
+            window.scrollTo({top: 0, behavior: 'smooth'});
         } else {
             // Collapse all other cards and open the new one
             setExpandedCards({});
@@ -166,7 +172,7 @@ const SionNormList = () => {
                 import_norm: data.import_norm
             };
             await axios.patch(`/api/sion-classes/${id}/`, payload);
-            toast.success('Norm updated');
+            toast.success(`Norm "${data.norm_class}" Updated`);
             cancelEditing(id);
         } catch (err) {
             const parsed = parseFormErrors(err);
@@ -183,54 +189,72 @@ const SionNormList = () => {
 
     return (
         <Container className="mt-4">
-            <div className="d-flex flex-wrap justify-content-between align-items-center mb-4">
-                <h2 className="fw-semibold text-primary">SION Norms</h2>
-                <div className="d-flex flex-wrap gap-2 align-items-center">
-                    <input
-                        type="text"
-                        className="form-control form-control-sm"
-                        placeholder="Search..."
-                        value={searchQuery}
-                        onChange={e => {
-                            setPage(1);
-                            setSearchQuery(e.target.value);
-                        }}
-                    />
+            <ListControls
+                title="SION Norms"
+                search={searchQuery}
+                setSearch={setSearchQuery}
+                filters={[
                     <AsyncHeadNormSelect
+                        key="head_norm"
+                        value={filters.head_norm}
+                        onChange={(selected) => {
+                            setPage(1);
+                            setFilters((prev) => ({...prev, head_norm: selected}));
+                        }}
+                        styles={{
+                            container: (base) => ({...base, width: '100%'}),
+                            control: (base) => ({...base, width: '100%'}),
+                        }}
+                    />,
+                ]}
+                sortField={sortField}
+                setSortOrder={(o) => {
+                    setPage(1);
+                    setSortOrder(o);
+                }}
+                setSortField={(f) => {
+                    setPage(1);
+                    setSortField(f);
+                }}
+                sortOrder={sortOrder}
+                setPage={setPage}
+                showAdd={false}
+                sortOptions={[
+                    {label: 'Newest', value: 'created_at:desc'},
+                    {label: 'Recently Modified', value: 'modified_at:desc'},
+                ]}
+                onReset={() => {
+                    setFilters({item: '', head_norm: null});
+                    setSearchQuery('');
+                    setSortField('');
+                    setSortOrder('');
+                    setPage(1);
+                }}
+                handleReset={() => {
+                    setFilters({head_norm: null});
+                    setSearchQuery('');
+                    setSortField('');
+                    setSortOrder('');
+                    setPage(1);
+                }}
+                extraFilters={[
+                    <AsyncHeadNormSelect
+                        key="head_norm"
                         value={filters.head_norm}
                         onChange={(selected) => {
                             setPage(1);
                             setFilters(prev => ({...prev, head_norm: selected}));
                         }}
-                    />
-                    <select
-                        className="form-select form-select-sm"
-                        value={`${sortField}:${sortOrder}`}
-                        onChange={e => {
-                            const [field, order] = e.target.value.split(':');
-                            setPage(1);
-                            setSortField(field);
-                            setSortOrder(order);
+                        className="form-group-sm"
+                        styles={{
+                            container: base => ({...base, width: '100%'}),
+                            control: base => ({...base, width: '100%'}),
                         }}
-                    >
-                        <option value=":">Sort By</option>
-                        <option value="created_at:desc">Newest</option>
-                        <option value="modified_at:desc">Recently Modified</option>
-                    </select>
-                    <Button size="sm" variant="outline-secondary" onClick={() => {
-                        setFilters({item: '', head_norm: null});
-                        setSearchQuery('');
-                        setSortField('');
-                        setSortOrder('');
-                        setPage(1);
-                    }}>
-                        Reset
-                    </Button>
-                    <Button size="sm" variant="primary" onClick={handleAddNewClick}>
-                        <FaPlus className="me-1"/> Add New
-                    </Button>
-                </div>
-            </div>
+                    />
+                ]}
+                onAddNew={handleAddNewClick}
+
+            />
 
             {newNorm && (
                 <Card className="mb-3 border-success">
@@ -303,7 +327,7 @@ const SionNormList = () => {
                                         import_norm: newNorm.import_norm
                                     };
                                     await axios.post('/api/sion-classes/', payload);
-                                    toast.success('New norm added');
+                                    toast.success(`Norm "${newNorm.norm_class}" Added`);
                                     setNewNorm(null);
                                     fetchData(1);
                                 } catch (err) {

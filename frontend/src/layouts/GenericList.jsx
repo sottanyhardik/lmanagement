@@ -1,7 +1,13 @@
-import {useEffect, useRef, useState} from 'react';
+import React, {useEffect, useRef, useState} from 'react';
 import axios from '../api/axiosInstance';
 import {toast} from 'react-toastify';
+import {Container} from 'react-bootstrap';
 import 'bootstrap/dist/js/bootstrap.bundle.min.js';
+import ListControls from '../components/ListControls';
+import GenericTable from '../components/GenericTable';
+import PaginationControls from '../components/PaginationControls';
+import AddItemModal from '../components/AddItemModal';
+
 
 const PAGE_SIZE = 10;
 
@@ -20,14 +26,16 @@ const GenericList = ({
     const [editIndex, setEditIndex] = useState(null);
     const [errors, setErrors] = useState({});
     const [search, setSearch] = useState('');
-    const [ordering, setOrdering] = useState('');
+    const [sortOrder, setSortOrder] = useState(''); // 'asc' or 'desc'
+    const [sortField, setSortField] = useState('');
     const [page, setPage] = useState(1);
     const [totalCount, setTotalCount] = useState(0);
     const [selectedIds, setSelectedIds] = useState([]);
     const [loading, setLoading] = useState(true);
     const [newItem, setNewItem] = useState(initialItem);
     const [addErrors, setAddErrors] = useState({});
-    const addModalRef = useRef();
+    const [showAddModal, setShowAddModal] = useState(false);
+    const [adding, setAdding] = useState(false);
     const inputRef = useRef();
 
     const totalPages = Math.ceil(totalCount / PAGE_SIZE);
@@ -40,7 +48,7 @@ const GenericList = ({
                     page,
                     page_size: PAGE_SIZE,
                     search,
-                    ordering: ordering || undefined,
+                    ordering: sortOrder === 'desc' ? `-${sortField}` : sortField,
                 },
             });
             const data = res.data;
@@ -53,10 +61,15 @@ const GenericList = ({
             setLoading(false);
         }
     };
+    useEffect(() => {
+        if (title) {
+            document.title = title.toUpperCase();
+        }
+    }, [title]);
 
     useEffect(() => {
         fetchItems();
-    }, [page, search, ordering]);
+    }, [page, search, sortField, sortOrder]);
 
     const validate = () => {
         const newErrors = validateItem(editedItem);
@@ -117,10 +130,20 @@ const GenericList = ({
     };
 
     const toggleSort = (field) => {
-        if (ordering === field) setOrdering(`-${field}`);
-        else if (ordering === `-${field}`) setOrdering('');
-        else setOrdering(field);
         setPage(1);
+        if (sortField === field) {
+            if (sortOrder === 'asc') {
+                setSortOrder('desc'); // Asc → Desc
+            } else if (sortOrder === 'desc') {
+                setSortField('');
+                setSortOrder('');     // Desc → None
+            } else {
+                setSortOrder('asc');  // None → Asc
+            }
+        } else {
+            setSortField(field);
+            setSortOrder('asc');      // New field → Asc
+        }
     };
 
     const toggleSelect = (id) => {
@@ -179,19 +202,23 @@ const GenericList = ({
 
     const handleAdd = async () => {
         if (!validateNew()) return;
+
+        setAdding(true); // Start loading
+
         try {
             const response = await axios.post(`/${resource}/`, newItem);
-            if (response.status === 201) {
-                toast.success('✅ Added');
-            } else {
-                toast.error('❌ Failed to add');
+
+            if (response.status !== 201) {
+                toast.error(`❌ Unexpected response (${response.status})`);
                 return;
             }
+
+            toast.success('✅ Added successfully');
             setNewItem(initialItem);
             setAddErrors({});
-            const modal = bootstrap.Modal.getInstance(addModalRef.current);
-            modal.hide();
+            setShowAddModal(false);
             fetchItems();
+
         } catch (err) {
             if (err.response?.data) {
                 const apiErrors = err.response.data;
@@ -199,206 +226,78 @@ const GenericList = ({
 
                 const nonFieldErrors = Object.entries(apiErrors)
                     .filter(([key]) => !fields.some((f) => f.name === key))
-                    .map(([_, val]) => (Array.isArray(val) ? val.join(', ') : val))
-                    .join('');
+                    .map(([_, val]) => Array.isArray(val) ? val.join(', ') : val)
+                    .join('; ');
 
-                if (nonFieldErrors) {
-                    toast.error(`❌ ${nonFieldErrors}`);
-                }
+                toast.error(nonFieldErrors || '❌ Please fix validation errors.');
             } else {
-                toast.error('❌ Failed to add');
+                toast.error(`❌ ${err.message || 'Failed to add item'}`);
             }
+        } finally {
+            setAdding(false); // Done loading
         }
     };
 
+
     return (
-        <div className="container py-4">
-            <div className="d-flex justify-content-between align-items-center mb-3">
-                <h3 className="fw-bold mb-0">📋 {title}</h3>
-                <button
-                    className="btn btn-primary btn-sm shadow-sm"
-                    data-bs-toggle="modal"
-                    data-bs-target="#addItemModal"
-                >
-                    ➕ Add
-                </button>
-            </div>
+        <Container className="mt-4">
+            <ListControls
+                title={title.toUpperCase()}
+                search={search}
+                setSearch={setSearch}
+                sortField={sortField}
+                sortOrder={sortOrder}
+                setSortField={setSortField}
+                setSortOrder={setSortOrder}
+                setPage={setPage}
+                selectedIds={selectedIds}
+                onDeleteSelected={deleteSelected}
+                onAddNewClick={() => setShowAddModal(true)}
+                onAddNew={false}
+            />
 
-            <div className="card card-body border-0 shadow-sm mb-3">
-                <div className="row row-cols-auto g-2 align-items-end">
-                    <div className="col">
-                        <input
-                            type="text"
-                            className="form-control form-control-sm"
-                            placeholder="🔍 Search..."
-                            value={search}
-                            onChange={(e) => {
-                                setSearch(e.target.value);
-                                setPage(1);
-                            }}
-                            onKeyUp={() => fetchItems()}
-                        />
-                    </div>
-                    {selectedIds.length > 0 && (
-                        <div className="col">
-                            <button className="btn btn-danger btn-sm" onClick={deleteSelected}>
-                                🗑️ Delete Selected ({selectedIds.length})
-                            </button>
-                        </div>
-                    )}
-                </div>
-            </div>
+            <GenericTable
+                loading={loading}
+                items={items}
+                fields={fields}
+                selectedIds={selectedIds}
+                editIndex={editIndex}
+                editedItem={editedItem}
+                errors={errors}
+                renderInput={renderInput}
+                renderField={renderField}
+                inputRef={inputRef}
+                sortField={sortField}
+                sortOrder={sortOrder}
+                toggleSort={toggleSort}
+                toggleSelect={toggleSelect}
+                toggleSelectAll={toggleSelectAll}
+                handleChange={handleChange}
+                handleSave={handleSave}
+                handleCancel={handleCancel}
+                handleEditClick={handleEditClick}
+                setEditedItem={setEditedItem}
+            />
 
-            {loading ? (
-                <p>Loading...</p>
-            ) : (
-                <table className="table table-sm table-hover table-striped align-middle">
-                    <thead className="table-light">
-                    <tr className="text-nowrap">
-                        <th>
-                            <div className="form-check form-switch">
-                                <input
-                                    type="checkbox"
-                                    className="form-check-input"
-                                    checked={items.length > 0 && items.every((c) => selectedIds.includes(c.id))}
-                                    onChange={toggleSelectAll}
-                                />
-                            </div>
-                        </th>
-                        {fields.map((f) => (
-                            <th
-                                key={f.name}
-                                style={{cursor: 'pointer'}}
-                                onClick={() => toggleSort(f.name)}
-                            >
-                                {f.label}
-                                {ordering === f.name ? ' ▲' : ordering === `-${f.name}` ? ' ▼' : ''}
-                            </th>
-                        ))}
-                        <th className="text-center">Actions</th>
-                    </tr>
-                    </thead>
-                    <tbody>
-                    {items.map((item, index) => (
-                        <tr key={item.id}>
-                            <td>
-                                <div className="form-check form-switch">
-                                    <input
-                                        type="checkbox"
-                                        className="form-check-input"
-                                        checked={selectedIds.includes(item.id)}
-                                        onChange={() => toggleSelect(item.id)}
-                                    />
-                                </div>
-                            </td>
-                            {fields.map((f) => (
-                                <td key={f.name}>
-                                    {editIndex === index ? (
-                                        renderInput[f.name] ? (
-                                            renderInput[f.name](editedItem[f.name], (val) =>
-                                                setEditedItem((prev) => ({...prev, [f.name]: val}))
-                                            )
-                                        ) : (
-                                            <>
-                                                <input
-                                                    ref={f.name === fields[0].name ? inputRef : null}
-                                                    type="text"
-                                                    name={f.name}
-                                                    className={`form-control form-control-sm ${errors[f.name] ? 'is-invalid' : ''}`}
-                                                    value={editedItem[f.name] || ''}
-                                                    onChange={handleChange}
-                                                />
-                                                {errors[f.name] && (
-                                                    <div className="invalid-feedback">{errors[f.name]}</div>
-                                                )}
-                                            </>
-                                        )
-                                    ) : renderField[f.name] ? (
-                                        renderField[f.name](item[f.name], item)
-                                    ) : (
-                                        item[f.name]
-                                    )}
-                                </td>
-                            ))}
-                            <td className="text-center">
-                                {editIndex === index ? (
-                                    <div className="d-flex gap-1 justify-content-center">
-                                        <button className="btn btn-success btn-sm" onClick={handleSave}>💾</button>
-                                        <button className="btn btn-outline-success btn-sm" onClick={handleCancel}>❌
-                                        </button>
-                                    </div>
-                                ) : (
-                                    <button className="btn btn-outline-primary btn-sm"
-                                            onClick={() => handleEditClick(index)}>
-                                        ✏️
-                                    </button>
-                                )}
-                            </td>
-                        </tr>
-                    ))}
-                    </tbody>
-                </table>
-            )}
 
-            <div className="d-flex justify-content-between align-items-center mt-3">
-                <span className="text-muted">Page {page} of {totalPages}</span>
-                <div className="btn-group btn-group-sm">
-                    <button
-                        className="btn btn-outline-success"
-                        disabled={page <= 1}
-                        onClick={() => setPage((p) => p - 1)}
-                    >
-                        ← Prev
-                    </button>
-                    <button
-                        className="btn btn-outline-success"
-                        disabled={page >= totalPages}
-                        onClick={() => setPage((p) => p + 1)}
-                    >
-                        Next →
-                    </button>
-                </div>
-            </div>
+            <PaginationControls
+                page={page}
+                totalPages={totalPages}
+                setPage={setPage}
+                loading={loading}
+            />
 
-            <div className="modal fade" id="addItemModal" tabIndex="-1" ref={addModalRef}>
-                <div className="modal-dialog modal-dialog-centered">
-                    <div className="modal-content">
-                        <div className="modal-header">
-                            <h5 className="modal-title">➕ Add</h5>
-                            <button type="button" className="btn-close" data-bs-dismiss="modal"/>
-                        </div>
-                        <div className="modal-body">
-                            {fields.map((f) => (
-                                <div className="mb-3" key={f.name}>
-                                    <label className="form-label">{f.label}</label>
-                                    {renderInput[f.name] ? (
-                                        renderInput[f.name](newItem[f.name], (val) =>
-                                            setNewItem((prev) => ({...prev, [f.name]: val}))
-                                        )
-                                    ) : (
-                                        <input
-                                            type="text"
-                                            className={`form-control ${addErrors[f.name] ? 'is-invalid' : ''}`}
-                                            value={newItem[f.name] || ''}
-                                            onChange={(e) =>
-                                                setNewItem((prev) => ({...prev, [f.name]: e.target.value}))
-                                            }
-                                        />
-                                    )}
-                                    {addErrors[f.name] && (
-                                        <div className="invalid-feedback">{addErrors[f.name]}</div>
-                                    )}
-                                </div>
-                            ))}
-                        </div>
-                        <div className="modal-footer">
-                            <button className="btn btn-success" data-bs-dismiss="modal">Cancel</button>
-                            <button className="btn btn-primary" onClick={handleAdd}>Add</button>
-                        </div>
-                    </div>
-                </div>
-            </div>
-        </div>
+            <AddItemModal
+                show={showAddModal}
+                handleClose={() => setShowAddModal(false)}
+                fields={fields}
+                newItem={newItem}
+                setNewItem={setNewItem}
+                addErrors={addErrors}
+                renderInput={renderInput}
+                handleAdd={handleAdd}
+                loading={adding}
+            /> </Container>
     );
 };
 
