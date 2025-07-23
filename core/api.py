@@ -19,7 +19,8 @@ class CompanyViewSet(viewsets.ModelViewSet):
     pagination_class = CustomPagination  # ✅ add this
     filter_backends = [filters.SearchFilter, filters.OrderingFilter]
     search_fields = ['iec', 'name']
-    ordering_fields = ['iec', 'name', 'address_line_1', 'address_line_2']
+    ordering_fields = ['iec', 'name']
+    ordering = ['-modified_on']  # Default: newest first
 
 
 class PortViewSet(viewsets.ModelViewSet):
@@ -29,6 +30,7 @@ class PortViewSet(viewsets.ModelViewSet):
     filter_backends = [filters.SearchFilter, filters.OrderingFilter]
     search_fields = ['code', 'name']
     ordering_fields = ['code', 'name']
+    ordering = ['-modified_on']  # Default: newest first
 
 
 class ItemHeadViewSet(viewsets.ModelViewSet):
@@ -38,6 +40,7 @@ class ItemHeadViewSet(viewsets.ModelViewSet):
     filter_backends = [filters.SearchFilter, filters.OrderingFilter]  # ✅ add this
     search_fields = ['name']
     ordering_fields = ['name']
+    ordering = ['-modified_on']  # Default: newest first
 
 
 class ItemNameViewSet(viewsets.ModelViewSet):
@@ -47,6 +50,7 @@ class ItemNameViewSet(viewsets.ModelViewSet):
     filter_backends = [filters.SearchFilter, filters.OrderingFilter]  # ✅
     search_fields = ['name']
     ordering_fields = ['name']
+    ordering = ['-modified_on']  # Default: newest first
 
 
 class HSCodeViewSet(viewsets.ModelViewSet):
@@ -55,7 +59,8 @@ class HSCodeViewSet(viewsets.ModelViewSet):
     pagination_class = CustomPagination  # ✅
     filter_backends = [filters.SearchFilter, filters.OrderingFilter]  # ✅
     search_fields = ['hs_code', 'product_description']
-    ordering_fields = ['hs_code']
+    ordering_fields = ['hs_code', 'product_description']
+    ordering = ['-modified_on']  # Default: newest first
 
 
 class SionNormClassViewSet(viewsets.ModelViewSet):
@@ -69,9 +74,9 @@ class SionNormClassViewSet(viewsets.ModelViewSet):
         filters.OrderingFilter
     ]
     filterset_class = SionNormClassFilter
-    filterset_fields = ['norm_class', 'head_norm', 'export_norm__description', 'import_norm__description']  # ✅
+    filterset_fields = ['head_norm']  # ✅
 
-    search_fields = ['norm_class', 'description']
+    search_fields = ['norm_class', 'description', 'export_norm__description', 'import_norm__description']
     ordering_fields = ['norm_class']
     ordering = ['-modified_on']  # Default: newest first
 

@@ -27,7 +27,7 @@ class CompanyFilter(django_filters.FilterSet):
 class SionNormClassFilter(django_filters.FilterSet):
     class Meta:
         model = core_models.SionNormClassModel
-        fields = ('norm_class', 'description')
+        fields = ('norm_class', 'description', 'head_norm')
         filter_overrides = {
             models.CharField: {
                 'filter_class': django_filters.CharFilter,
