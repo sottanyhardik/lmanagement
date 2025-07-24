@@ -1,15 +1,19 @@
 import React, {useContext} from 'react';
+import {Container} from 'react-bootstrap'; // ✅ FIXED: Missing import
 import AuthContext from '../../context/AuthContext.jsx';
 import './Dashboard.css';
+import ListControls from "../../components/ListControls";
 
 const Dashboard = () => {
-    const {user} = useContext(AuthContext);
+    const {username} = useContext(AuthContext);
 
     return (
-        <div className="dashboard">
-            <h1>Welcome, {user?.username}!</h1>
-            <p>This is your dashboard.</p>
-        </div>
+        <Container className="mt-4">
+            <ListControls
+                title="📋 Dashboard"
+                onlyHeader={false} // ✅ Optional: Set to true if you want only title
+            />
+        </Container>
     );
 };
 

@@ -63,6 +63,7 @@ const IcegateCaptchaForm = () => {
         <Container className="mt-4">
             <ListControls
                 title="📋 ICEGATE CAPTCHA"
+                onlyHeader={false}
             />
 
             {loading ? (

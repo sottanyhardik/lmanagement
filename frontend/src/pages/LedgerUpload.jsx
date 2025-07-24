@@ -35,6 +35,7 @@ const LedgerUpload = () => {
         <Container className="mt-4">
             <ListControls
                 title="📤 Upload Ledger CSV"
+                onlyHeader={false}
             />
 
             <Card className="mt-4">

@@ -4,6 +4,7 @@ import {FaPlus} from 'react-icons/fa';
 
 const ListControls = ({
                           title = 'List',
+                          onlyHeader = true,
                           search,
                           setSearch,
                           sortField,
@@ -37,7 +38,7 @@ const ListControls = ({
             </h2>
 
             {/* Controls */}
-            {search && (
+            {onlyHeader && (
                 <div
                     className="d-flex flex-wrap justify-content-start justify-content-md-end align-items-center gap-2 w-100 w-md-auto">
                     <input
