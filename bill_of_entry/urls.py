@@ -1,9 +1,16 @@
 from django.contrib.auth.decorators import login_required
-from django.urls import path
+from django.urls import path, include
+from rest_framework.routers import DefaultRouter
 
 from . import views
+from .api import BillOfEntryViewSet
+
+router = DefaultRouter()
+router.register(r'bill-of-entries', BillOfEntryViewSet, basename='bill-of-entry')
 
 urlpatterns = [
+    path('api/', include(router.urls)),
+
     path('', login_required(views.BillOfEntryView.as_view()), name='bill-of-entry-list'),
     path('ajax/', login_required(views.BillOfEntryAjaxListView.as_view()), name='bill-of-entry-ajax-list'),
     path('add', login_required(views.BillOfEntryCreateView.as_view()), name='bill-of-entry-create'),
