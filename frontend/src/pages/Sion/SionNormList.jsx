@@ -190,7 +190,7 @@ const SionNormList = () => {
     return (
         <Container className="mt-4">
             <ListControls
-                title="SION Norms"
+                title="📋 SION Norms"
                 search={searchQuery}
                 setSearch={setSearchQuery}
                 filters={[

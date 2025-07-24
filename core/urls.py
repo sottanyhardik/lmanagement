@@ -4,7 +4,7 @@ from rest_framework.routers import DefaultRouter
 
 from . import views
 from .api import CompanyViewSet, PortViewSet, ItemHeadViewSet, ItemNameViewSet, HSCodeViewSet, SionNormClassViewSet, \
-    HeadSIONNormsViewSet  # ✅
+    HeadSIONNormsViewSet, FetchBOEData, UploadLedgerAPIView  # ✅
 
 router = DefaultRouter()
 router.register(r'api/companies', CompanyViewSet, basename='company')
@@ -16,14 +16,17 @@ router.register(r'api/sion-classes', SionNormClassViewSet, basename='sion_norms'
 router.register(r'api/head-norms', HeadSIONNormsViewSet, basename='head_norms')
 
 urlpatterns = [
+    path('api/iecgate/fetch', FetchBOEData.as_view(), name='fetch-boe-details'),
+    path('api/ledger/upload/', UploadLedgerAPIView.as_view(), name='upload-ledger-api'),
+
     # ex: /polls/
     path('', login_required(views.DashboardView.as_view()), name='dashboard'),
     path('company/add', login_required(views.CreateCompanyView.as_view()), name='company-add'),
     path('company/', login_required(views.ListCompanyView.as_view()), name='company-list'),
     path('company/<int:pk>/update/', login_required(views.UpdateCompanyView.as_view()), name='company-update'),
-    path('sion/', login_required(views.ListSionView.as_view()), name='sion-list'),
-    path('sion/<int:pk>/update/', login_required(views.UpdateSionView.as_view()), name='sion-update'),
-    path('sion/<int:pk>/', login_required(views.SionDetailView.as_view()), name='sion-detail'),
+    path('sion/', login_required(views.ListSionView.as_view()), name='Sion-list'),
+    path('sion/<int:pk>/update/', login_required(views.UpdateSionView.as_view()), name='Sion-update'),
+    path('sion/<int:pk>/', login_required(views.SionDetailView.as_view()), name='Sion-detail'),
     path('hs_code/add/', login_required(views.CreateHSNCodeView.as_view()), name='hs-code-add'),
     path('hs_code/', login_required(views.ListHSNView.as_view()), name='hs-code-list'),
     path('hs_code/<int:pk>/update/', login_required(views.UpdateHSNCodeView.as_view()), name='hs-code-update'),
@@ -37,4 +40,4 @@ urlpatterns = [
     path('api/update-license-transfer/', views.save_license_transfer, name='save_license_transfer'),
 ]
 
-urlpatterns = router.urls
+urlpatterns = router.urls + urlpatterns

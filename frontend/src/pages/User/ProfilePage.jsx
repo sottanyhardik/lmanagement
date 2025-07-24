@@ -1,7 +1,7 @@
 // src/pages/ProfilePage.jsx
-import GenericForm from '../../layouts/GenericForm';
+import GenericForm from '../../layouts/GenericForm.jsx';
 import {useContext} from 'react';
-import AuthContext from '../../context/AuthContext';
+import AuthContext from '../../context/AuthContext.jsx';
 
 const ProfilePage = () => {
     const {authTokens} = useContext(AuthContext);

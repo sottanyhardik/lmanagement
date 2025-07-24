@@ -75,18 +75,19 @@ const Navbar = () => {
                                     className="me-2"/> Item Name</NavLink></li>
 
                                 <li><NavLink className="dropdown-item" to="/master/sion"><FaListAlt
-                                    className="me-2"/> SION Norms</NavLink></li>
+                                    className="me-2"/>Sion Norms</NavLink>
+                                </li>
                             </ul>
                         </li>
 
                         <li className="nav-item dropdown">
-              <span className="nav-link dropdown-toggle" data-bs-toggle="dropdown">
-                <FaBoxes className="me-2"/> Additional
-              </span>
+                              <span className="nav-link dropdown-toggle" data-bs-toggle="dropdown">
+                                <FaBoxes className="me-2"/> Additional
+                              </span>
                             <ul className="dropdown-menu">
-                                <li><NavLink className="dropdown-item" to="/upload-ledger"><FaFileUpload
+                                <li><NavLink className="dropdown-item" to="/addtional/ledger"><FaFileUpload
                                     className="me-2"/> Upload Ledger</NavLink></li>
-                                <li><NavLink className="dropdown-item" to="/fetch-boe"><FaDownload
+                                <li><NavLink className="dropdown-item" to="/addtional/fetch-boe"><FaDownload
                                     className="me-2"/> Fetch BOE</NavLink></li>
                             </ul>
                         </li>

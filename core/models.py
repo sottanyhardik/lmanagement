@@ -126,7 +126,7 @@ class SionNormClassModel(AuditModel):
     head_norm = models.ForeignKey('core.HeadSIONNormsModel', on_delete=models.CASCADE, related_name='sion_head')
     description = models.CharField(max_length=255)
     norm_class = models.CharField(max_length=10, unique=True)
-    
+
     def __str__(self):
         if self.description:
             return "{0} | {1}".format(self.norm_class, self.description)
@@ -134,7 +134,7 @@ class SionNormClassModel(AuditModel):
             return "{0}".format(self.norm_class)
 
     def get_absolute_url(self):
-        return reverse('sion-detail', kwargs={'pk': self.pk})
+        return reverse('Sion-detail', kwargs={'pk': self.pk})
 
 
 class SIONExportModel(models.Model):

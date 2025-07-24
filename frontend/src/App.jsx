@@ -1,20 +1,23 @@
 import React, {useContext} from 'react';
 import {Navigate, Route, Routes} from 'react-router-dom';
 import MainLayout from './layouts/MainLayout';
-import LoginForm from './components/Login/LoginForm';
-import ForgotPassword from './components/Login/ForgotPassword';
-import ResetPassword from './components/Login/ResetPassword';
-import Dashboard from './components/Dashboard/Dashboard';
+import LoginForm from './pages/Login/LoginForm';
+import ForgotPassword from './pages/Login/ForgotPassword';
+import ResetPassword from './pages/Login/ResetPassword';
+import Dashboard from './pages/Dashboard/Dashboard';
 import PrivateRoute from './routes/PrivateRoute';
-import Logout from './components/Login/Logout.jsx';
-import EditUser from './components/User/EditUser';
-import ProfilePage from './components/User/ProfilePage';
+import Logout from './pages/Login/Logout.jsx';
+import EditUser from './pages/User/EditUser';
+import ProfilePage from './pages/User/ProfilePage';
 import CompanyList from './pages/CompanyList';
 import PortList from './pages/PortList';
 import ItemNameList from './pages/ItemNameList';
 import ItemHeadList from './pages/ItemHeadList';
 import HSCodeList from './pages/HSCodeList';
-import SionNormList from './pages/sion/SionNormList.jsx';
+import SionNormList from './pages/Sion/SionNormList.jsx';
+
+import IcegateCaptchaForm from './pages/IcegateCaptchaForm.jsx';
+import LedgerUpload from './pages/LedgerUpload.jsx';
 import AuthContext from '../src/context/AuthContext';
 import {ToastContainer} from 'react-toastify';
 import 'react-toastify/dist/ReactToastify.css';
@@ -108,6 +111,23 @@ function App() {
                             </PrivateRoute>
                         }
                     />
+                    <Route
+                        path="/addtional/fetch-boe"
+                        element={
+                            <PrivateRoute>
+                                <IcegateCaptchaForm/>
+                            </PrivateRoute>
+                        }
+                    />
+                    <Route
+                        path="/addtional/ledger"
+                        element={
+                            <PrivateRoute>
+                                <LedgerUpload/>
+                            </PrivateRoute>
+                        }
+                    />
+
                 </Route>
             </Routes>
             <ToastContainer position="top-right" autoClose={3000}/>

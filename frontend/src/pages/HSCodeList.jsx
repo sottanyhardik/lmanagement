@@ -25,7 +25,7 @@ const initialItem = {
 const HSCodeList = () => (
     <GenericList
         resource="api/hs-codes"
-        title="HS Code List"
+        title="📋 HS Code List"
         fields={fields}
         validateItem={validateHSCode}
         initialItem={initialItem}

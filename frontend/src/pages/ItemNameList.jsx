@@ -81,7 +81,7 @@ const ItemNameList = () => {
     return (
         <GenericList
             resource="api/item-names"
-            title="Item Names"
+            title="📋 Item Names"
             fields={fields}
             validateItem={validateItemName}
             initialItem={initialItem}

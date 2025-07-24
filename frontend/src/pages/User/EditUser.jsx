@@ -1,6 +1,6 @@
 import {useContext} from 'react';
-import AuthContext from '../../context/AuthContext';
-import GenericProfileForm from '../../layouts/GenericForm';
+import AuthContext from '../../context/AuthContext.jsx';
+import GenericProfileForm from '../../layouts/GenericForm.jsx';
 
 const ViewProfile = () => {
     const {user, authTokens} = useContext(AuthContext);

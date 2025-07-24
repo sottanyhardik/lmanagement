@@ -1,6 +1,15 @@
 import datetime
 
 
+def parse_date(date_str):
+    for fmt in ("%d/%m/%Y", "%d/%m/%y"):
+        try:
+            return datetime.datetime.strptime(date_str, fmt)
+        except ValueError:
+            continue
+    return None  # or raise error if needed
+
+
 def parse_license_data(rows):
     """
     Parses a list of rows (from CSV or OCR extraction) into structured dict_list based on license groupings.
@@ -18,22 +27,22 @@ def parse_license_data(rows):
             continue
 
         # Detect start of new license block
-        if row[0] == "Regn.No.":
+        if row[0].strip() == "Regn.No.":
             if current:
                 dict_list.append(current)
             if len(row[5]) == 9:
                 row[5] = "0" + row[5]
             current = {
-                "ledger_date":datetime.datetime.now().date(),
+                "ledger_date": datetime.datetime.now().date(),
                 "registration_no": row[1],
                 "registration_date": row[3],
                 "lic_no": row[5],
                 "lic_date": row[7],
-                "row":[]
+                "row": []
             }
-        elif row[0] == "RA No.":
+        elif row[0].strip() == "RA No.":
             current["port"] = row[5]
-        elif row[0] == "IEC":
+        elif row[0].strip() == "IEC":
             if len(row[1]) == 9:
                 row[1] = "0" + row[1]
             current["iec"] = row[1]
@@ -41,12 +50,12 @@ def parse_license_data(rows):
             current["notification"] = row[5]
             current["foregin_currency"] = row[7]
 
-        elif row[0].lower() == "tot.duty":
+        elif row[0].lower().strip() == "tot.duty":
             current["cif_inr"] = float(row[3]) if row[3] else 0
-            current["total_quantity"]= float(row[5]) if row[5] else 0
-            current["cif_fc"]= float(row[7]) if row[7] else 0
+            current["total_quantity"] = float(row[5]) if row[5] else 0
+            current["cif_fc"] = float(row[7]) if row[7] else 0
 
-        elif row[0] and row[0].lower() in ["credit-", "debit-"]:
+        elif row[0] and row[0].lower().strip() in ["credit-", "debit-"]:
             if row[0].lower() == 'credit-':
                 txn = {
                     "type": 'C',
@@ -67,7 +76,7 @@ def parse_license_data(rows):
                     "cif_fc": float(row[4]) if row[4] else 0,
                     "qty": float(row[5]) if row[5] else 0,
                     "be_number": row[7] if len(row) > 5 else None,
-                    "be_date": datetime.datetime.strptime(row[8], "%d/%m/%Y") if len(row) > 6 else None,
+                    "be_date": parse_date(row[8]) if len(row) > 8 else None,
                     "port": row[9] if len(row) > 7 else None
                 }
             current["row"].append(txn)

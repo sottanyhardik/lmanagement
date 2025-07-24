@@ -1,6 +1,6 @@
 // src/pages/auth/Logout.jsx
 import {useContext, useEffect} from 'react';
-import AuthContext from '../../context/AuthContext';
+import AuthContext from '../../context/AuthContext.jsx';
 
 const Logout = () => {
     const {logoutUser} = useContext(AuthContext);

@@ -29,7 +29,7 @@ const PortList = () => {
     return (
         <GenericList
             resource="api/ports" // your Django API endpoint should be `/api/ports/`
-            title="Port List"
+            title="📋 Port List"
             fields={fields}
             validateItem={validatePort}
             initialItem={initialItem}

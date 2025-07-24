@@ -27,7 +27,7 @@ const CompanyList = () => {
     return (
         <GenericList
             resource="api/companies"
-            title="Company List"
+            title="📋 Company List"
             fields={fields}
             initialItem={initialItem}
             validateItem={validateCompany}

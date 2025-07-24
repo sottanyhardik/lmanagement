@@ -1,6 +1,6 @@
 import {useContext, useState} from 'react';
 import {toast} from 'react-toastify';
-import AuthContext from '../../context/AuthContext';
+import AuthContext from '../../context/AuthContext.jsx';
 import './LoginPage.css';
 
 const LoginForm = () => {

@@ -153,7 +153,7 @@
                             </a>
                             <div class="dropdown-menu dropdown-menu-right navbar-dropdown preview-list"
                                  aria-labelledby="nreportDropdown">
-                                <a href="{% url 'sion-list' %}" class="dropdown-item">
+                                <a href="{% url 'Sion-list' %}" class="dropdown-item">
                                     <i class="mdi mdi-arrange-send-to-back text-primary"></i>
                                     SION
                                 </a>
@@ -306,8 +306,7 @@
         var form = $(button).closest("form");
         try {
             boe = form.serializeArray()[2]['value']
-        }
-        catch(err) {
+        } catch (err) {
             console.log(err.message);
         }
         target_div = button.dataset.target;
@@ -319,7 +318,7 @@
                 xhr.setRequestHeader("X-CSRFToken", getCookie("csrftoken"));
             },
             success: function (data) {
-                if (data.url != undefined){
+                if (data.url != undefined) {
                     window.location.href = data.url;
                 }
                 if (target_div.indexOf("card") >= 0) {

@@ -39,7 +39,7 @@ const initialItem = {
 const ItemHeadList = () => (
     <GenericList
         resource="api/item-heads"
-        title="Item Heads"
+        title="📋 Item Heads"
         fields={fields}
         validateItem={validateItemHead}
         initialItem={initialItem}
