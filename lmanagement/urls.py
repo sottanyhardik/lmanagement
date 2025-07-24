@@ -24,7 +24,7 @@ urlpatterns = [
                   path('', include('core.urls')),
                   path('', include('accounts.urls')),
                   path('license/', include('license.urls')),
-                  path('allotment/', include('allotment.urls')),
+                  path('', include('allotment.urls')),
                   path('', include('bill_of_entry.urls')),
                   path('admin/', admin.site.urls),
                   path('select2/', include('django_select2.urls')),

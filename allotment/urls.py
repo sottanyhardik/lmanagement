@@ -1,7 +1,14 @@
 from django.contrib.auth.decorators import login_required
 from django.urls import path
+# urls.py
+from rest_framework.routers import DefaultRouter
+
 from . import views
+from .api import AllotmentOptionViewSet
 from .views import AllotmentCopyView
+
+router = DefaultRouter()
+router.register(r'api/option-allotments', AllotmentOptionViewSet, basename='allotment')
 
 urlpatterns = [
     # ex: /polls/
@@ -11,13 +18,17 @@ urlpatterns = [
     path('', login_required(views.AllotmentView.as_view()), name='allotment-list'),
     path('<int:pk>/update', login_required(views.AllotmentUpdateView.as_view()), name='allotment-update'),
     path('<int:pk>/delete', login_required(views.AllotmentDeleteView.as_view()), name='allotment-delete'),
-    path('<int:pk>/item/delete', login_required(views.AllotmentDeleteItemsView.as_view()), name='allotment-item-delete'),
+    path('<int:pk>/item/delete', login_required(views.AllotmentDeleteItemsView.as_view()),
+         name='allotment-item-delete'),
     path('<int:pk>/verify', login_required(views.AllotmentVerifyView.as_view()), name='allotment-verify'),
     path('<int:pk>/data/', login_required(views.allotment_data), name='allotment-data'),
     path('<int:pk>/download/', login_required(views.SendAllotmentView.as_view()), name='allotment-download'),
     path('download/', login_required(views.DownloadPendingAllotmentView.as_view()), name='allotment-pending'),
     path('<int:pk>/generate/', login_required(views.ARODocumentGenerateView.as_view()), name='allotment-generate-aro'),
     path('<int:pk>/tl/', login_required(views.GenerateTransferLetterView.as_view()), name='allotment-tl'),
-    path('pdownload/', login_required(views.PandasDownloadPendingAllotmentView.as_view()), name='allotment-pending-pandas'),
+    path('pdownload/', login_required(views.PandasDownloadPendingAllotmentView.as_view()),
+         name='allotment-pending-pandas'),
     path('copy_allotment/<int:pk>/', AllotmentCopyView.as_view(), name='copy_allotment'),
 ]
+
+urlpatterns = router.urls + urlpatterns

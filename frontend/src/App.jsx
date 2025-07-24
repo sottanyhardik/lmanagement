@@ -14,7 +14,8 @@ import PortList from './pages/PortList';
 import ItemNameList from './pages/ItemNameList';
 import ItemHeadList from './pages/ItemHeadList';
 import HSCodeList from './pages/HSCodeList';
-import SionNormList from './pages/Sion/SionNormList.jsx';
+import SionNormList from './pages/Sion/SionNormList';
+import BillOfEntryList from './pages/BillOfEntry/BillOfEntryList'
 
 import IcegateCaptchaForm from './pages/IcegateCaptchaForm.jsx';
 import LedgerUpload from './pages/LedgerUpload.jsx';
@@ -124,6 +125,14 @@ function App() {
                         element={
                             <PrivateRoute>
                                 <LedgerUpload/>
+                            </PrivateRoute>
+                        }
+                    />
+                    <Route
+                        path="/bill-of-entry"
+                        element={
+                            <PrivateRoute>
+                                <BillOfEntryList/>
                             </PrivateRoute>
                         }
                     />

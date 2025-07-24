@@ -1,5 +1,7 @@
 from rest_framework import serializers
 
+from allotment.serializers import AllotmentOptionSerializer
+from core.serializers import PortOptionSerializer, CompanyOptionSerializer
 from .models import BillOfEntryModel, RowDetails
 
 
@@ -16,12 +18,15 @@ class RowDetailsSerializer(serializers.ModelSerializer):
 
 class BillOfEntrySerializer(serializers.ModelSerializer):
     item_details = RowDetailsSerializer(many=True)
+    port = PortOptionSerializer()
+    company = CompanyOptionSerializer()
+    allotment = AllotmentOptionSerializer(many=True)
 
     class Meta:
         model = BillOfEntryModel
         fields = [
             'id', 'company', 'bill_of_entry_number', 'bill_of_entry_date', 'port',
-            'exchange_rate', 'product_name', 'invoice_no',
+            'exchange_rate', 'product_name', 'allotment', 'invoice_no',
             'item_details', 'get_total_inr', 'get_total_fc', 'get_total_quantity',
             'get_unit_price', 'get_exchange_rate', 'get_licenses'
         ]

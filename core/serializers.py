@@ -4,6 +4,20 @@ from .models import CompanyModel, PortModel, ItemHeadModel, ItemNameModel, HSCod
     SIONExportModel, SionNormClassModel, HeadSIONNormsModel
 
 
+# ports/serializers.py
+class PortOptionSerializer(serializers.ModelSerializer):
+    class Meta:
+        model = PortModel
+        fields = ['id', 'code', 'name']
+
+
+# companies/serializers.py
+class CompanyOptionSerializer(serializers.ModelSerializer):
+    class Meta:
+        model = CompanyModel
+        fields = ['id', 'name']
+
+
 class CompanySerializer(serializers.ModelSerializer):
     class Meta:
         model = CompanyModel
