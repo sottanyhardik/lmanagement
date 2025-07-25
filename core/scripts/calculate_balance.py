@@ -9,7 +9,8 @@ def calculate_available_quantity(instance):
     if instance.item and instance.item.head and instance.item.head.is_restricted:
         if instance.old_quantity or instance.license.notification_number == N2015:
             credit = instance.old_quantity or instance.quantity
-    value = round_down(float(credit) - calculate_debited_quantity(instance) - calculate_allotted_quantity(instance), 0)
+    value = round_down(float(credit) - float(calculate_debited_quantity(instance)) - float(calculate_allotted_quantity(
+        instance)))
     return max(round(value, 2), 0)
 
 

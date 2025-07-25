@@ -15,15 +15,23 @@ const loadOptions = async (inputValue) => {
 };
 
 const AsyncAllotmentSelect = ({value, onChange, isMulti = true}) => {
-    const handleChange = (selected) => {
-        onChange(selected?.map(s => s.data));
-    };
-
-    const defaultValue = (value || []).map(v => ({
+    const toOption = (v) => ({
         value: v.id,
         label: `${v.invoice} - ${v.item_name} - ${v.required_quantity} - ${v.company?.name}`,
         data: v
-    }));
+    });
+
+    const defaultValue = isMulti
+        ? (value || []).map(toOption)
+        : value ? toOption(value) : null;
+
+    const handleChange = (selected) => {
+        if (isMulti) {
+            onChange((selected || []).map(s => s.data));
+        } else {
+            onChange(selected?.data || null);
+        }
+    };
 
     return (
         <AsyncSelect
@@ -31,8 +39,8 @@ const AsyncAllotmentSelect = ({value, onChange, isMulti = true}) => {
             defaultOptions
             loadOptions={loadOptions}
             isMulti={isMulti}
-            onChange={handleChange}
             value={defaultValue}
+            onChange={handleChange}
             getOptionLabel={(e) => e.label}
         />
     );

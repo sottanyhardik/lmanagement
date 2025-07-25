@@ -1,0 +1,8 @@
+.sticky-header {
+    position: sticky;
+    top: 60px; /* adjust based on your navbar height */
+    z-index: 5;
+    background-color: #f8f9fa;
+    padding: 8px 12px;
+    border-bottom: 1px solid #ccc;
+}

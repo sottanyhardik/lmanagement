@@ -8,6 +8,8 @@ from django.dispatch import receiver
 from django.urls import reverse
 from django.utils.functional import cached_property
 
+from core.models import AuditModel
+
 Credit = 'C'
 Debit = 'D'
 TYPE_CHOICES = (
@@ -23,7 +25,7 @@ ROW_TYPE = (
 )
 
 
-class BillOfEntryModel(models.Model):
+class BillOfEntryModel(AuditModel):
     company = models.ForeignKey(
         'core.CompanyModel', related_name="bill_of_entry", on_delete=models.CASCADE,
         null=True, blank=True
@@ -103,7 +105,7 @@ class BillOfEntryModel(models.Model):
         return 0
 
 
-class RowDetails(models.Model):
+class RowDetails(AuditModel):
     bill_of_entry = models.ForeignKey(
         BillOfEntryModel, on_delete=models.CASCADE,
         related_name='item_details', null=True, blank=True

@@ -1,11 +1,12 @@
 from django.db import models
-
 # Create your models here.
 from django.db.models import Sum
 from django.db.models.signals import post_save, post_delete
 from django.dispatch import receiver
 from django.urls import reverse
 from django.utils.functional import cached_property
+
+from core.models import AuditModel
 
 Credit = 'C'
 Debit = 'D'
@@ -24,7 +25,7 @@ ROW_TYPE = (
 )
 
 
-class AllotmentModel(models.Model):
+class AllotmentModel(AuditModel):
     company = models.ForeignKey('core.CompanyModel', related_name='company_allotments', on_delete=models.CASCADE)
     type = models.CharField(max_length=2, choices=ROW_TYPE, default=ALLOTMENT)
     required_quantity = models.FloatField(default=0)
@@ -39,16 +40,9 @@ class AllotmentModel(models.Model):
                              related_name="allotments")
     related_company = models.ForeignKey('core.CompanyModel', related_name='related_company', on_delete=models.CASCADE,
                                         null=True, blank=True)
-    created_on = models.DateField(auto_created=True, null=True, blank=True)
-    created_by = models.ForeignKey('auth.User', on_delete=models.CASCADE, null=True, blank=True,
-                                   related_name='allotment_created')
-    modified_on = models.DateField(auto_now=True)
-    modified_by = models.ForeignKey('auth.User', on_delete=models.CASCADE, null=True, blank=True,
-                                    related_name='allotment_updated')
 
     class Meta:
         ordering = ['estimated_arrival_date', ]
-
 
     def __str__(self):
         if self.invoice:
@@ -92,7 +86,7 @@ class AllotmentModel(models.Model):
             return 0
 
 
-class AllotmentItems(models.Model):
+class AllotmentItems(AuditModel):
     item = models.ForeignKey('license.LicenseImportItemsModel', on_delete=models.CASCADE,
                              related_name='allotment_details', null=True, blank=True)
     allotment = models.ForeignKey('allotment.AllotmentModel', on_delete=models.CASCADE,
@@ -117,7 +111,6 @@ class AllotmentItems(models.Model):
     @cached_property
     def ledger(self):
         return self.item.license.ledger_date
-
 
     @cached_property
     def product_description(self):

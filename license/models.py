@@ -156,7 +156,7 @@ class LicenseDetailsModel(models.Model):
         allotment = AllotmentItems.objects.filter(item__license=self,
                                                   allotment__bill_of_entry__bill_of_entry_number__isnull=True).aggregate(
             Sum('cif_fc'))['cif_fc__sum'] or 0
-        return round_down(credit - (debit + allotment),2)
+        return round_down(float(credit) - (float(debit) + float(allotment)), 2)
 
     def get_party_name(self):
         return str(self.exporter)[:8]
@@ -492,11 +492,11 @@ class LicenseDetailsModel(models.Model):
             rbd_cif = 0
         else:
             rbd_cif = oil_types['rbd_oil'][1]
-        oil_data = allocate_priority_oils_with_min_pomace(total_oil_available,available_value,
-                                             olive_cif=olive_cif,
-                                             rbd_cif=rbd_cif,
-                                             pomace_cif=pomace_cif,
-                                             pko_cif=pko_cif)
+        oil_data = allocate_priority_oils_with_min_pomace(total_oil_available, available_value,
+                                                          olive_cif=olive_cif,
+                                                          rbd_cif=rbd_cif,
+                                                          pomace_cif=pomace_cif,
+                                                          pko_cif=pko_cif)
         # Ensure oil CIF values are calculated correctly
         if oil_data.get('Total_CIF'):
             available_value = self.use_balance_cif(oil_data.get('Total_CIF'), available_value)
@@ -517,7 +517,7 @@ class LicenseDetailsModel(models.Model):
             oil_data['cif_olive_oil'] = float(olive_cif) * float(total_oil_available)
             if pko_cif and oil_data['cif_olive_oil'] > float(available_value):
                 oil_data['pko_oil'] = total_oil_available
-                oil_data['cif_pko_oil'] = min(float(pko_cif) * float(total_oil_available),oil_data.get('Total_CIF'))
+                oil_data['cif_pko_oil'] = min(float(pko_cif) * float(total_oil_available), oil_data.get('Total_CIF'))
                 if oil_data['cif_pko_oil'] <= 0:
                     oil_data['pko_oil'] = 0
                 oil_data['olive_oil'] = 0
@@ -525,7 +525,7 @@ class LicenseDetailsModel(models.Model):
                 available_value = self.use_balance_cif(oil_data['cif_pko_oil'], available_value)
             elif rbd_cif and oil_data['cif_olive_oil'] > float(available_value):
                 oil_data['rbd_oil'] = total_oil_available
-                oil_data['cif_rbd_oil'] = min(float(rbd_cif) * float(total_oil_available),oil_data.get('Total_CIF'))
+                oil_data['cif_rbd_oil'] = min(float(rbd_cif) * float(total_oil_available), oil_data.get('Total_CIF'))
                 if oil_data['cif_rbd_oil'] <= 0:
                     oil_data['rbd_oil'] = 0
                 available_value = self.use_balance_cif(oil_data['cif_rbd_oil'], available_value)
@@ -691,6 +691,7 @@ class LicenseDetailsModel(models.Model):
             return "Current Owner is {}".format(self.current_owner.name)
         else:
             return "Data Not Found"
+
 
 KG = 'kg'
 
@@ -858,27 +859,29 @@ class LicenseImportItemsModel(models.Model):
         dict_list = []
         dict_return = {}
         data = self.allotment_details.filter(is_boe=False).order_by('allotment__company',
-                                          'allotment__modified_on')
+                                                                    'allotment__modified_on')
         company_data = list(set([c['allotment__company__name'] for c in
                                  self.allotment_details.filter(is_boe=False).order_by('allotment__company',
-                                                            'allotment__modified_on','allotment__unit_value_per_unit').values(
+                                                                                      'allotment__modified_on',
+                                                                                      'allotment__unit_value_per_unit').values(
                                      'allotment__company__name')]))
         for company in company_data:
             if company:
                 if not company in list(dict_return.keys()):
                     dict_return[company] = {}
                 dict_return[company]['company'] = company
-                dict_return[company]['data_list'] = data.filter(allotment__company__name=company,is_boe=False)
-                dict_return[company]['sum_total_qty'] = data.filter(allotment__company__name=company,is_boe=False).aggregate(
+                dict_return[company]['data_list'] = data.filter(allotment__company__name=company, is_boe=False)
+                dict_return[company]['sum_total_qty'] = data.filter(allotment__company__name=company,
+                                                                    is_boe=False).aggregate(
                     Sum('qty')).get('qty__sum', 0.00)
-                dict_return[company]['sum_total_cif_fc'] = data.filter(allotment__company__name=company,is_boe=False).aggregate(
+                dict_return[company]['sum_total_cif_fc'] = data.filter(allotment__company__name=company,
+                                                                       is_boe=False).aggregate(
                     Sum('cif_fc')).get('cif_fc__sum', 0.00)
         for company in company_data:
             if company:
                 dict_list.append(dict_return[company])
         dict_return['item_details'] = dict_list
         return dict_return
-
 
     @cached_property
     def total_debited_qty(self):
@@ -1014,8 +1017,10 @@ class LicenseTransferModel(models.Model):
 
     transfer_date = models.DateField(null=True, blank=True)
 
-    from_company = models.ForeignKey('core.CompanyModel', on_delete=models.SET_NULL, null=True, blank=True, related_name='transfers_from')
-    to_company = models.ForeignKey('core.CompanyModel', on_delete=models.SET_NULL, null=True, blank=True, related_name='transfers_to')
+    from_company = models.ForeignKey('core.CompanyModel', on_delete=models.SET_NULL, null=True, blank=True,
+                                     related_name='transfers_from')
+    to_company = models.ForeignKey('core.CompanyModel', on_delete=models.SET_NULL, null=True, blank=True,
+                                   related_name='transfers_to')
 
     transfer_status = models.CharField(max_length=50)
     transfer_initiation_date = models.DateTimeField(null=True, blank=True)
@@ -1040,4 +1045,5 @@ class LicenseTransferModel(models.Model):
 
     def to_company_name(self):
         return self.to_company.name if self.to_company else "-"
+
     to_company_name.short_description = "To Company"

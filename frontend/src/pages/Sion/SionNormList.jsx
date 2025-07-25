@@ -237,7 +237,7 @@ const SionNormList = () => {
                     setSortOrder('');
                     setPage(1);
                 }}
-                extraFilters={[
+                Filters={[
                     <AsyncHeadNormSelect
                         key="head_norm"
                         value={filters.head_norm}
