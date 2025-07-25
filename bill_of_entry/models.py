@@ -1,4 +1,4 @@
-from decimal import Decimal
+from decimal import Decimal, DivisionByZero
 
 from django.core.validators import MinValueValidator
 from django.db import models
@@ -55,6 +55,19 @@ class BillOfEntryModel(AuditModel):
         ordering = ('-bill_of_entry_date',)
         verbose_name = "Bill of Entry"
         verbose_name_plural = "Bills of Entry"
+
+    def save(self, *args, **kwargs):
+        # Only calculate exchange rate if it's not explicitly set or is 0
+        if not self.exchange_rate or self.exchange_rate == Decimal('0.0000'):
+            try:
+                total_fc = self.get_total_fc
+                total_inr = self.get_total_inr
+                if total_fc > 0:
+                    calculated_rate = round(total_inr / total_fc, 4)
+                    self.exchange_rate = calculated_rate
+            except (ZeroDivisionError, DivisionByZero, TypeError):
+                self.exchange_rate = Decimal('0.0000')
+        super().save(*args, **kwargs)
 
     def __str__(self):
         return self.bill_of_entry_number

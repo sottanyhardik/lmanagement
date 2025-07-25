@@ -1,5 +1,5 @@
 // BillOfEntryForm.jsx
-import React, {useMemo, useState} from 'react';
+import React, {useMemo, useRef, useState} from 'react';
 import {Button, Col, Form, Row, Table} from 'react-bootstrap';
 import AsyncCompanySelect from './AsyncCompanySelect';
 import AsyncPortSelect from './AsyncPortSelect';
@@ -11,23 +11,48 @@ const BillOfEntryForm = ({entry, isNew = false, onClose, onSaved}) => {
     const [data, setData] = useState(entry);
     const [saving, setSaving] = useState(false);
     const [errors, setErrors] = useState({});
+    const [exchangeRateError, setExchangeRateError] = useState(false);
+    const exchangeRateRef = useRef();
 
     const handleChange = (field, value) => {
         setData(prev => ({...prev, [field]: value}));
         setErrors(prev => ({...prev, [field]: null}));
     };
 
-    const handleItemChange = (i, field, value) => {
-        const updated = [...data.item_details];
-        updated[i][field] = value;
-        setData(prev => ({...prev, item_details: updated}));
+    const handleItemChange = (index, field, value) => {
+        const updatedItems = [...data.item_details];
+        const item = {...updatedItems[index], [field]: value};
+        const rate = parseFloat(data.exchange_rate || 0);
+
+        if ((field === 'cif_fc' || field === 'cif_inr') && (!rate || rate <= 0)) {
+            toast.warning('Please enter a valid Exchange Rate first');
+            setExchangeRateError(true);
+            exchangeRateRef.current?.focus();
+            return;
+        }
+
+        if (field === 'cif_fc') {
+            const fc = parseFloat(value || 0);
+            item.cif_inr = (fc * rate).toFixed(2);
+        } else if (field === 'cif_inr') {
+            const inr = parseFloat(value || 0);
+            item.cif_fc = (inr / rate).toFixed(2);
+        }
+
+        updatedItems[index] = item;
+        setData(prev => ({...prev, item_details: updatedItems}));
     };
 
     const addItemRow = () => {
         setData(prev => ({
             ...prev,
             item_details: [...prev.item_details, {
-                sr_number: '', sr_number_display: '', transaction_type: 'D', qty: '', cif_fc: '', cif_inr: ''
+                sr_number: '',
+                sr_number_display: '',
+                transaction_type: 'D',
+                qty: '',
+                cif_fc: '',
+                cif_inr: ''
             }]
         }));
     };
@@ -80,7 +105,7 @@ const BillOfEntryForm = ({entry, isNew = false, onClose, onSaved}) => {
                 ...data,
                 port: data.port?.id,
                 company: data.company?.id,
-                allotment: data.allotment.map(a => a.id), // pass IDs
+                allotment: data.allotment.map(a => a.id),
             };
             if (isNew) {
                 await axios.post('/api/bill-of-entries/', payload);
@@ -102,7 +127,8 @@ const BillOfEntryForm = ({entry, isNew = false, onClose, onSaved}) => {
             <Row className="mb-3">
                 <Col md={3}>
                     <Form.Label>BOE Number</Form.Label>
-                    <Form.Control size="sm" value={data.bill_of_entry_number} isInvalid={!!errors.bill_of_entry_number}
+                    <Form.Control size="sm" value={data.bill_of_entry_number}
+                                  isInvalid={!!errors.bill_of_entry_number}
                                   onChange={(e) => handleChange('bill_of_entry_number', e.target.value)}/>
                     <Form.Control.Feedback type="invalid">{errors.bill_of_entry_number}</Form.Control.Feedback>
                 </Col>
@@ -134,21 +160,35 @@ const BillOfEntryForm = ({entry, isNew = false, onClose, onSaved}) => {
             <Row className="mb-3">
                 <Col md={4}>
                     <Form.Label>Invoice No</Form.Label>
-                    <Form.Control size="sm" value={data.invoice_no} isInvalid={!!errors.invoice_no}
+                    <Form.Control size="sm" value={data.invoice_no}
+                                  isInvalid={!!errors.invoice_no}
                                   onChange={(e) => handleChange('invoice_no', e.target.value)}/>
                     <Form.Control.Feedback type="invalid">{errors.invoice_no}</Form.Control.Feedback>
                 </Col>
                 <Col md={4}>
                     <Form.Label>Product Name</Form.Label>
-                    <Form.Control size="sm" value={data.product_name} isInvalid={!!errors.product_name}
+                    <Form.Control size="sm" value={data.product_name}
+                                  isInvalid={!!errors.product_name}
                                   onChange={(e) => handleChange('product_name', e.target.value)}/>
                     <Form.Control.Feedback type="invalid">{errors.product_name}</Form.Control.Feedback>
                 </Col>
                 <Col md={4}>
                     <Form.Label>Exchange Rate</Form.Label>
-                    <Form.Control size="sm" value={data.exchange_rate} isInvalid={!!errors.exchange_rate}
-                                  onChange={(e) => handleChange('exchange_rate', e.target.value)}/>
-                    <Form.Control.Feedback type="invalid">{errors.exchange_rate}</Form.Control.Feedback>
+                    <Form.Control
+                        size="sm"
+                        type="number"
+                        step="0.0001"
+                        value={data.exchange_rate}
+                        ref={exchangeRateRef}
+                        isInvalid={!!errors.exchange_rate || exchangeRateError}
+                        onChange={(e) => {
+                            setExchangeRateError(false);
+                            handleChange('exchange_rate', e.target.value);
+                        }}
+                    />
+                    <Form.Control.Feedback type="invalid">
+                        {errors.exchange_rate || 'Exchange rate is required'}
+                    </Form.Control.Feedback>
                 </Col>
             </Row>
 
@@ -172,17 +212,20 @@ const BillOfEntryForm = ({entry, isNew = false, onClose, onSaved}) => {
                             <Form.Control.Feedback type="invalid">{errors[`item_${idx}_sr`]}</Form.Control.Feedback>
                         </td>
                         <td>
-                            <Form.Control size="sm" value={item.qty} isInvalid={!!errors[`item_${idx}_qty`]}
+                            <Form.Control size="sm" value={item.qty}
+                                          isInvalid={!!errors[`item_${idx}_qty`]}
                                           onChange={(e) => handleItemChange(idx, 'qty', e.target.value)}/>
                             <Form.Control.Feedback type="invalid">{errors[`item_${idx}_qty`]}</Form.Control.Feedback>
                         </td>
                         <td>
-                            <Form.Control size="sm" value={item.cif_fc} isInvalid={!!errors[`item_${idx}_fc`]}
+                            <Form.Control size="sm" value={item.cif_fc}
+                                          isInvalid={!!errors[`item_${idx}_fc`]}
                                           onChange={(e) => handleItemChange(idx, 'cif_fc', e.target.value)}/>
                             <Form.Control.Feedback type="invalid">{errors[`item_${idx}_fc`]}</Form.Control.Feedback>
                         </td>
                         <td>
-                            <Form.Control size="sm" value={item.cif_inr} isInvalid={!!errors[`item_${idx}_inr`]}
+                            <Form.Control size="sm" value={item.cif_inr}
+                                          isInvalid={!!errors[`item_${idx}_inr`]}
                                           onChange={(e) => handleItemChange(idx, 'cif_inr', e.target.value)}/>
                             <Form.Control.Feedback type="invalid">{errors[`item_${idx}_inr`]}</Form.Control.Feedback>
                         </td>
@@ -201,11 +244,13 @@ const BillOfEntryForm = ({entry, isNew = false, onClose, onSaved}) => {
                 </tr>
                 </tbody>
             </Table>
+
             <Button size="sm" variant="outline-primary" onClick={addItemRow}>+ Add Item</Button>
 
             <div className="mt-3">
-                <Button variant="success" size="sm" onClick={save}
-                        disabled={saving}>{saving ? 'Saving...' : 'Save'}</Button>
+                <Button variant="success" size="sm" onClick={save} disabled={saving}>
+                    {saving ? 'Saving...' : 'Save'}
+                </Button>
                 {onClose && <Button variant="secondary" size="sm" className="ms-2" onClick={onClose}>Cancel</Button>}
             </div>
         </Form>
