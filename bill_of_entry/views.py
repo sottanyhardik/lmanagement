@@ -1,8 +1,8 @@
 # Create your views here.
+from datetime import date
 from decimal import Decimal
 
 from django.db.models import Q
-from django.http import JsonResponse, HttpResponse
 from django.http import HttpResponseRedirect
 from django.urls import reverse, reverse_lazy
 from django.views.generic import DetailView, FormView, DeleteView, UpdateView, CreateView
@@ -14,6 +14,7 @@ from extra_views import UpdateWithInlinesView, InlineFormSetFactory
 
 from allotment.forms import TlForm
 from bill_of_entry.models import RowDetails
+from core.utils import render_to_pdf
 from lmanagement.tasks import fetch_data_to_model
 from . import forms, tables, filters
 from . import models as bill_of_entry
@@ -179,7 +180,7 @@ class DownloadPendingBillView(PDFTemplateResponseMixin, FilterView):
     table_class = tables.BillOfEntryTable
     filterset_class = filters.BillOfEntryFilter
     paginate_by = 500
-    template_name = 'bill_of_entry/download.html'
+    template_name = 'bill_of_entry/bill_export_pdf.html'
     model = bill_of_entry.BillOfEntryModel
     ordering = ('company', 'product_name', 'bill_of_entry_date')
 
@@ -257,9 +258,10 @@ class GenerateTransferLetterView(FormView):
                     'file_number': item.sr_number.license.file_number, 'quantity': item.qty,
                     'v_allotment_inr': round(item.cif_inr, 2),
                     'exporter_name': item.sr_number.license.exporter.name,
-                    'v_allotment_usd': item.cif_fc,'boe':"BE NUMBER :- " + item.bill_of_entry.bill_of_entry_number} for item in
+                    'v_allotment_usd': item.cif_fc, 'boe': "BE NUMBER :- " + item.bill_of_entry.bill_of_entry_number}
+                    for item in
                     boe.item_details.all()]
-                be_number=boe.bill_of_entry_number
+                be_number = boe.bill_of_entry_number
                 tl = self.request.POST.get('tl_choice')
                 from core.models import TransferLetterModel
                 transfer_letter = TransferLetterModel.objects.get(pk=tl)
@@ -278,3 +280,127 @@ class GenerateTransferLetterView(FormView):
             except Exception as e:
                 print(e)
                 return self.form_invalid(form)
+
+
+from rest_framework.views import APIView
+from django.http import JsonResponse
+
+
+class BillOfEntryExportView(APIView):
+    # permission_classes = [IsAuthenticated]
+
+    def get(self, request, *args, **kwargs):
+        export_type = request.headers.get('Accept', '')
+
+        queryset = BillOfEntryModel.objects.all()
+        f = BillOfEntryFilter(request.GET, queryset=queryset)
+        filtered = f.qs
+
+        response = HttpResponse(content_type='application/pdf')
+        response['Content-Disposition'] = 'attachment; filename="bill_of_entries.pdf"'
+
+        context = {
+            'object_list': filtered,
+            'today': date.today(),
+        }
+        return render_to_pdf('bill_of_entry/bill_export_pdf.html', context)
+
+
+# views.py
+from rest_framework.views import APIView
+from django.http import HttpResponse
+from openpyxl import Workbook
+from .models import BillOfEntryModel
+from .filters import BillOfEntryFilter
+import datetime
+
+
+class ExportBOEExcelView(APIView):
+    # permission_classes = [IsAuthenticated]
+
+    def get(self, request, *args, **kwargs):
+        queryset = BillOfEntryFilter(
+            request.GET,
+            queryset=BillOfEntryModel.objects.prefetch_related(
+                'item_details__sr_number__license',
+                'company',
+                'port'
+            )
+        ).qs
+
+        wb = Workbook()
+        ws = wb.active
+        ws.title = "Pending BOE"
+        ws.append(["Pending Bills", "", "", "", datetime.date.today()])
+
+        companies = {}
+        for boe in queryset:
+            companies.setdefault(boe.company.name, []).append(boe)
+
+        for company_name, boes in companies.items():
+            ws.append([company_name])
+
+            product_groups = {}
+            for boe in boes:
+                product_groups.setdefault(boe.product_name or '-', []).append(boe)
+
+            for product_name, items in product_groups.items():
+                ws.append([
+                    "Sr No", "BE No.", "BE Dt.", "Port", "Qty", "Unit Price", "Value ($)",
+                    "Exc Rt.", "Value (INR)", "Item Name", "Invoice", "DFIA No.", "DFIA Qty", "DFIA $", "DFIA INR"
+                ])
+
+                for idx, boe in enumerate(items, start=1):
+                    license_rows = []
+                    for detail in boe.item_details.all():
+                        license_rows.append([
+                            detail.sr_number.license.license_number,
+                            detail.qty,
+                            detail.cif_fc,
+                            detail.cif_inr,
+                            detail.sr_number.license.purchase_status
+                        ])
+
+                    total_qty = boe.get_total_quantity
+                    total_fc = boe.get_total_fc
+                    total_inr = boe.get_total_inr
+                    invoice = boe.invoice_no or '-'
+                    item_name = boe.product_name or (
+                        boe.item_details.first().sr_number.item if boe.item_details.exists() else '-'
+                    )
+
+                    ws.append([
+                        idx,
+                        boe.bill_of_entry_number,
+                        str(boe.bill_of_entry_date),
+                        boe.port.code if boe.port else '-',
+                        total_qty,
+                        boe.get_unit_price,
+                        total_fc,
+                        boe.get_exchange_rate,
+                        total_inr,
+                        item_name,
+                        invoice,
+                        "", "", "", ""  # DFIA placeholder
+                    ])
+
+                    for lic_row in license_rows:
+                        ws.append(["", "", "", "", "", "", "", "", "", "", "", *lic_row])
+
+                # Totals row
+                ws.append([
+                    "-", "-", "-", "Total",
+                    sum(b.get_total_quantity for b in items),
+                    "-",
+                    sum(b.get_total_fc for b in items),
+                    "-",
+                    sum(b.get_total_inr for b in items)
+                ])
+                ws.append([])
+
+        response = HttpResponse(
+            content_type='application/vnd.openxmlformats-officedocument.spreadsheetml.sheet'
+        )
+        response['Content-Disposition'] = 'attachment; filename=bill_of_entries.xlsx'
+        wb.save(response)
+        return response

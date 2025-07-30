@@ -1,34 +1,84 @@
-// BillOfEntryForm.jsx
-import React, {useMemo, useRef, useState} from 'react';
-import {Button, Col, Form, Row, Table} from 'react-bootstrap';
+import React, {useCallback, useMemo, useRef, useState} from 'react';
+import {Button, Col, Form, Row} from 'react-bootstrap';
 import AsyncCompanySelect from './AsyncCompanySelect';
 import AsyncPortSelect from './AsyncPortSelect';
 import AsyncAllotmentSelect from './AsyncAllotmentSelect';
 import axios from '../../api/axiosInstance';
 import {toast} from 'react-toastify';
+import LineItemTable from './LineItemTable';
 
 const BillOfEntryForm = ({entry, isNew = false, onClose, onSaved}) => {
-    const [data, setData] = useState(entry);
     const [saving, setSaving] = useState(false);
     const [errors, setErrors] = useState({});
     const [exchangeRateError, setExchangeRateError] = useState(false);
     const exchangeRateRef = useRef();
+    const lastRowRef = useRef();
 
-    const handleChange = (field, value) => {
-        setData(prev => ({...prev, [field]: value}));
-        setErrors(prev => ({...prev, [field]: null}));
-    };
+    const normalizeEntry = (entry) => ({
+        ...entry,
+        item_details: entry.item_details.map(item => ({
+            ...item,
+            sr_number_display: item.sr_number?.id
+                ? {value: item.sr_number.id, label: item.sr_number.display_name}
+                : null
+        }))
+    });
+    // const [data, setData] = useState(() => normalizeEntry(entry));
+    const [data, setData] = useState(() => {
+        const normalized = normalizeEntry(entry);
+        return normalized;
+    });
+    const selectedSrNumbers = useMemo(() =>
+        data.item_details.map(item => item.sr_number?.value).filter(Boolean), [data.item_details]);
 
-    const handleItemChange = (index, field, value) => {
+    const handleChange = useCallback((field, value) => {
+        if (field === 'allotment') {
+            const first = Array.isArray(value) && value.length > 0 ? value[0] : null;
+
+            setData(prev => {
+                const prevNames = prev.product_name
+                    ? prev.product_name.split(',').map(n => n.trim()).filter(Boolean)
+                    : [];
+
+                const newNames = value
+                    .map(a => a.item_name)
+                    .filter(Boolean);
+
+                const combinedNames = Array.from(new Set([...prevNames, ...newNames]));
+
+                return {
+                    ...prev,
+                    allotment: value,
+                    product_name: combinedNames.join(', '),
+                    company: prev.company || first?.company || null,
+                    port: prev.port || first?.port || null
+                };
+            });
+        } else {
+            setData(prev => ({...prev, [field]: value}));
+        }
+
+        setErrors(prev => {
+            const newErrors = {...prev};
+            delete newErrors[field];
+            return newErrors;
+        });
+    }, []);
+
+    const handleItemChange = useCallback((index, field, value) => {
         const updatedItems = [...data.item_details];
         const item = {...updatedItems[index], [field]: value};
         const rate = parseFloat(data.exchange_rate || 0);
 
-        if ((field === 'cif_fc' || field === 'cif_inr') && (!rate || rate <= 0)) {
-            toast.warning('Please enter a valid Exchange Rate first');
-            setExchangeRateError(true);
-            exchangeRateRef.current?.focus();
-            return;
+        if ((field === 'cif_fc' || field === 'cif_inr')) {
+            if (!rate || rate <= 0) {
+                toast.warning('Please enter a valid Exchange Rate first');
+                setExchangeRateError(true);
+                exchangeRateRef.current?.focus();
+                return;
+            } else {
+                setExchangeRateError(false);
+            }
         }
 
         if (field === 'cif_fc') {
@@ -41,36 +91,44 @@ const BillOfEntryForm = ({entry, isNew = false, onClose, onSaved}) => {
 
         updatedItems[index] = item;
         setData(prev => ({...prev, item_details: updatedItems}));
-    };
+        setErrors(prev => {
+            const newErrors = {...prev};
+            delete newErrors[`item_${index}_${field}`];
+            return newErrors;
+        });
+
+        if (field === 'sr_number') {
+            const srValue = value?.value;
+            const count = updatedItems.filter(item => item.sr_number?.value === srValue).length;
+            if (srValue && count > 1) {
+                toast.warning('Duplicate SR number selected in another row');
+            }
+        }
+    }, [data.exchange_rate, selectedSrNumbers]);
 
     const addItemRow = () => {
         setData(prev => ({
             ...prev,
-            item_details: [...prev.item_details, {
-                sr_number: '',
-                sr_number_display: '',
-                transaction_type: 'D',
-                qty: '',
-                cif_fc: '',
-                cif_inr: ''
-            }]
+            item_details: [
+                ...prev.item_details,
+                {
+                    sr_number: null,
+                    transaction_type: 'D',
+                    qty: '',
+                    cif_fc: '',
+                    cif_inr: ''
+                }
+            ]
         }));
+        setTimeout(() => lastRowRef.current?.focus(), 100);
     };
 
     const removeItemRow = (index) => {
+        if (data.item_details.length === 1) return;
         const updated = [...data.item_details];
         updated.splice(index, 1);
         setData(prev => ({...prev, item_details: updated}));
     };
-
-    const totalQuantity = useMemo(() =>
-        data.item_details.reduce((sum, row) => sum + parseFloat(row.qty || 0), 0), [data.item_details]);
-
-    const totalCifInr = useMemo(() =>
-        data.item_details.reduce((sum, row) => sum + parseFloat(row.cif_inr || 0), 0), [data.item_details]);
-
-    const totalCifUsd = useMemo(() =>
-        data.item_details.reduce((sum, row) => sum + parseFloat(row.cif_fc || 0), 0), [data.item_details]);
 
     const validate = () => {
         const errs = {};
@@ -78,12 +136,11 @@ const BillOfEntryForm = ({entry, isNew = false, onClose, onSaved}) => {
         if (!data.bill_of_entry_date) errs.bill_of_entry_date = 'Required';
         if (!data.company) errs.company = 'Required';
         if (!data.port) errs.port = 'Required';
-        if (!data.invoice_no) errs.invoice_no = 'Required';
         if (!data.product_name) errs.product_name = 'Required';
         if (!data.exchange_rate || isNaN(data.exchange_rate)) errs.exchange_rate = 'Enter valid number';
 
         data.item_details.forEach((item, idx) => {
-            if (!item.sr_number_display) errs[`item_${idx}_sr`] = 'Required';
+            if (!item.sr_number) errs[`item_${idx}_sr`] = 'Required';
             if (!item.qty || isNaN(item.qty)) errs[`item_${idx}_qty`] = 'Invalid';
             if (!item.cif_fc || isNaN(item.cif_fc)) errs[`item_${idx}_fc`] = 'Invalid';
             if (!item.cif_inr || isNaN(item.cif_inr)) errs[`item_${idx}_inr`] = 'Invalid';
@@ -106,6 +163,10 @@ const BillOfEntryForm = ({entry, isNew = false, onClose, onSaved}) => {
                 port: data.port?.id,
                 company: data.company?.id,
                 allotment: data.allotment.map(a => a.id),
+                item_details: data.item_details.map(({sr_number, ...item}) => ({
+                    ...item,
+                    sr_number: sr_number?.value || null
+                }))
             };
             if (isNew) {
                 await axios.post('/api/bill-of-entries/', payload);
@@ -126,59 +187,65 @@ const BillOfEntryForm = ({entry, isNew = false, onClose, onSaved}) => {
         <Form>
             <Row className="mb-3">
                 <Col md={3}>
-                    <Form.Label>BOE Number</Form.Label>
-                    <Form.Control size="sm" value={data.bill_of_entry_number}
+                    <Form.Label htmlFor="boe_number">BOE Number</Form.Label>
+                    <Form.Control id="boe_number" name="boe_number" size="sm" value={data.bill_of_entry_number ?? ""}
                                   isInvalid={!!errors.bill_of_entry_number}
                                   onChange={(e) => handleChange('bill_of_entry_number', e.target.value)}/>
                     <Form.Control.Feedback type="invalid">{errors.bill_of_entry_number}</Form.Control.Feedback>
                 </Col>
                 <Col md={3}>
-                    <Form.Label>Date</Form.Label>
-                    <Form.Control size="sm" type="date" value={data.bill_of_entry_date}
+                    <Form.Label htmlFor="boe_date">Date</Form.Label>
+                    <Form.Control id="boe_date" name="boe_date" size="sm" type="date"
+                                  value={data.bill_of_entry_date ?? ""}
                                   isInvalid={!!errors.bill_of_entry_date}
                                   onChange={(e) => handleChange('bill_of_entry_date', e.target.value)}/>
                     <Form.Control.Feedback type="invalid">{errors.bill_of_entry_date}</Form.Control.Feedback>
                 </Col>
                 <Col md={3}>
                     <Form.Label>Company</Form.Label>
-                    <AsyncCompanySelect value={data.company} onChange={(v) => handleChange('company', v)}/>
+                    <AsyncCompanySelect value={data.company ?? ""} onChange={(v) => handleChange('company', v)}/>
                     {errors.company && <div className="text-danger small">{errors.company}</div>}
                 </Col>
                 <Col md={3}>
                     <Form.Label>Port</Form.Label>
-                    <AsyncPortSelect value={data.port} onChange={(v) => handleChange('port', v)}/>
+                    <AsyncPortSelect value={data.port ?? ""} onChange={(v) => handleChange('port', v)}/>
                     {errors.port && <div className="text-danger small">{errors.port}</div>}
                 </Col>
             </Row>
             <Row className="mb-3">
                 <Col>
                     <Form.Label>Allotments</Form.Label>
-                    <AsyncAllotmentSelect value={data.allotment} onChange={(v) => handleChange('allotment', v)}/>
+                    <AsyncAllotmentSelect
+                        value={data.allotment ?? []}
+                        onChange={(v) => handleChange('allotment', v)}
+                    />
                     {errors.allotment && <div className="text-danger small">{errors.allotment}</div>}
                 </Col>
             </Row>
             <Row className="mb-3">
                 <Col md={4}>
-                    <Form.Label>Invoice No</Form.Label>
-                    <Form.Control size="sm" value={data.invoice_no}
+                    <Form.Label htmlFor="invoice_no">Invoice No</Form.Label>
+                    <Form.Control id="invoice_no" name="invoice_no" size="sm" value={data.invoice_no ?? ""}
                                   isInvalid={!!errors.invoice_no}
                                   onChange={(e) => handleChange('invoice_no', e.target.value)}/>
                     <Form.Control.Feedback type="invalid">{errors.invoice_no}</Form.Control.Feedback>
                 </Col>
                 <Col md={4}>
-                    <Form.Label>Product Name</Form.Label>
-                    <Form.Control size="sm" value={data.product_name}
+                    <Form.Label htmlFor="product_name">Product Name</Form.Label>
+                    <Form.Control id="product_name" name="product_name" size="sm" value={data.product_name ?? ""}
                                   isInvalid={!!errors.product_name}
                                   onChange={(e) => handleChange('product_name', e.target.value)}/>
                     <Form.Control.Feedback type="invalid">{errors.product_name}</Form.Control.Feedback>
                 </Col>
                 <Col md={4}>
-                    <Form.Label>Exchange Rate</Form.Label>
+                    <Form.Label htmlFor="exchange_rate">Exchange Rate</Form.Label>
                     <Form.Control
+                        id="exchange_rate"
+                        name="exchange_rate"
                         size="sm"
                         type="number"
                         step="0.0001"
-                        value={data.exchange_rate}
+                        value={data.exchange_rate ?? ""}
                         ref={exchangeRateRef}
                         isInvalid={!!errors.exchange_rate || exchangeRateError}
                         onChange={(e) => {
@@ -192,60 +259,28 @@ const BillOfEntryForm = ({entry, isNew = false, onClose, onSaved}) => {
                 </Col>
             </Row>
 
-            <Table bordered size="sm">
-                <thead>
-                <tr>
-                    <th>SR No Display</th>
-                    <th>Qty</th>
-                    <th>CIF FC</th>
-                    <th>CIF INR</th>
-                    <th></th>
-                </tr>
-                </thead>
-                <tbody>
-                {data.item_details.map((item, idx) => (
-                    <tr key={idx}>
-                        <td>
-                            <Form.Control size="sm" value={item.sr_number_display}
-                                          isInvalid={!!errors[`item_${idx}_sr`]}
-                                          onChange={(e) => handleItemChange(idx, 'sr_number_display', e.target.value)}/>
-                            <Form.Control.Feedback type="invalid">{errors[`item_${idx}_sr`]}</Form.Control.Feedback>
-                        </td>
-                        <td>
-                            <Form.Control size="sm" value={item.qty}
-                                          isInvalid={!!errors[`item_${idx}_qty`]}
-                                          onChange={(e) => handleItemChange(idx, 'qty', e.target.value)}/>
-                            <Form.Control.Feedback type="invalid">{errors[`item_${idx}_qty`]}</Form.Control.Feedback>
-                        </td>
-                        <td>
-                            <Form.Control size="sm" value={item.cif_fc}
-                                          isInvalid={!!errors[`item_${idx}_fc`]}
-                                          onChange={(e) => handleItemChange(idx, 'cif_fc', e.target.value)}/>
-                            <Form.Control.Feedback type="invalid">{errors[`item_${idx}_fc`]}</Form.Control.Feedback>
-                        </td>
-                        <td>
-                            <Form.Control size="sm" value={item.cif_inr}
-                                          isInvalid={!!errors[`item_${idx}_inr`]}
-                                          onChange={(e) => handleItemChange(idx, 'cif_inr', e.target.value)}/>
-                            <Form.Control.Feedback type="invalid">{errors[`item_${idx}_inr`]}</Form.Control.Feedback>
-                        </td>
-                        <td>
-                            <Button variant="outline-danger" size="sm"
-                                    onClick={() => removeItemRow(idx)}>Delete</Button>
-                        </td>
-                    </tr>
-                ))}
-                <tr className="table-light">
-                    <td><strong>Totals</strong></td>
-                    <td><strong>{totalQuantity}</strong></td>
-                    <td><strong>{totalCifUsd.toLocaleString(undefined, {maximumFractionDigits: 2})}</strong></td>
-                    <td><strong>{totalCifInr.toLocaleString(undefined, {maximumFractionDigits: 2})}</strong></td>
-                    <td></td>
-                </tr>
-                </tbody>
-            </Table>
+            {Object.keys(errors).length > 0 && (
+                console.log(errors),
+                    <div className="alert alert-danger py-1 small">
+                        <div>Please fix the following validation issue(s):</div>
+                        <ul className="mb-0 mt-1 ps-3">
+                            {Object.entries(errors).map(([field, msg], i) => (
+                                <li key={i}>
+                                    <strong>{field}</strong>: {msg}
+                                </li>
+                            ))}
+                        </ul>
+                    </div>
+            )}
 
-            <Button size="sm" variant="outline-primary" onClick={addItemRow}>+ Add Item</Button>
+            <LineItemTable
+                items={data.item_details}
+                errors={errors}
+                selectedSrNumbers={selectedSrNumbers}
+                onItemChange={handleItemChange}
+                onAddRow={addItemRow}
+                onRemoveRow={removeItemRow}
+            />
 
             <div className="mt-3">
                 <Button variant="success" size="sm" onClick={save} disabled={saving}>

@@ -1,5 +1,4 @@
 import React, {useEffect, useState} from 'react';
-import axios from '../../api/axiosInstance';
 import {Card, Col, Collapse, Container, Form, Row, Spinner} from 'react-bootstrap';
 import {toast} from 'react-toastify';
 import BillOfEntryForm from './BillOfEntryForm';
@@ -8,6 +7,8 @@ import AsyncCompanySelect from './AsyncCompanySelect';
 import AsyncPortSelect from './AsyncPortSelect';
 import PaginationControls from '../../components/PaginationControls';
 import useUrlSync from '../../hooks/useUrlSync';
+import axios from '../../api/axiosInstance';
+import YesNoRadio from '../../components/YesNoRadio';
 
 const BillOfEntryList = () => {
     const [entries, setEntries] = useState([]);
@@ -22,10 +23,10 @@ const BillOfEntryList = () => {
         company_objs: [],
         exclude_company_objs: [],
         port_objs: [],
-        invoice_no: '',
         product_name: '',
         from_date: '',
         to_date: '',
+        is_invoice: false, // Default to "All"
     });
     const [newEntry, setNewEntry] = useState(null);
 
@@ -56,10 +57,10 @@ const BillOfEntryList = () => {
                 ...(filters.port_objs.length > 0 && {
                     port__in: filters.port_objs.map(p => p.id).join(','),
                 }),
-                ...(filters.invoice_no && {invoice_no: filters.invoice_no}),
                 ...(filters.product_name && {product_name: filters.product_name}),
                 ...(filters.from_date && {from_date: filters.from_date}),
                 ...(filters.to_date && {to_date: filters.to_date}),
+                ...(typeof filters.is_invoice === 'boolean' && {is_invoice: filters.is_invoice.toString()}),
             };
 
             const res = await axios.get('/api/bill-of-entries/', {params});
@@ -78,6 +79,72 @@ const BillOfEntryList = () => {
 
     const toggle = (id) => setExpanded(prev => ({...prev, [id]: !prev[id]}));
 
+    const buildExportParams = () => {
+        const params = new URLSearchParams({
+            search: searchQuery,
+            ordering: sortField && sortOrder ? `${sortOrder === 'desc' ? '-' : ''}${sortField}` : '',
+            ...(filters.company_objs.length > 0 && {
+                company__in: filters.company_objs.map(c => c.id).join(','),
+            }),
+            ...(filters.exclude_company_objs.length > 0 && {
+                exclude_company__in: filters.exclude_company_objs.map(c => c.id).join(','),
+            }),
+            ...(filters.port_objs.length > 0 && {
+                port__in: filters.port_objs.map(p => p.id).join(','),
+            }),
+            ...(filters.product_name && {product_name: filters.product_name}),
+            ...(filters.from_date && {from_date: filters.from_date}),
+            ...(filters.to_date && {to_date: filters.to_date}),
+            ...(typeof filters.is_invoice === 'boolean' && {is_invoice: filters.is_invoice.toString()}),
+        });
+        return params.toString();
+    };
+
+    const handleExportXLSX = async () => {
+        try {
+            const res = await axios.get(`/api/bill-of-entries/export-excel/?${buildExportParams()}`, {
+                responseType: 'blob',
+            });
+
+            const blob = new Blob([res.data], {
+                type: 'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet',
+            });
+
+            const url = window.URL.createObjectURL(blob);
+            const a = document.createElement('a');
+            a.href = url;
+            a.download = 'bill_of_entries.xlsx';
+            document.body.appendChild(a);
+            a.click();
+            a.remove();
+            window.URL.revokeObjectURL(url);
+        } catch (error) {
+            toast.error('Failed to export Excel');
+            console.error(error);
+        }
+    };
+
+
+    const handleExportPDF = async () => {
+        try {
+            const res = await axios.get(`/api/bill-of-entries/export/pdf?${buildExportParams()}`, {
+                responseType: 'blob',
+            });
+
+            const blob = new Blob([res.data], {type: 'application/pdf'});
+            const url = window.URL.createObjectURL(blob);
+            const newTab = window.open();
+            if (newTab) {
+                newTab.location.href = url;
+            } else {
+                toast.error('Popup blocked! Please allow popups for this site.');
+            }
+            setTimeout(() => window.URL.revokeObjectURL(url), 1000);
+        } catch (err) {
+            toast.error('Failed to export PDF');
+        }
+    };
+
     const handleReset = () => {
         setSearchQuery('');
         setSortField('bill_of_entry_date');
@@ -86,12 +153,13 @@ const BillOfEntryList = () => {
             company_objs: [],
             exclude_company_objs: [],
             port_objs: [],
-            invoice_no: '',
             product_name: '',
             from_date: '',
             to_date: '',
+            is_invoice: false,
         });
         setPage(1);
+        setTimeout(fetchData, 0);
     };
 
     return (
@@ -106,6 +174,9 @@ const BillOfEntryList = () => {
                 setSortOrder={setSortOrder}
                 setPage={setPage}
                 handleReset={handleReset}
+                handleExportCSV={handleExportXLSX}
+                handleExportPDF={handleExportPDF}
+                dataExport={true}
                 Filters={[
                     <AsyncCompanySelect
                         key="company"
@@ -128,19 +199,19 @@ const BillOfEntryList = () => {
                         onChange={(v) => setFilters(prev => ({...prev, port_objs: v}))}
                     />,
                     <Form.Control
-                        key="invoice"
-                        size="sm"
-                        placeholder="Invoice No"
-                        value={filters.invoice_no}
-                        onChange={(e) => setFilters(prev => ({...prev, invoice_no: e.target.value}))}
-                    />,
-                    <Form.Control
                         key="product"
                         size="sm"
                         placeholder="Product Name"
                         value={filters.product_name}
                         onChange={(e) => setFilters(prev => ({...prev, product_name: e.target.value}))}
                     />,
+                    <YesNoRadio
+                        key="is_invoice"
+                        label="Has Invoice?"
+                        value={filters.is_invoice}
+                        onChange={(val) => setFilters(prev => ({...prev, is_invoice: val}))}
+                    />,
+
                     <Form.Control
                         key="from_date"
                         size="sm"
@@ -168,7 +239,6 @@ const BillOfEntryList = () => {
                         item_details: [
                             {
                                 sr_number: '',
-                                sr_number_display: '',
                                 transaction_type: 'D',
                                 qty: '',
                                 cif_fc: '',

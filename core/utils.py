@@ -1,5 +1,4 @@
 from datetime import datetime
-from io import BytesIO
 
 from django.http import HttpResponse
 from django.template.loader import get_template
@@ -32,14 +31,12 @@ class PagedFilteredTableView(ExportMixin, SingleTableView):
 
 def render_to_pdf(template_src, context_dict={}):
     template = get_template(template_src)
-    html  = template.render(context_dict)
-    result = BytesIO()
-    pdf = pisa.pisaDocument(BytesIO(html.encode("ISO-8859-1")), result)
-    if not pdf.err:
-        return HttpResponse(result.getvalue(), content_type='application/pdf')
-    return None
-
-
+    html = template.render(context_dict)
+    response = HttpResponse(content_type='application/pdf')
+    pisa_status = pisa.CreatePDF(html, dest=response)
+    if pisa_status.err:
+        return HttpResponse('Error rendering PDF', status=500)
+    return response
 
 
 def safe_parse_datetime(value):
@@ -65,6 +62,7 @@ def safe_parse_datetime(value):
     except Exception:
         pass
     return None
+
 
 def safe_parse_date(value):
     dt = safe_parse_datetime(value)

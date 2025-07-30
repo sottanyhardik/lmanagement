@@ -23,6 +23,8 @@ const ListControls = ({
                               {label: 'Modified On ⬆️', value: 'modified_on:asc'},
                           ],
                           handleReset,
+                          handleExportCSV,     // NEW
+                          handleExportPDF,     // NEW
                           Filters = [],
                       }) => {
     useEffect(() => {
@@ -96,6 +98,16 @@ const ListControls = ({
                         <Button size="sm" variant="primary" onClick={onAddNewClick}>
                             <FaPlus className="me-1"/> Add
                         </Button>
+                    )}
+                    {handleExportCSV && (
+                        <button onClick={handleExportCSV} className="btn btn-outline-secondary btn-sm me-2">
+                            Export CSV
+                        </button>
+                    )}
+                    {handleExportPDF && (
+                        <button onClick={handleExportPDF} className="btn btn-outline-secondary btn-sm me-2">
+                            Export PDF
+                        </button>
                     )}
                 </div>
             )}

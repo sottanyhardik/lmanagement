@@ -102,10 +102,11 @@ class BillOfEntryFilter(django_filters.FilterSet):
         return queryset
 
     def check_is_invoice(self, queryset, name, value):
-        if value:
-            return queryset.exclude(invoice_no=None)
-        else:
-            return queryset.filter(invoice_no=None)
+        if str(value).lower() == 'true':
+            return queryset.exclude(invoice_no__isnull=True).exclude(invoice_no__exact='')
+        elif str(value).lower() == 'false':
+            return queryset.filter(Q(invoice_no__isnull=True) | Q(invoice_no__exact=''))
+        return queryset
 
     def check_is_ooc(self, queryset, name, value):
         if value:

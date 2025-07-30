@@ -2,16 +2,17 @@ from rest_framework import serializers
 
 from allotment.serializers import AllotmentOptionSerializer
 from core.serializers import PortOptionSerializer, CompanyOptionSerializer
+from license.serializers import LicenseImportItemsSelectSerializer
 from .models import BillOfEntryModel, RowDetails
 
 
 class RowDetailsSerializer(serializers.ModelSerializer):
-    sr_number_display = serializers.CharField(source='sr_number.__str__', read_only=True)
+    sr_number = LicenseImportItemsSelectSerializer()
 
     class Meta:
         model = RowDetails
         fields = [
-            'id', 'bill_of_entry', 'row_type', 'sr_number', 'sr_number_display',
+            'id', 'bill_of_entry', 'row_type', 'sr_number',
             'transaction_type', 'cif_inr', 'cif_fc', 'qty'
         ]
 

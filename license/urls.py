@@ -1,7 +1,12 @@
 from django.contrib.auth.decorators import login_required
 from django.urls import path
+from rest_framework.routers import DefaultRouter
 
 from . import views
+from .api import LicenseImportItemsViewSet
+
+router = DefaultRouter()
+router.register(r'api/license-import-items', LicenseImportItemsViewSet, basename='license-import-items')
 
 urlpatterns = [
     path('license/report/biscuits/', login_required(views.PDFSummaryLicenseDetailView.as_view()),
@@ -49,3 +54,5 @@ urlpatterns = [
     path('refresh_items', login_required(views.RefreshItems.as_view()),
          name='refresh_items'),
 ]
+
+urlpatterns += router.urls
