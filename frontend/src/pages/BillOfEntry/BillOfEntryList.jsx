@@ -181,6 +181,7 @@ const BillOfEntryList = () => {
 
     const handleExportPDF = async () => {
         try {
+            toast.info('Downloading PDF. Please wait..');
             const res = await axios.get(`/api/bill-of-entries/export/pdf?${buildExportParams()}`, {
                 responseType: 'blob',
             });
