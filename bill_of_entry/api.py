@@ -1,5 +1,8 @@
 from django_filters.rest_framework import DjangoFilterBackend
 from rest_framework import filters, viewsets
+from rest_framework import status, permissions
+from rest_framework.response import Response
+from rest_framework.views import APIView
 
 from .filters import BillOfEntryFilter
 from .models import BillOfEntryModel
@@ -20,3 +23,15 @@ class BillOfEntryViewSet(viewsets.ModelViewSet):
         if self.action in ['create', 'update', 'partial_update']:
             return BillOfEntryWriteSerializer
         return BillOfEntrySerializer
+
+
+class BillOfEntryBulkDeleteView(APIView):
+    permission_classes = [permissions.IsAuthenticated]
+
+    def post(self, request, *args, **kwargs):
+        ids = request.data.get('ids', [])
+        if not isinstance(ids, list):
+            return Response({'error': 'Invalid data format. Expected list of IDs.'}, status=status.HTTP_400_BAD_REQUEST)
+
+        deleted_count, _ = BillOfEntryModel.objects.filter(id__in=ids).delete()
+        return Response({'message': f'{deleted_count} entries deleted successfully.'}, status=status.HTTP_200_OK)

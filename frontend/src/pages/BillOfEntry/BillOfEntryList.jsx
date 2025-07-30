@@ -11,7 +11,6 @@ import useUrlSync from '../../hooks/useUrlSync';
 import axios from '../../api/axiosInstance';
 import YesNoRadio from '../../components/YesNoRadio';
 
-
 const BillOfEntryList = () => {
     const [entries, setEntries] = useState([]);
     const [expanded, setExpanded] = useState({});
@@ -22,6 +21,7 @@ const BillOfEntryList = () => {
     const [sortOrder, setSortOrder] = useState('desc');
     const [searchQuery, setSearchQuery] = useState('');
     const [allExpanded, setAllExpanded] = useState(true);
+    const [selectedIds, setSelectedIds] = useState([]);
 
     const [filters, setFilters] = useState({
         company_objs: [],
@@ -30,8 +30,9 @@ const BillOfEntryList = () => {
         product_name: '',
         from_date: '',
         to_date: '',
-        is_invoice: false, // Default to "All"
+        is_invoice: false,
     });
+
     const [newEntry, setNewEntry] = useState(null);
 
     useUrlSync({
@@ -47,7 +48,6 @@ const BillOfEntryList = () => {
 
     const groupEntries = (entries) => {
         const groups = {};
-
         entries.forEach(entry => {
             const companyName = entry.company?.name || 'Unknown Company';
             const date = new Date(entry.bill_of_entry_date);
@@ -69,10 +69,8 @@ const BillOfEntryList = () => {
             groups[companyName][month][portName].summary.fc += cif_fc;
             groups[companyName][month][portName].summary.inr += cif_inr;
         });
-
         return groups;
     };
-
 
     const fetchData = useCallback(async () => {
         setLoading(true);
@@ -112,6 +110,28 @@ const BillOfEntryList = () => {
 
     const toggle = (id) => setExpanded(prev => ({...prev, [id]: !prev[id]}));
 
+    const toggleSelect = (id) => {
+        setSelectedIds(prev => prev.includes(id) ? prev.filter(i => i !== id) : [...prev, id]);
+    };
+
+    const toggleSelectAll = (ids) => {
+        const allSelected = ids.every(id => selectedIds.includes(id));
+        setSelectedIds(prev => allSelected ? prev.filter(id => !ids.includes(id)) : [...new Set([...prev, ...ids])]);
+    };
+
+    const handleBulkDelete = async () => {
+        if (selectedIds.length === 0) return;
+        if (!window.confirm(`Are you sure you want to delete ${selectedIds.length} entries?`)) return;
+        try {
+            await axios.post('/api/bill-of-entries/bulk-delete/', {ids: selectedIds});
+            toast.success('Selected entries deleted');
+            setSelectedIds([]);
+            fetchData();
+        } catch (err) {
+            toast.error('Failed to delete selected entries');
+        }
+    };
+
     const buildExportParams = () => {
         const params = new URLSearchParams({
             search: searchQuery,
@@ -138,11 +158,9 @@ const BillOfEntryList = () => {
             const res = await axios.get(`/api/bill-of-entries/export-excel/?${buildExportParams()}`, {
                 responseType: 'blob',
             });
-
             const blob = new Blob([res.data], {
                 type: 'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet',
             });
-
             const url = window.URL.createObjectURL(blob);
             const a = document.createElement('a');
             a.href = url;
@@ -153,30 +171,25 @@ const BillOfEntryList = () => {
             window.URL.revokeObjectURL(url);
         } catch (error) {
             toast.error('Failed to export Excel');
-            console.error(error);
         }
     };
-
 
     const handleExportPDF = async () => {
         try {
             const res = await axios.get(`/api/bill-of-entries/export/pdf?${buildExportParams()}`, {
                 responseType: 'blob',
             });
-
             const blob = new Blob([res.data], {type: 'application/pdf'});
             const url = window.URL.createObjectURL(blob);
             const newTab = window.open();
-            if (newTab) {
-                newTab.location.href = url;
-            } else {
-                toast.error('Popup blocked! Please allow popups for this site.');
-            }
+            if (newTab) newTab.location.href = url;
+            else toast.error('Popup blocked! Please allow popups.');
             setTimeout(() => window.URL.revokeObjectURL(url), 1000);
         } catch (err) {
             toast.error('Failed to export PDF');
         }
     };
+
     const sortOptions = [
         {label: 'BOE Date ⬇️', value: 'bill_of_entry_date:desc'},
         {label: 'BOE Date ⬆️', value: 'bill_of_entry_date:asc'},
@@ -220,84 +233,48 @@ const BillOfEntryList = () => {
                 handleExportPDF={loading ? undefined : handleExportPDF}
                 dataExport={true}
                 Filters={[
-                    <AsyncCompanySelect
-                        key="company"
-                        value={filters.company_objs}
-                        isMulti={true}
-                        placeholder="Select Company"
-                        onChange={(v) => setFilters(prev => ({...prev, company_objs: v}))}
-                    />,
-                    <AsyncCompanySelect
-                        key="exclude_company"
-                        value={filters.exclude_company_objs}
-                        isMulti={true}
-                        placeholder="Exclude Company"
-                        onChange={(v) => setFilters(prev => ({...prev, exclude_company_objs: v}))}
-                    />,
-                    <AsyncPortSelect
-                        key="port"
-                        value={filters.port_objs}
-                        isMulti={true}
-                        onChange={(v) => setFilters(prev => ({...prev, port_objs: v}))}
-                    />,
-                    <Form.Control
-                        key="product"
-                        size="sm"
-                        placeholder="Product Name"
-                        value={filters.product_name}
-                        onChange={(e) => setFilters(prev => ({...prev, product_name: e.target.value}))}
-                    />,
-                    <YesNoRadio
-                        key="is_invoice"
-                        label="Has Invoice?"
-                        value={filters.is_invoice}
-                        onChange={(val) => setFilters(prev => ({...prev, is_invoice: val}))}
-                    />,
-
-                    <Form.Control
-                        key="from_date"
-                        size="sm"
-                        type="date"
-                        value={filters.from_date}
-                        onChange={(e) => setFilters(prev => ({...prev, from_date: e.target.value}))}
-                    />,
-                    <Form.Control
-                        key="to_date"
-                        size="sm"
-                        type="date"
-                        value={filters.to_date}
-                        onChange={(e) => setFilters(prev => ({...prev, to_date: e.target.value}))}
-                    />,
+                    <AsyncCompanySelect key="company" value={filters.company_objs} isMulti
+                                        onChange={v => setFilters(prev => ({...prev, company_objs: v}))}/>,
+                    <AsyncCompanySelect key="exclude_company" value={filters.exclude_company_objs} isMulti
+                                        placeholder="Exclude Company"
+                                        onChange={v => setFilters(prev => ({...prev, exclude_company_objs: v}))}/>,
+                    <AsyncPortSelect key="port" value={filters.port_objs} isMulti
+                                     onChange={v => setFilters(prev => ({...prev, port_objs: v}))}/>,
+                    <Form.Control key="product" size="sm" placeholder="Product Name" value={filters.product_name}
+                                  onChange={e => setFilters(prev => ({...prev, product_name: e.target.value}))}/>,
+                    <YesNoRadio key="is_invoice" label="Has Invoice?" value={filters.is_invoice}
+                                onChange={val => setFilters(prev => ({...prev, is_invoice: val}))}/>,
+                    <Form.Control key="from_date" size="sm" type="date" value={filters.from_date}
+                                  onChange={e => setFilters(prev => ({...prev, from_date: e.target.value}))}/>,
+                    <Form.Control key="to_date" size="sm" type="date" value={filters.to_date}
+                                  onChange={e => setFilters(prev => ({...prev, to_date: e.target.value}))}/>,
                 ]}
-                onAddNewClick={() =>
-                    setNewEntry({
-                        bill_of_entry_number: '',
-                        bill_of_entry_date: '',
-                        port: null,
-                        exchange_rate: '',
-                        company: null,
-                        invoice_no: '',
-                        product_name: '',
-                        item_details: [
-                            {
-                                sr_number: '',
-                                transaction_type: 'D',
-                                qty: '',
-                                cif_fc: '',
-                                cif_inr: '',
-                            },
-                        ],
-                    })
-                }
+                onAddNewClick={() => setNewEntry({
+                    bill_of_entry_number: '',
+                    bill_of_entry_date: '',
+                    port: null,
+                    exchange_rate: '',
+                    company: null,
+                    invoice_no: '',
+                    product_name: '',
+                    item_details: [{sr_number: '', transaction_type: 'D', qty: '', cif_fc: '', cif_inr: ''}]
+                })}
             />
+
+            {selectedIds.length > 0 && (
+                <div className="d-flex justify-content-end mb-2">
+                    <button className="btn btn-danger btn-sm" onClick={handleBulkDelete}>
+                        Delete Selected ({selectedIds.length})
+                    </button>
+                </div>
+            )}
+
             <div className="d-flex justify-content-end mb-2">
-                <button
-                    className="btn btn-outline-primary btn-sm"
-                    onClick={() => setAllExpanded(prev => !prev)}
-                >
+                <button className="btn btn-outline-primary btn-sm" onClick={() => setAllExpanded(prev => !prev)}>
                     {allExpanded ? 'Collapse All' : 'Expand All'}
                 </button>
             </div>
+
             {newEntry && (
                 <Card className="mb-3 border-success">
                     <Card.Header className="bg-success text-white">New Bill of Entry</Card.Header>
@@ -335,19 +312,37 @@ const BillOfEntryList = () => {
                                                     {port} — Total Qty: {summary.qty.toFixed(2)} | CIF
                                                     $: {summary.fc.toFixed(2)} | INR ₹{summary.inr.toLocaleString()}
                                                 </div>
+
+                                                <Form.Check
+                                                    type="checkbox"
+                                                    className="mb-2"
+                                                    label={`Select All (${boes.length})`}
+                                                    checked={boes.every(entry => selectedIds.includes(entry.id))}
+                                                    onChange={() => toggleSelectAll(boes.map(e => e.id))}
+                                                />
+
                                                 {boes.map(entry => (
                                                     <Card key={entry.id} className="mb-2 shadow-sm">
-                                                        <Card.Header onClick={() => toggle(entry.id)}
-                                                                     style={{cursor: 'pointer'}}>
-                                                            <Row>
-                                                                <Col>BOE #{entry.bill_of_entry_number}</Col>
-                                                                <Col>Date: {entry.bill_of_entry_date}</Col>
-                                                                <Col>Qty: {entry.get_total_quantity}</Col>
-                                                                <Col>Product Name: {entry.product_name}</Col>
-                                                                <Col>CIF $: {entry.get_total_fc}</Col>
-                                                                <Col className="text-end">INR
-                                                                    ₹{entry.get_total_inr.toLocaleString()}</Col>
-                                                            </Row>
+                                                        <Card.Header
+                                                            className="d-flex align-items-center justify-content-between">
+                                                            <Form.Check
+                                                                type="checkbox"
+                                                                className="me-2"
+                                                                checked={selectedIds.includes(entry.id)}
+                                                                onChange={() => toggleSelect(entry.id)}
+                                                            />
+                                                            <div onClick={() => toggle(entry.id)}
+                                                                 style={{cursor: 'pointer', flex: 1}}>
+                                                                <Row>
+                                                                    <Col>BOE #{entry.bill_of_entry_number}</Col>
+                                                                    <Col>Date: {entry.bill_of_entry_date}</Col>
+                                                                    <Col>Qty: {entry.get_total_quantity}</Col>
+                                                                    <Col>Product Name: {entry.product_name}</Col>
+                                                                    <Col>CIF $: {entry.get_total_fc}</Col>
+                                                                    <Col className="text-end">INR
+                                                                        ₹{entry.get_total_inr.toLocaleString()}</Col>
+                                                                </Row>
+                                                            </div>
                                                         </Card.Header>
                                                         <Collapse in={!!expanded[entry.id]}>
                                                             <Card.Body className="bg-light border-top">
@@ -366,12 +361,7 @@ const BillOfEntryList = () => {
                 </Accordion>
             )}
 
-            <PaginationControls
-                page={page}
-                totalPages={totalPages}
-                setPage={setPage}
-                loading={loading}
-            />
+            <PaginationControls page={page} totalPages={totalPages} setPage={setPage} loading={loading}/>
         </Container>
     );
 };
