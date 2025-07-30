@@ -1,33 +1,20 @@
 // components/AsyncPortSelect.jsx
 import React from 'react';
 import AsyncSelect from 'react-select/async';
-import axios from '../../api/axiosInstance';
+import {useDebouncedAsyncOptions} from '../../hooks/useDebouncedAsyncOptions';
 
-const loadOptions = async (inputValue) => {
-    const res = await axios.get('/api/ports/', {
-        params: {search: inputValue}
-    });
-    return res.data.results.map(port => ({
-        label: port.name,
-        value: port.id,
-        data: port
-    }));
-};
+const AsyncPortSelect = ({value, onChange, isMulti = false, placeholder = "Select Port"}) => {
+    const loadOptions = useDebouncedAsyncOptions('/api/ports/');
 
-const AsyncPortSelect = ({
-                             value,
-                             onChange,
-                             isMulti = false,
-                             placeholder = "Select Port" // ✅ default value
-                         }) => {
-    const toOption = (v) => ({
-        label: v.name,
-        value: v.id,
-        data: v
-    });
+    const toOption = (v) =>
+        v?.id
+            ? {value: v.id, label: v.name, data: v}
+            : v?.value && v.label
+                ? {value: v.value, label: v.label, data: v.data || {id: v.value, name: v.label}}
+                : null;
 
     const formattedValue = isMulti
-        ? (value || []).map(toOption)
+        ? (value || []).map(toOption).filter(Boolean)
         : value ? toOption(value) : null;
 
     const handleChange = (selected) => {
@@ -47,8 +34,11 @@ const AsyncPortSelect = ({
             value={formattedValue}
             onChange={handleChange}
             isClearable
-            placeholder={placeholder} // ✅ use dynamic placeholder
-            getOptionLabel={(e) => e.label}
+            placeholder={placeholder}
+            styles={{
+                control: base => ({...base, minHeight: '32px', fontSize: '0.875rem'}),
+                menu: base => ({...base, zIndex: 9999})
+            }}
         />
     );
 };

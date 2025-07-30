@@ -1,14 +1,24 @@
+// components/AsyncSrNumberSelect.jsx
 import React from 'react';
 import AsyncSelect from 'react-select/async';
-import axios from '../../api/axiosInstance';
+import {useDebouncedAsyncOptions} from '../../hooks/useDebouncedAsyncOptions';
 
 const AsyncSrNumberSelect = ({
                                  value,
                                  onChange,
                                  isMulti = false,
                                  placeholder = "Select SR Number",
-                                 excludeIds = []
+                                 excludeIds = [],
                              }) => {
+    // Use shared debounced loader
+    const loadBaseOptions = useDebouncedAsyncOptions('/api/license-import-items/', 'display_name', 'id');
+
+    // Wrap to filter excluded IDs
+    const loadOptions = async (inputValue) => {
+        const options = await loadBaseOptions(inputValue);
+        return options.filter(option => !excludeIds.includes(option.value));
+    };
+
     const toOption = (v) =>
         v?.id
             ? {value: v.id, label: v.display_name, data: v}
@@ -28,20 +38,6 @@ const AsyncSrNumberSelect = ({
         }
     };
 
-    const loadOptions = async (inputValue) => {
-        const res = await axios.get('/api/license-import-items/', {
-            params: {search: inputValue}
-        });
-
-        return res.data.results
-            .filter(item => !excludeIds.includes(item.id))
-            .map(item => ({
-                value: item.id,
-                label: item.display_name,
-                data: item
-            }));
-    };
-
     return (
         <AsyncSelect
             cacheOptions
@@ -52,14 +48,9 @@ const AsyncSrNumberSelect = ({
             onChange={handleChange}
             isClearable
             placeholder={placeholder}
-            getOptionLabel={(e) => e.label}
             styles={{
-                control: (base) => ({
-                    ...base,
-                    minHeight: '32px',
-                    fontSize: '0.875rem'
-                }),
-                menu: base => ({...base, zIndex: 9999})
+                control: base => ({...base, minHeight: '32px', fontSize: '0.875rem'}),
+                menu: base => ({...base, zIndex: 9999}),
             }}
         />
     );

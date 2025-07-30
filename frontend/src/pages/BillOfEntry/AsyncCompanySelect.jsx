@@ -1,25 +1,11 @@
-// components/AsyncCompanySelect.jsx
 import React from 'react';
 import AsyncSelect from 'react-select/async';
-import axios from '../../api/axiosInstance';
-
-const loadOptions = async (inputValue) => {
-    const res = await axios.get('/api/companies/', {
-        params: {search: inputValue}
-    });
-    return res.data.results.map(company => ({
-        label: company.name,
-        value: company.id,
-        data: company
-    }));
-};
+import {useDebouncedAsyncOptions} from '../../hooks/useDebouncedAsyncOptions';
 
 const AsyncCompanySelect = ({value, onChange, isMulti = false, placeholder = "Select Company"}) => {
-    const toOption = (v) => ({
-        label: v.name,
-        value: v.id,
-        data: v
-    });
+    const loadOptions = useDebouncedAsyncOptions('/api/companies/');
+
+    const toOption = (v) => ({label: v.name, value: v.id, data: v});
 
     const formattedValue = isMulti
         ? (value || []).map(toOption)
@@ -41,9 +27,7 @@ const AsyncCompanySelect = ({value, onChange, isMulti = false, placeholder = "Se
             isMulti={isMulti}
             value={formattedValue}
             onChange={handleChange}
-            isClearable
-            placeholder={placeholder}  // ✅ dynamic placeholder
-            getOptionLabel={(e) => e.label}
+            placeholder={placeholder}
         />
     );
 };

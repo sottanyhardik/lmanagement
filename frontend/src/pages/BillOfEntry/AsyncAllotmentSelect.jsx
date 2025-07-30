@@ -1,28 +1,31 @@
 // components/AsyncAllotmentSelect.jsx
 import React from 'react';
 import AsyncSelect from 'react-select/async';
-import axios from '../../api/axiosInstance';
-
-const loadOptions = async (inputValue) => {
-    const response = await axios.get('/api/option-allotments/', {
-        params: {search: inputValue}
-    });
-    return response.data.results.map(a => ({
-        value: a.id,
-        label: `${a.invoice} - ${a.item_name} - ${a.required_quantity} - ${a.company?.name}`,
-        data: a
-    }));
-};
+import {useDebouncedAsyncOptions} from '../../hooks/useDebouncedAsyncOptions';
 
 const AsyncAllotmentSelect = ({value, onChange, isMulti = true}) => {
-    const toOption = (v) => ({
-        value: v.id,
-        label: `${v.invoice} - ${v.item_name} - ${v.required_quantity} - ${v.company?.name}`,
-        data: v
-    });
+    const formatLabel = (item) =>
+        `${item.invoice} - ${item.item_name} - ${item.required_quantity} - ${item.company?.name}`;
+
+    const baseLoader = useDebouncedAsyncOptions('/api/option-allotments/', 'item_name', 'id');
+
+    const loadOptions = async (inputValue) => {
+        const options = await baseLoader(inputValue);
+        return options.map(o => ({
+            ...o,
+            label: formatLabel(o.data), // override label formatting
+        }));
+    };
+
+    const toOption = (v) =>
+        v?.id
+            ? {value: v.id, label: formatLabel(v), data: v}
+            : v?.value && v.label
+                ? {value: v.value, label: v.label, data: v.data || {id: v.value}}
+                : null;
 
     const defaultValue = isMulti
-        ? (value || []).map(toOption)
+        ? (value || []).map(toOption).filter(Boolean)
         : value ? toOption(value) : null;
 
     const handleChange = (selected) => {
@@ -41,7 +44,12 @@ const AsyncAllotmentSelect = ({value, onChange, isMulti = true}) => {
             isMulti={isMulti}
             value={defaultValue}
             onChange={handleChange}
-            getOptionLabel={(e) => e.label}
+            isClearable
+            placeholder="Select Allotment"
+            styles={{
+                control: base => ({...base, minHeight: '32px', fontSize: '0.875rem'}),
+                menu: base => ({...base, zIndex: 9999})
+            }}
         />
     );
 };
