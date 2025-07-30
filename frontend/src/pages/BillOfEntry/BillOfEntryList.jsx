@@ -1,5 +1,6 @@
-import React, {useEffect, useState} from 'react';
-import {Card, Col, Collapse, Container, Form, Row, Spinner} from 'react-bootstrap';
+import React, {useCallback, useEffect, useState} from 'react';
+import {Card, Col, Collapse, Container, Form, Row} from 'react-bootstrap';
+import Accordion from 'react-bootstrap/Accordion';
 import {toast} from 'react-toastify';
 import BillOfEntryForm from './BillOfEntryForm';
 import ListControls from '../../components/ListControls';
@@ -10,6 +11,7 @@ import useUrlSync from '../../hooks/useUrlSync';
 import axios from '../../api/axiosInstance';
 import YesNoRadio from '../../components/YesNoRadio';
 
+
 const BillOfEntryList = () => {
     const [entries, setEntries] = useState([]);
     const [expanded, setExpanded] = useState({});
@@ -19,6 +21,8 @@ const BillOfEntryList = () => {
     const [sortField, setSortField] = useState('bill_of_entry_date');
     const [sortOrder, setSortOrder] = useState('desc');
     const [searchQuery, setSearchQuery] = useState('');
+    const [allExpanded, setAllExpanded] = useState(true);
+
     const [filters, setFilters] = useState({
         company_objs: [],
         exclude_company_objs: [],
@@ -41,7 +45,36 @@ const BillOfEntryList = () => {
         setSortOrder,
     });
 
-    const fetchData = async () => {
+    const groupEntries = (entries) => {
+        const groups = {};
+
+        entries.forEach(entry => {
+            const companyName = entry.company?.name || 'Unknown Company';
+            const date = new Date(entry.bill_of_entry_date);
+            const month = date.toLocaleString('default', {month: 'long', year: 'numeric'});
+            const portName = entry.port?.code || 'Unknown Port';
+
+            const qty = parseFloat(entry.get_total_quantity || 0);
+            const cif_fc = parseFloat(entry.get_total_fc || 0);
+            const cif_inr = parseFloat(entry.get_total_inr || 0);
+
+            if (!groups[companyName]) groups[companyName] = {};
+            if (!groups[companyName][month]) groups[companyName][month] = {};
+            if (!groups[companyName][month][portName]) {
+                groups[companyName][month][portName] = {entries: [], summary: {qty: 0, fc: 0, inr: 0}};
+            }
+
+            groups[companyName][month][portName].entries.push(entry);
+            groups[companyName][month][portName].summary.qty += qty;
+            groups[companyName][month][portName].summary.fc += cif_fc;
+            groups[companyName][month][portName].summary.inr += cif_inr;
+        });
+
+        return groups;
+    };
+
+
+    const fetchData = useCallback(async () => {
         setLoading(true);
         try {
             const params = {
@@ -71,11 +104,11 @@ const BillOfEntryList = () => {
         } finally {
             setLoading(false);
         }
-    };
+    }, [page, searchQuery, sortField, sortOrder, filters]);
 
     useEffect(() => {
         fetchData();
-    }, [page, filters, searchQuery, sortField, sortOrder]);
+    }, [fetchData]);
 
     const toggle = (id) => setExpanded(prev => ({...prev, [id]: !prev[id]}));
 
@@ -144,6 +177,14 @@ const BillOfEntryList = () => {
             toast.error('Failed to export PDF');
         }
     };
+    const sortOptions = [
+        {label: 'BOE Date ⬇️', value: 'bill_of_entry_date:desc'},
+        {label: 'BOE Date ⬆️', value: 'bill_of_entry_date:asc'},
+        {label: 'BOE Number ⬇️', value: 'bill_of_entry_number:desc'},
+        {label: 'BOE Number ⬆️', value: 'bill_of_entry_number:asc'},
+        {label: 'Modified On ⬇️', value: 'modified_on:desc'},
+        {label: 'Modified On ⬆️', value: 'modified_on:asc'},
+    ];
 
     const handleReset = () => {
         setSearchQuery('');
@@ -172,10 +213,11 @@ const BillOfEntryList = () => {
                 sortOrder={sortOrder}
                 setSortField={setSortField}
                 setSortOrder={setSortOrder}
+                sortOptions={sortOptions}
                 setPage={setPage}
                 handleReset={handleReset}
-                handleExportCSV={handleExportXLSX}
-                handleExportPDF={handleExportPDF}
+                handleExportCSV={loading ? undefined : handleExportXLSX}
+                handleExportPDF={loading ? undefined : handleExportPDF}
                 dataExport={true}
                 Filters={[
                     <AsyncCompanySelect
@@ -248,7 +290,14 @@ const BillOfEntryList = () => {
                     })
                 }
             />
-
+            <div className="d-flex justify-content-end mb-2">
+                <button
+                    className="btn btn-outline-primary btn-sm"
+                    onClick={() => setAllExpanded(prev => !prev)}
+                >
+                    {allExpanded ? 'Collapse All' : 'Expand All'}
+                </button>
+            </div>
             {newEntry && (
                 <Card className="mb-3 border-success">
                     <Card.Header className="bg-success text-white">New Bill of Entry</Card.Header>
@@ -266,40 +315,55 @@ const BillOfEntryList = () => {
                 </Card>
             )}
 
-            {loading ? (
-                <Spinner animation="border"/>
-            ) : (
-                entries.map(entry => (
-                    <Card key={entry.id} className="mb-3 shadow-sm">
-                        <Card.Header onClick={() => toggle(entry.id)} style={{cursor: 'pointer'}}>
-                            <Row>
-                                <Col>BOE <strong>#{entry.bill_of_entry_number}</strong></Col>
-                                <Col>Date: <strong>{entry.bill_of_entry_date}</strong></Col>
-                                <Col>Port: <strong>{entry.port?.code || '-'}</strong></Col>
-                                <Col>Company: <strong>{entry.company?.name || '-'}</strong></Col>
-                                <Col>Qty: <strong>{entry.get_total_quantity}</strong></Col>
-                                <Col>CIF <strong>$: {entry.get_total_fc}</strong></Col>
-                                <Col
-                                    className="text-end">INR <strong>₹{entry.get_total_inr.toLocaleString()}</strong></Col>
-                            </Row>
-                            <hr/>
-                            <Row className="mt-1">
-                                <Col>Allotments: <strong>{entry.allotment?.map(a => a?.item_name).join(', ') || '-'}</strong></Col>
-                                <Col>Product Name <strong>{entry.product_name}</strong></Col>
-                                <Col>Invoice: <strong>{entry.invoice_no}</strong></Col>
-                                <Col>Exchange Rate: <strong>{entry.exchange_rate || '-'}</strong></Col>
-                            </Row>
-                        </Card.Header>
-                        <Collapse in={!!expanded[entry.id]}>
-                            <Card.Body className="bg-light border-top">
-                                <BillOfEntryForm
-                                    entry={entry}
-                                    onSaved={fetchData}
-                                />
-                            </Card.Body>
-                        </Collapse>
-                    </Card>
-                ))
+            {!loading && (
+                <Accordion alwaysOpen
+                           activeKey={allExpanded ? Object.keys(groupEntries(entries)).map((_, i) => `company-${i}`) : []}>
+                    {Object.entries(groupEntries(entries)).map(([company, months], companyIndex) => (
+                        <Accordion.Item eventKey={`company-${companyIndex}`} key={company}>
+                            <Accordion.Header>
+                                <div className="sticky-header w-100">
+                                    <strong>Company: {company}</strong>
+                                </div>
+                            </Accordion.Header>
+                            <Accordion.Body>
+                                {Object.entries(months).map(([month, ports]) => (
+                                    <div key={month}>
+                                        <div className="sticky-header text-primary fw-semibold mt-3">{month}</div>
+                                        {Object.entries(ports).map(([port, {entries: boes, summary}], portIndex) => (
+                                            <div key={port} className="border rounded p-2 mb-3 bg-white shadow-sm">
+                                                <div className="sticky-header fw-bold text-dark mb-2">
+                                                    {port} — Total Qty: {summary.qty.toFixed(2)} | CIF
+                                                    $: {summary.fc.toFixed(2)} | INR ₹{summary.inr.toLocaleString()}
+                                                </div>
+                                                {boes.map(entry => (
+                                                    <Card key={entry.id} className="mb-2 shadow-sm">
+                                                        <Card.Header onClick={() => toggle(entry.id)}
+                                                                     style={{cursor: 'pointer'}}>
+                                                            <Row>
+                                                                <Col>BOE #{entry.bill_of_entry_number}</Col>
+                                                                <Col>Date: {entry.bill_of_entry_date}</Col>
+                                                                <Col>Qty: {entry.get_total_quantity}</Col>
+                                                                <Col>Product Name: {entry.product_name}</Col>
+                                                                <Col>CIF $: {entry.get_total_fc}</Col>
+                                                                <Col className="text-end">INR
+                                                                    ₹{entry.get_total_inr.toLocaleString()}</Col>
+                                                            </Row>
+                                                        </Card.Header>
+                                                        <Collapse in={!!expanded[entry.id]}>
+                                                            <Card.Body className="bg-light border-top">
+                                                                <BillOfEntryForm entry={entry} onSaved={fetchData}/>
+                                                            </Card.Body>
+                                                        </Collapse>
+                                                    </Card>
+                                                ))}
+                                            </div>
+                                        ))}
+                                    </div>
+                                ))}
+                            </Accordion.Body>
+                        </Accordion.Item>
+                    ))}
+                </Accordion>
             )}
 
             <PaginationControls

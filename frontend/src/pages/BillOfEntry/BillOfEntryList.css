@@ -1,8 +1,13 @@
 .sticky-header {
     position: sticky;
-    top: 60px; /* adjust based on your navbar height */
-    z-index: 5;
-    background-color: #f8f9fa;
+    top: 60px; /* adjust based on your navbar */
+    z-index: 1010;
+    background: #ffffff;
+    border-bottom: 1px solid #dee2e6;
     padding: 8px 12px;
-    border-bottom: 1px solid #ccc;
+}
+
+.btn-sm {
+    font-size: 0.85rem;
+    padding: 3px 8px;
 }
