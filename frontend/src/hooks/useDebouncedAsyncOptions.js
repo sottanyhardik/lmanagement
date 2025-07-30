@@ -1,25 +1,48 @@
-// hooks/useDebouncedAsyncOptions.js
-import {useMemo} from 'react';
+import {useCallback, useRef} from 'react';
 import axios from '../api/axiosInstance';
 import debounce from 'lodash.debounce';
 
-export const useDebouncedAsyncOptions = (endpoint, labelKey = 'name', valueKey = 'id') => {
-    const cache = {};
+/**
+ * Custom hook to create a debounced async options loader for react-select
+ * @param {string} url - API endpoint
+ * @param {string} searchParam - query param name to search (e.g. 'name')
+ * @param {string} valueKey - field used for option.value (e.g. 'id')
+ * @param {object} additionalParams - any static query parameters (optional)
+ * @returns {function} debounced loader function
+ */
+export const useDebouncedAsyncOptions = (url, searchParam = 'search', valueKey = 'id', additionalParams = {}) => {
+    const cacheRef = useRef({});
 
-    const loadOptions = async (inputValue) => {
-        if (cache[inputValue]) return cache[inputValue];
+    const fetchOptions = async (inputValue) => {
+        const key = `${url}::${inputValue}`;
+        if (cacheRef.current[key]) {
+            return cacheRef.current[key];
+        }
 
-        const res = await axios.get(endpoint, {params: {search: inputValue}});
-        const options = res.data.results.map(item => ({
-            label: item[labelKey],
-            value: item[valueKey],
-            data: item,
-        }));
-        cache[inputValue] = options;
-        return options;
+        try {
+            const params = {
+                [searchParam]: inputValue,
+                ...additionalParams
+            };
+
+            const res = await axios.get(url, {params});
+            const results = Array.isArray(res.data?.results) ? res.data.results : res.data;
+
+            const options = results.map(item => ({
+                value: item[valueKey],
+                label: item.name || item.display_name || String(item[valueKey]),
+                data: item
+            }));
+
+            cacheRef.current[key] = options;
+            return options;
+        } catch (err) {
+            console.error(`[useDebouncedAsyncOptions] Failed to fetch options from ${url}`, err);
+            return [];
+        }
     };
 
-    const debouncedLoadOptions = useMemo(() => debounce(loadOptions, 300), []);
+    const debouncedLoader = useCallback(debounce(fetchOptions, 300), [url, searchParam, valueKey]);
 
-    return debouncedLoadOptions;
+    return debouncedLoader;
 };

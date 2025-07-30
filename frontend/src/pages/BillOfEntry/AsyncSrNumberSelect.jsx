@@ -1,4 +1,3 @@
-// components/AsyncSrNumberSelect.jsx
 import React from 'react';
 import AsyncSelect from 'react-select/async';
 import {useDebouncedAsyncOptions} from '../../hooks/useDebouncedAsyncOptions';
@@ -10,14 +9,34 @@ const AsyncSrNumberSelect = ({
                                  placeholder = "Select SR Number",
                                  excludeIds = [],
                              }) => {
-    // Use shared debounced loader
-    const loadBaseOptions = useDebouncedAsyncOptions('/api/license-import-items/', 'display_name', 'id');
+    const baseLoader = useDebouncedAsyncOptions('/api/license-import-items/', 'display_name', 'id');
 
-    // Wrap to filter excluded IDs
     const loadOptions = async (inputValue) => {
-        const options = await loadBaseOptions(inputValue);
-        return options.filter(option => !excludeIds.includes(option.value));
+        const options = await baseLoader(inputValue);
+        if (!Array.isArray(options)) return [];
+
+        // Print raw values
+        const values = options.map(o => o.value);
+        const seen = new Set();
+        const duplicates = values.filter(val => {
+            if (seen.has(val)) return true;
+            seen.add(val);
+            return false;
+        });
+        if (duplicates.length > 0) {
+            console.warn("❌ Duplicate keys detected in options:", duplicates);
+        }
+
+        // Apply excludeIds and deduplication
+        const filtered = options
+            .filter(option => !excludeIds.includes(option.value))
+            .filter((opt, index, self) =>
+                index === self.findIndex(o => o.value === opt.value)
+            );
+
+        return filtered;
     };
+
 
     const toOption = (v) =>
         v?.id

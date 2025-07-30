@@ -34,7 +34,9 @@ const BillOfEntryForm = ({entry, isNew = false, onClose, onSaved}) => {
     const handleChange = useCallback((field, value) => {
         if (field === 'allotment') {
             const first = Array.isArray(value) && value.length > 0 ? value[0] : null;
-            const combinedItems = value.flatMap(a =>
+
+            // Map new item rows from selected allotments
+            const newItems = value.flatMap(a =>
                 (a.item_details || []).map(item => ({
                     sr_number: item.item
                         ? {
@@ -48,17 +50,34 @@ const BillOfEntryForm = ({entry, isNew = false, onClose, onSaved}) => {
                     cif_inr: item.cif_inr || ''
                 }))
             );
-            console.log('[Allotment] Mapped BOE items from allotment:', combinedItems);
+
             setData(prev => {
                 const prevNames = prev.product_name
                     ? prev.product_name.split(',').map(n => n.trim()).filter(Boolean)
                     : [];
-
-                const newNames = value
-                    .map(a => a.item_name)
-                    .filter(Boolean);
-
+                const newNames = value.map(a => a.item_name).filter(Boolean);
                 const combinedNames = Array.from(new Set([...prevNames, ...newNames]));
+
+                // Decide base items to work with
+                const isEmptyOrSingleBlank = prev.item_details.length === 0 || (
+                    prev.item_details.length === 1 &&
+                    !prev.item_details[0].sr_number &&
+                    !prev.item_details[0].qty &&
+                    !prev.item_details[0].cif_fc &&
+                    !prev.item_details[0].cif_inr
+                );
+                const baseItems = isEmptyOrSingleBlank ? [] : prev.item_details;
+
+                // Combine old + new items, filtering duplicates by sr_number.value
+                const seen = new Set();
+                const combinedItems = [...baseItems, ...newItems].filter(item => {
+                    const id = item.sr_number?.value;
+                    if (!id || seen.has(id)) return false;
+                    seen.add(id);
+                    return true;
+                });
+
+                console.log('[Allotment] Combined Items:', combinedItems);
 
                 return {
                     ...prev,
@@ -66,14 +85,25 @@ const BillOfEntryForm = ({entry, isNew = false, onClose, onSaved}) => {
                     product_name: combinedNames.join(', '),
                     company: prev.company || first?.company || null,
                     port: prev.port || first?.port || null,
-                    item_details: prev.item_details.length > 0
-                        ? prev.item_details // don’t overwrite if already filled
-                        : combinedItems // prefill only if empty
+                    item_details: combinedItems
                 };
+            });
+
+            // Clear any existing errors for allotment field
+            setErrors(prev => {
+                const newErrors = {...prev};
+                delete newErrors[field];
+                return newErrors;
             });
         } else {
             setData(prev => ({...prev, [field]: value}));
+            setErrors(prev => {
+                const newErrors = {...prev};
+                delete newErrors[field];
+                return newErrors;
+            });
         }
+
 
         setErrors(prev => {
             const newErrors = {...prev};
@@ -141,11 +171,23 @@ const BillOfEntryForm = ({entry, isNew = false, onClose, onSaved}) => {
     };
 
     const removeItemRow = (index) => {
-        if (data.item_details.length === 1) return;
         const updated = [...data.item_details];
         updated.splice(index, 1);
+
+        // If empty after deletion, insert a blank row
+        if (updated.length === 0) {
+            updated.push({
+                sr_number: null,
+                transaction_type: 'D',
+                qty: '',
+                cif_fc: '',
+                cif_inr: ''
+            });
+        }
+
         setData(prev => ({...prev, item_details: updated}));
     };
+
 
     const validate = () => {
         const errs = {};
@@ -240,6 +282,7 @@ const BillOfEntryForm = ({entry, isNew = false, onClose, onSaved}) => {
                     <AsyncAllotmentSelect
                         value={data.allotment ?? []}
                         onChange={(v) => handleChange('allotment', v)}
+                        currentBoeId={data.id}
                     />
                     {errors.allotment && <div className="text-danger small">{errors.allotment}</div>}
                 </Col>

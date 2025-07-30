@@ -83,7 +83,6 @@ const LineItemTable = ({
                                     variant="outline-danger"
                                     size="sm"
                                     onClick={() => onRemoveRow(idx)}
-                                    disabled={items.length === 1}
                                 >
                                     Delete
                                 </Button>
