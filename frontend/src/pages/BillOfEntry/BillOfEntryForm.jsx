@@ -34,7 +34,21 @@ const BillOfEntryForm = ({entry, isNew = false, onClose, onSaved}) => {
     const handleChange = useCallback((field, value) => {
         if (field === 'allotment') {
             const first = Array.isArray(value) && value.length > 0 ? value[0] : null;
-
+            const combinedItems = value.flatMap(a =>
+                (a.item_details || []).map(item => ({
+                    sr_number: item.item
+                        ? {
+                            value: item.item.id,
+                            label: item.item.display_name
+                        }
+                        : null,
+                    transaction_type: item.transaction_type || 'D',
+                    qty: item.qty || '',
+                    cif_fc: item.cif_fc || '',
+                    cif_inr: item.cif_inr || ''
+                }))
+            );
+            console.log('[Allotment] Mapped BOE items from allotment:', combinedItems);
             setData(prev => {
                 const prevNames = prev.product_name
                     ? prev.product_name.split(',').map(n => n.trim()).filter(Boolean)
@@ -51,7 +65,10 @@ const BillOfEntryForm = ({entry, isNew = false, onClose, onSaved}) => {
                     allotment: value,
                     product_name: combinedNames.join(', '),
                     company: prev.company || first?.company || null,
-                    port: prev.port || first?.port || null
+                    port: prev.port || first?.port || null,
+                    item_details: prev.item_details.length > 0
+                        ? prev.item_details // don’t overwrite if already filled
+                        : combinedItems // prefill only if empty
                 };
             });
         } else {
@@ -140,7 +157,10 @@ const BillOfEntryForm = ({entry, isNew = false, onClose, onSaved}) => {
         if (!data.exchange_rate || isNaN(data.exchange_rate)) errs.exchange_rate = 'Enter valid number';
 
         data.item_details.forEach((item, idx) => {
-            if (!item.sr_number) errs[`item_${idx}_sr`] = 'Required';
+            const srValue = item.sr_number?.value || item.sr_number_display?.value;
+            if (!srValue) {
+                errs[`item_${idx}_sr`] = 'License Number is required';
+            }
             if (!item.qty || isNaN(item.qty)) errs[`item_${idx}_qty`] = 'Invalid';
             if (!item.cif_fc || isNaN(item.cif_fc)) errs[`item_${idx}_fc`] = 'Invalid';
             if (!item.cif_inr || isNaN(item.cif_inr)) errs[`item_${idx}_inr`] = 'Invalid';
@@ -163,11 +183,12 @@ const BillOfEntryForm = ({entry, isNew = false, onClose, onSaved}) => {
                 port: data.port?.id,
                 company: data.company?.id,
                 allotment: data.allotment.map(a => a.id),
-                item_details: data.item_details.map(({sr_number, ...item}) => ({
+                item_details: data.item_details.map((item) => ({
                     ...item,
-                    sr_number: sr_number?.value || null
+                    sr_number: item.sr_number?.value || item.sr_number_display?.value || null
                 }))
             };
+            console.log(payload);
             if (isNew) {
                 await axios.post('/api/bill-of-entries/', payload);
                 toast.success('Bill of Entry Created');
@@ -177,6 +198,7 @@ const BillOfEntryForm = ({entry, isNew = false, onClose, onSaved}) => {
             }
             onSaved?.();
         } catch (err) {
+            console.error(err);
             toast.error('Failed to save entry');
         } finally {
             setSaving(false);

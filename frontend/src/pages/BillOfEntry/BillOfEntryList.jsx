@@ -285,7 +285,6 @@ const BillOfEntryList = () => {
                             <hr/>
                             <Row className="mt-1">
                                 <Col>Allotments: <strong>{entry.allotment?.map(a => a?.item_name).join(', ') || '-'}</strong></Col>
-                                <Col>Invoices: <strong>{entry.allotment?.map(a => a?.invoice).join(', ') || '-'}</strong></Col>
                                 <Col>Product Name <strong>{entry.product_name}</strong></Col>
                                 <Col>Invoice: <strong>{entry.invoice_no}</strong></Col>
                                 <Col>Exchange Rate: <strong>{entry.exchange_rate || '-'}</strong></Col>
