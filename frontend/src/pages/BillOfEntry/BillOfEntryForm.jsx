@@ -230,7 +230,6 @@ const BillOfEntryForm = ({entry, isNew = false, onClose, onSaved}) => {
                     sr_number: item.sr_number?.value || item.sr_number_display?.value || null
                 }))
             };
-            console.log(payload);
             if (isNew) {
                 await axios.post('/api/bill-of-entries/', payload);
                 toast.success('Bill of Entry Created');
@@ -238,7 +237,10 @@ const BillOfEntryForm = ({entry, isNew = false, onClose, onSaved}) => {
                 await axios.patch(`/api/bill-of-entries/${data.id}/`, payload);
                 toast.success('Bill of Entry Updated');
             }
-            onSaved?.();
+            onSaved?.({
+                ...data,
+                id: data.id || 'new' // ensure ID is passed for tab switch
+            });
         } catch (err) {
             console.error(err);
             toast.error('Failed to save entry');
