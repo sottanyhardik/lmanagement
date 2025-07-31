@@ -11,14 +11,14 @@ from .serializers import BillOfEntrySerializer, BillOfEntryWriteSerializer
 
 class BillOfEntryViewSet(viewsets.ModelViewSet):
     queryset = BillOfEntryModel.objects.all().select_related('company', 'port').prefetch_related(
-        'item_details').distinct()
+        'item_details').order_by('company__name').distinct()
     serializer_class = BillOfEntrySerializer
     # permission_classes = [IsAuthenticated]
     filter_backends = [DjangoFilterBackend, filters.SearchFilter, filters.OrderingFilter]
     filterset_class = BillOfEntryFilter
     search_fields = ['bill_of_entry_number', 'invoice_no', 'product_name']
     ordering_fields = ['bill_of_entry_date', 'bill_of_entry_number', 'exchange_rate']
-    ordering = ['-bill_of_entry_date']
+    ordering = ['company__name']
 
     def get_serializer_class(self):
         if self.action in ['create', 'update', 'partial_update']:
