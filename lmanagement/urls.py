@@ -21,12 +21,12 @@ from django.contrib import admin
 from django.urls import path, include
 
 urlpatterns = [
+                  path('admin/', admin.site.urls),
                   path('', include('core.urls')),
                   path('', include('accounts.urls')),
                   path('', include('license.urls')),
                   path('', include('allotment.urls')),
                   path('', include('bill_of_entry.urls')),
-                  path('admin/', admin.site.urls),
                   path('select2/', include('django_select2.urls')),
                   path('accounts/', include('django.contrib.auth.urls')),
                   path('django-rq/', include('django_rq.urls')),

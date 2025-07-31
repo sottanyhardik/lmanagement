@@ -1,5 +1,5 @@
 import React, {useEffect, useState} from 'react';
-import {Button, Col, Form, Row, Spinner} from 'react-bootstrap';
+import {Button, Col, Form, Row, Spinner, Table} from 'react-bootstrap';
 import axios from '../../api/axiosInstance';
 import {toast} from 'react-toastify';
 
@@ -14,37 +14,40 @@ const TransferLetterForm = ({boe, autoDownload = false}) => {
         tl_choice: ''
     });
 
+    const [editableItems, setEditableItems] = useState([]);
+
     useEffect(() => {
         const fetchTemplates = async () => {
             try {
                 const res = await axios.get('/api/transfer-letters/');
                 const data = res.data?.results || res.data;
-                if (Array.isArray(data)) {
-                    setTemplates(data);
-                } else {
-                    console.error("Transfer letter API did not return an array:", data);
-                    setTemplates([]);
-                }
+                setTemplates(Array.isArray(data) ? data : []);
             } catch (err) {
-                console.error('Failed to load templates:', err);
                 toast.error('Failed to load TL templates');
-                setTemplates([]);
             } finally {
                 setLoading(false);
             }
         };
+
         fetchTemplates();
     }, []);
 
     useEffect(() => {
-        console.log('BOE:', boe);
-        if (boe) {
+        if (boe && boe.company) {
             setFormData({
-                company: boe.company?.name || '',
-                company_address_line1: boe.company?.address_line_1 || '',
-                company_address_line2: boe.company?.address_line_2 || '',
+                company: boe.company.name || '',
+                company_address_line1: boe.company.address_line_1 || '',
+                company_address_line2: boe.company.address_line_2 || '',
                 tl_choice: ''
             });
+
+            setEditableItems(
+                boe.item_details?.map((item, index) => ({
+                    id: item.id || index,
+                    sr_number: item.sr_number?.display_name || `SR ${index + 1}`,
+                    cif_fc: item.cif_fc
+                })) || []
+            );
         }
     }, [boe]);
 
@@ -52,15 +55,28 @@ const TransferLetterForm = ({boe, autoDownload = false}) => {
         setFormData(prev => ({...prev, [field]: value}));
     };
 
+    const handleCifChange = (index, value) => {
+        setEditableItems(prev =>
+            prev.map((item, idx) =>
+                idx === index ? {...item, cif_fc: value} : item
+            )
+        );
+    };
+
     const handleGenerate = async () => {
         if (!formData.tl_choice) {
             toast.warning('Please select a TL template');
             return;
         }
+
         setGenerating(true);
         try {
-            const payload = {...formData};
-            const res = await axios.post(`/boe/${boe.id}/generate/${boe.id}/`, payload);
+            const payload = {
+                ...formData,
+                modified_items: editableItems
+            };
+
+            const res = await axios.post(`/boe/${boe.id}/generate`, payload);
             toast.success('Transfer Letter Generated');
 
             if (autoDownload && res.data?.url) {
@@ -71,7 +87,6 @@ const TransferLetterForm = ({boe, autoDownload = false}) => {
                 link.click();
             }
         } catch (err) {
-            console.error(err);
             toast.error('Failed to generate TL');
         } finally {
             setGenerating(false);
@@ -79,7 +94,11 @@ const TransferLetterForm = ({boe, autoDownload = false}) => {
     };
 
     if (loading) {
-        return <div className="text-muted"><Spinner size="sm"/> Loading templates...</div>;
+        return (
+            <div className="text-muted">
+                <Spinner size="sm"/> Loading templates...
+            </div>
+        );
     }
 
     return (
@@ -88,21 +107,21 @@ const TransferLetterForm = ({boe, autoDownload = false}) => {
                 <Col md={4}>
                     <Form.Label>Company</Form.Label>
                     <Form.Control
-                        value={formData.company ?? ""}
+                        value={formData.company}
                         onChange={e => handleChange('company', e.target.value)}
                     />
                 </Col>
                 <Col md={4}>
                     <Form.Label>Address Line 1</Form.Label>
                     <Form.Control
-                        value={formData.company_address_line1 ?? ""}
+                        value={formData.company_address_line1}
                         onChange={e => handleChange('company_address_line1', e.target.value)}
                     />
                 </Col>
                 <Col md={4}>
                     <Form.Label>Address Line 2</Form.Label>
                     <Form.Control
-                        value={formData.company_address_line2 ?? ""}
+                        value={formData.company_address_line2}
                         onChange={e => handleChange('company_address_line2', e.target.value)}
                     />
                 </Col>
@@ -112,23 +131,52 @@ const TransferLetterForm = ({boe, autoDownload = false}) => {
                 <Col md={6}>
                     <Form.Label>Select Template</Form.Label>
                     <Form.Select
-                        value={formData.tl_choice ?? ""}
-                        onChange={(e) => handleChange('tl_choice', e.target.value)}
+                        value={formData.tl_choice}
+                        onChange={e => handleChange('tl_choice', e.target.value)}
                     >
                         <option value="">-- Select Transfer Letter Template --</option>
-                        {Array.isArray(templates) && templates.map(template => (
+                        {templates.map(template => (
                             <option key={template.id} value={template.id}>
                                 {template.name}
                             </option>
                         ))}
                     </Form.Select>
                 </Col>
-                <Col md={6} className="d-flex align-items-end">
-                    <Button variant="primary" onClick={handleGenerate} disabled={generating}>
-                        {generating ? 'Generating...' : 'Generate Transfer Letter'}
-                    </Button>
-                </Col>
             </Row>
+
+            <h6 className="mt-3 mb-2">Edit CIF FC Values</h6>
+            <Table bordered size="sm" className="mb-3">
+                <thead className="table-light">
+                <tr>
+                    <th>#</th>
+                    <th>SR Number</th>
+                    <th className="text-end">CIF FC (editable)</th>
+                </tr>
+                </thead>
+                <tbody>
+                {editableItems.map((item, idx) => (
+                    <tr key={item.id}>
+                        <td>{idx + 1}</td>
+                        <td>{item.sr_number}</td>
+                        <td className="text-end">
+                            <Form.Control
+                                type="number"
+                                min="0"
+                                value={item.cif_fc}
+                                onChange={e => handleCifChange(idx, e.target.value)}
+                                style={{textAlign: 'right'}}
+                            />
+                        </td>
+                    </tr>
+                ))}
+                </tbody>
+            </Table>
+
+            <div className="text-end">
+                <Button variant="primary" onClick={handleGenerate} disabled={generating}>
+                    {generating ? 'Generating...' : 'Generate Transfer Letter'}
+                </Button>
+            </div>
         </Form>
     );
 };

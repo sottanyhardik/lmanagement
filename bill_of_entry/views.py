@@ -5,9 +5,7 @@ from decimal import Decimal
 
 from django.db.models import Prefetch
 from django.db.models import Q
-from django.http import HttpResponse
 from django.http import HttpResponseRedirect
-from django.http import JsonResponse
 from django.urls import reverse, reverse_lazy
 from django.views.generic import DetailView, FormView, DeleteView, UpdateView, CreateView
 from django_filters.views import FilterView
@@ -18,9 +16,7 @@ from extra_views import UpdateWithInlinesView, InlineFormSetFactory
 from openpyxl import Workbook
 from openpyxl.styles import Font, Border, Side
 from openpyxl.utils import get_column_letter
-from rest_framework.views import APIView
 
-from allotment.forms import TlForm
 from bill_of_entry.models import RowDetails
 from core.utils import render_to_pdf
 from lmanagement.tasks import fetch_data_to_model
@@ -222,74 +218,70 @@ class DownloadPortView(PDFTemplateResponseMixin, FilterView):
         return context
 
 
-class GenerateTransferLetterView(FormView):
-    template_name = 'allotment/generate.html'
-    model = bill_of_entry.BillOfEntryModel
-    form_class = TlForm
+from rest_framework.views import APIView
+from rest_framework.response import Response
+from rest_framework import status
+from django.http import HttpResponse
+from shutil import make_archive
+from datetime import datetime
+from core.models import TransferLetterModel
+from allotment.scripts.aro import generate_tl_software
 
-    def get_context_data(self, **kwargs):
-        context = super().get_context_data(**kwargs)
-        context['type'] = True
-        context['object'] = self.get_object()
-        return context
 
-    def get(self, request, *args, **kwargs):
-        context = self.get_context_data(**kwargs)
-        return self.render_to_response(context)
+class GenerateTransferLetterAPI(APIView):
+    def post(self, request, pk):
+        try:
+            boe = BillOfEntryModel.objects.get(id=pk)
 
-    def get_object(self):
-        return self.model.objects.get(id=self.kwargs.get('pk'))
+            # Required form fields
+            company = request.data.get('company')
+            address_1 = request.data.get('company_address_line1')
+            address_2 = request.data.get('company_address_line2')
+            tl_id = request.data.get('tl_choice')
 
-    def get_initial(self):
-        initial = super().get_initial()
-        initial['company'] = str(self.get_object().company)
-        initial['company_address_line1'] = str(self.get_object().company.address_line_1)
-        initial['company_address_line2'] = str(self.get_object().company.address_line_2)
-        return initial
+            if not (company and address_1 and address_2 and tl_id):
+                return Response({'error': 'Missing required fields'}, status=status.HTTP_400_BAD_REQUEST)
+            items_data = request.data.get('modified_items', [])
 
-    def post(self, request, *args, **kwargs):
-        from shutil import make_archive
-        form = self.get_form()
-        if not form.is_valid():
-            return self.form_invalid(form)
-        else:
-            try:
-                boe_id = self.kwargs.get('boe')
-                boe = bill_of_entry.BillOfEntryModel.objects.get(id=self.kwargs.get('pk'))
-                from datetime import datetime
-                data = [{
+            # Build TL data
+            data = []
+            for item, item_data in zip(boe.item_details.all(), items_data):
+                override_fc = item_data.get('cif_fc')
+                cif_fc = float(override_fc) if override_fc is not None else item.cif_fc
+                data.append({
                     'status': item.sr_number.license.purchase_status,
-                    'company': self.request.POST.get('company'),
-                    'company_address_1': self.request.POST.get('company_address_line1'),
-                    'company_address_2': self.request.POST.get('company_address_line2'),
+                    'company': company,
+                    'company_address_1': address_1,
+                    'company_address_2': address_2,
                     'today': str(datetime.now().date()),
                     'license': item.sr_number.license.license_number,
                     'license_date': item.sr_number.license_date.strftime("%d/%m/%Y"),
-                    'file_number': item.sr_number.license.file_number, 'quantity': item.qty,
+                    'file_number': item.sr_number.license.file_number,
+                    'quantity': item.qty,
                     'v_allotment_inr': round(item.cif_inr, 2),
+                    'v_allotment_usd': cif_fc,
                     'exporter_name': item.sr_number.license.exporter.name,
-                    'v_allotment_usd': item.cif_fc, 'boe': "BE NUMBER :- " + item.bill_of_entry.bill_of_entry_number}
-                    for item in
-                    boe.item_details.all()]
-                be_number = boe.bill_of_entry_number
-                tl = self.request.POST.get('tl_choice')
-                from core.models import TransferLetterModel
-                transfer_letter = TransferLetterModel.objects.get(pk=tl)
-                tl_path = transfer_letter.tl.path
-                file_path = 'media/TL_' + str(be_number) + '_' + transfer_letter.name.replace(' ', '_') + '/'
-                from allotment.scripts.aro import generate_tl_software
-                generate_tl_software(data=data, tl_path=tl_path, path=file_path,
-                                     transfer_letter_name=transfer_letter.name.replace(' ', '_'))
-                file_name = 'TL_' + str(be_number) + '_' + transfer_letter.name.replace(' ', '_') + '.zip'
-                path_to_zip = make_archive(file_path.rstrip('/'), 'zip', file_path.rstrip('/'))
-                zip_file = open(path_to_zip, 'rb')
-                response = HttpResponse(zip_file, content_type='application/force-download')
-                response['Content-Disposition'] = 'attachment; filename="%s"' % file_name
-                url = request.headers.get('origin') + path_to_zip.split('lmanagement')[-1]
-                return JsonResponse({'url': url, 'message': 'Success'})
-            except Exception as e:
-                print(e)
-                return self.form_invalid(form)
+                    'boe': "BE NUMBER :- " + item.bill_of_entry.bill_of_entry_number
+                })
+
+            transfer_letter = TransferLetterModel.objects.get(pk=tl_id)
+            tl_path = transfer_letter.tl.path
+            file_name_prefix = f"TL_{boe.bill_of_entry_number}_{transfer_letter.name.replace(' ', '_')}"
+            file_dir = f"media/{file_name_prefix}/"
+
+            generate_tl_software(data=data, tl_path=tl_path, path=file_dir,
+                                 transfer_letter_name=transfer_letter.name.replace(' ', '_'))
+            zip_path = make_archive(file_dir.rstrip('/'), 'zip', file_dir.rstrip('/'))
+
+            url = request.build_absolute_uri('/media/' + zip_path.split('media/')[-1])
+            return Response({'url': url, 'message': 'Success'})
+
+        except BillOfEntryModel.DoesNotExist:
+            return Response({'error': 'BOE not found'}, status=status.HTTP_404_NOT_FOUND)
+        except TransferLetterModel.DoesNotExist:
+            return Response({'error': 'Transfer Letter not found'}, status=status.HTTP_404_NOT_FOUND)
+        except Exception as e:
+            return Response({'error': str(e)}, status=status.HTTP_500_INTERNAL_SERVER_ERROR)
 
 
 class BillOfEntryExportView(APIView):

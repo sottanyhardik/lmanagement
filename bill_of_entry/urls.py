@@ -24,6 +24,8 @@ urlpatterns = [
     path('<slug:boe>/delete', login_required(views.BillOfEntryDeleteView.as_view()), name='bill-of-entry-delete'),
     path('fetch/', login_required(views.BillOfEntryFetchView.as_view()), name='bill_of_entry_fetch'),
 
-    path('<slug:pk>/tl', login_required(views.GenerateTransferLetterView.as_view()), name='bill-of-entry-tl'),
+    path('boe/<slug:pk>/generate', views.GenerateTransferLetterAPI.as_view(),
+         name='bill-of-entry-tl'),
+
     path('download/port/', login_required(views.DownloadPortView.as_view()), name='bill_of_entry_download_boe'),
 ]

@@ -1,8 +1,6 @@
-import shutil
-
-
-
 import csv
+import os
+import subprocess
 
 from docxtpl import DocxTemplate
 
@@ -75,23 +73,50 @@ def generate_agreement():
         doc.save(context['license'] + "_Tri-party agreement.docx")
 
 
+import platform
+import shutil
+
+
+def get_libreoffice_path():
+    if platform.system() == "Darwin":  # macOS
+        return "/Applications/LibreOffice.app/Contents/MacOS/soffice"
+    return shutil.which("libreoffice")  # Linux/Windows
+
+
 def generate_tl_software(data, tl_path, path='', transfer_letter_name=""):
-    if data:
-        input_file = data
-        import os
-        remove(path)
-        os.mkdir(path)
-        for context in data:
-            doc = DocxTemplate(tl_path)
-            doc.render(context)
-            if len(str(context['license'])) == 9:
-                context['license'] = '0' + str(data['license'])
-            try:
-                id = context['id']
-                context['file_number'] = ''
-                doc.save(path + context['license'] + '_'+ context['status'] + '_' + transfer_letter_name + '_' + str(id) + "_TL.docx")
-            except:
-                doc.save(path + context['license'] + '_' + context['status'] + '_' + transfer_letter_name + "_TL.docx")
+    if not data:
+        return
+
+    remove(path)
+    os.makedirs(path, exist_ok=True)
+
+    for context in data:
+        doc = DocxTemplate(tl_path)
+        doc.render(context)
+
+        license_str = str(context['license']).zfill(10)  # Ensures leading zero if needed
+        base_filename = f"{license_str}_{context['status']}_{transfer_letter_name}"
+        docx_file = os.path.join(path, f"{base_filename}.docx")
+
+        try:
+            context['file_number'] = ''
+            doc.save(docx_file)
+        except Exception:
+            doc.save(docx_file)
+
+        # Convert DOCX to PDF using LibreOffice (headless mode)
+        try:
+            subprocess.run([
+                get_libreoffice_path(),
+                "--headless",
+                "--convert-to", "pdf",
+                "--outdir", path,
+                docx_file
+            ], check=True)
+            if os.path.exists(docx_file):
+                os.remove(docx_file)
+        except subprocess.CalledProcessError as e:
+            print(f"Error converting to PDF: {e}")
 
 
 def generate_sugar():
