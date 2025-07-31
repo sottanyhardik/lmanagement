@@ -28,10 +28,10 @@ const AsyncPortSelect = ({value, onChange, isMulti = false, placeholder = "Selec
     return (
         <AsyncSelect
             cacheOptions
-            defaultOptions
-            loadOptions={loadOptions}
+            defaultOptions={false} // ✅ disables fetch on mount
+            loadOptions={loadOptions} // ✅ fetches only on typing
             isMulti={isMulti}
-            value={formattedValue}
+            value={formattedValue} // ✅ supports prefilled display
             onChange={handleChange}
             isClearable
             placeholder={placeholder}

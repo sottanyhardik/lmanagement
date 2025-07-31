@@ -16,10 +16,10 @@ from lmanagement.tasks import fetch_data_to_model
 from scripts.parse_ledger import parse_license_data
 from .filters import SionNormClassFilter
 from .models import CompanyModel, PortModel, ItemNameModel, HSCodeModel, ItemHeadModel, SionNormClassModel, \
-    HeadSIONNormsModel
+    HeadSIONNormsModel, TransferLetterModel
 from .scripts.ledger import create_object
 from .serializers import CompanySerializer, PortSerializer, ItemHeadSerializer, ItemNameSerializer, HSCodeSerializer, \
-    SionNormClassSerializer, HeadSIONNormsSerializer
+    SionNormClassSerializer, HeadSIONNormsSerializer, TransferLetterSerializer
 
 
 class CustomPagination(PageNumberPagination):
@@ -207,3 +207,8 @@ class UploadLedgerAPIView(APIView):
                 })
 
         return Response({"result": results}, status=status.HTTP_200_OK)
+
+
+class TransferLetterViewSet(viewsets.ReadOnlyModelViewSet):  # ReadOnly to restrict to GET only
+    queryset = TransferLetterModel.objects.all()
+    serializer_class = TransferLetterSerializer

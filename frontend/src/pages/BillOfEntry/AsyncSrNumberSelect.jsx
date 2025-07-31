@@ -1,48 +1,45 @@
 import React from 'react';
 import AsyncSelect from 'react-select/async';
-import {useDebouncedAsyncOptions} from '../../hooks/useDebouncedAsyncOptions';
+import axios from '../../api/axiosInstance'; // adjust path as needed
 
 const AsyncSrNumberSelect = ({
                                  value,
                                  onChange,
                                  isMulti = false,
                                  placeholder = "Select SR Number",
-                                 excludeIds = [],
                              }) => {
-    const baseLoader = useDebouncedAsyncOptions('/api/license-import-items/', 'display_name', 'id');
 
     const loadOptions = async (inputValue) => {
-        const options = await baseLoader(inputValue);
-        if (!Array.isArray(options)) return [];
-
-        // Print raw values
-        const values = options.map(o => o.value);
-        const seen = new Set();
-        const duplicates = values.filter(val => {
-            if (seen.has(val)) return true;
-            seen.add(val);
-            return false;
-        });
-        if (duplicates.length > 0) {
-            console.warn("❌ Duplicate keys detected in options:", duplicates);
+        try {
+            const res = await axios.get('/api/license-import-items/', {
+                params: {display_name: inputValue}
+            });
+            const seen = new Set();
+            const options = (res.data?.results || []).filter(item => {
+                if (seen.has(item.id)) return false;
+                seen.add(item.id);
+                return true;
+            }).map(item => ({
+                value: item.id,
+                label: item.display_name,
+                data: item
+            }));
+            return options;
+        } catch (err) {
+            console.error('Failed to load SR options', err);
+            return [];
         }
-
-        // Apply excludeIds and deduplication
-        const filtered = options
-            .filter(option => !excludeIds.includes(option.value))
-            .filter((opt, index, self) =>
-                index === self.findIndex(o => o.value === opt.value)
-            );
-
-        return filtered;
     };
-
 
     const toOption = (v) =>
         v?.id
             ? {value: v.id, label: v.display_name, data: v}
             : v?.value && v.label
-                ? {value: v.value, label: v.label, data: v.data || {id: v.value, display_name: v.label}}
+                ? {
+                    value: v.value,
+                    label: v.label,
+                    data: v.data || {id: v.value, display_name: v.label}
+                }
                 : null;
 
     const formattedValue = isMulti
@@ -60,7 +57,7 @@ const AsyncSrNumberSelect = ({
     return (
         <AsyncSelect
             cacheOptions
-            defaultOptions
+            defaultOptions={false}
             loadOptions={loadOptions}
             isMulti={isMulti}
             value={formattedValue}

@@ -75,9 +75,11 @@
                     <th colspan="2">Item Name</th>
                     <th>Invoice</th>
                     <th>DFIA No.</th>
+                    <th>DFIA Sr No.</th>
                     <th>DFIA Qty.</th>
                     <th>DFIA $.</th>
                     <th>DFIA INR</th>
+                    <th>Office</th>
                 </tr>
                 <tbody>
                 {% for boe in product_data.list %}
@@ -97,11 +99,12 @@
                             <td colspan="2">{{ boe.item_details.all.first.sr_number.item|truncatechars:25 }}</td>
                         {% endif %}
                         <td>{% if boe.invoice_no %}{{ boe.invoice_no }}{% else %}-{% endif %}</td>
-                        <td colspan="5">
+                        <td colspan="6">
                             <table>
                                 {% for boe_detail in boe.item_details.all %}
                                     <tr>
                                         <td>{{ boe_detail.sr_number.license }}</td>
+                                        <td>{{ boe_detail.sr_number.serial_number }}</td>
                                         <td>{{ boe_detail.qty }}</td>
                                         <td>{{ boe_detail.cif_fc }}</td>
                                         <td>{{ boe_detail.cif_inr }}</td>
@@ -110,7 +113,7 @@
 
                                 {% endfor %}
                                 <tr>
-                                    <td><b>Total</b></td>
+                                    <td colspan="2"><b>Total</b></td>
                                     <td>{{ boe.get_total_quantity }}</td>
                                     <td>{{ boe.get_total_fc }}</td>
                                     <td>{{ boe.get_total_inr }}</td>
@@ -130,6 +133,7 @@
                     <td>-</td>
                     <td><b>{% get_boe_total_inr product_data.list %}</b></td>
                     <td colspan="2">-</td>
+                    <td>-</td>
                     <td>-</td>
                     <td>-</td>
                     <td>-</td>

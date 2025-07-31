@@ -71,10 +71,10 @@ const AsyncAllotmentSelect = ({
     return (
         <AsyncSelect
             cacheOptions
-            defaultOptions
-            loadOptions={loadOptions}
+            defaultOptions={false} // ✅ Do not call API on mount
+            loadOptions={loadOptions} // ✅ Only call API when typing
             isMulti={isMulti}
-            value={formattedValue}
+            value={formattedValue} // ✅ Show prefilled value directly
             onChange={handleChange}
             isClearable
             placeholder={placeholder}

@@ -1,21 +1,23 @@
 from django.contrib.auth.decorators import login_required
-from django.urls import path
+from django.urls import path, include
 from rest_framework.routers import DefaultRouter
 
 from . import views
 from .api import CompanyViewSet, PortViewSet, ItemHeadViewSet, ItemNameViewSet, HSCodeViewSet, SionNormClassViewSet, \
-    HeadSIONNormsViewSet, FetchBOEData, UploadLedgerAPIView  # ✅
+    HeadSIONNormsViewSet, FetchBOEData, UploadLedgerAPIView, TransferLetterViewSet  # ✅
 
 router = DefaultRouter()
-router.register(r'api/companies', CompanyViewSet, basename='company')
-router.register(r'api/ports', PortViewSet, basename='port')
-router.register(r'api/item-heads', ItemHeadViewSet, basename='item_head')
-router.register(r'api/item-names', ItemNameViewSet, basename='item_name')
-router.register(r'api/hs-codes', HSCodeViewSet, basename='hs_code')
-router.register(r'api/sion-classes', SionNormClassViewSet, basename='sion_norms')
-router.register(r'api/head-norms', HeadSIONNormsViewSet, basename='head_norms')
+router.register(r'companies', CompanyViewSet, basename='company')
+router.register(r'ports', PortViewSet, basename='port')
+router.register(r'item-heads', ItemHeadViewSet, basename='item_head')
+router.register(r'item-names', ItemNameViewSet, basename='item_name')
+router.register(r'hs-codes', HSCodeViewSet, basename='hs_code')
+router.register(r'sion-classes', SionNormClassViewSet, basename='sion_norms')
+router.register(r'head-norms', HeadSIONNormsViewSet, basename='head_norms')
+router.register(r'transfer-letters', TransferLetterViewSet, basename='transfer-letters')
 
 urlpatterns = [
+    path('api/', include(router.urls)),
     path('api/iecgate/fetch', FetchBOEData.as_view(), name='fetch-boe-details'),
     path('api/ledger/upload/', UploadLedgerAPIView.as_view(), name='upload-ledger-api'),
 

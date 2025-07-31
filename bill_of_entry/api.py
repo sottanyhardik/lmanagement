@@ -10,7 +10,8 @@ from .serializers import BillOfEntrySerializer, BillOfEntryWriteSerializer
 
 
 class BillOfEntryViewSet(viewsets.ModelViewSet):
-    queryset = BillOfEntryModel.objects.all().select_related('company', 'port').prefetch_related('item_details')
+    queryset = BillOfEntryModel.objects.all().select_related('company', 'port').prefetch_related(
+        'item_details').distinct()
     serializer_class = BillOfEntrySerializer
     # permission_classes = [IsAuthenticated]
     filter_backends = [DjangoFilterBackend, filters.SearchFilter, filters.OrderingFilter]

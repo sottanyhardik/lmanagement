@@ -1,6 +1,5 @@
-// components/LineItemTable.jsx
-import React, {useEffect, useRef} from 'react';
-import {Button, Form, Table} from 'react-bootstrap';
+import React from 'react';
+import {Button, Col, Form, Row} from 'react-bootstrap';
 import AsyncSrNumberSelect from './AsyncSrNumberSelect';
 
 const LineItemTable = ({
@@ -11,96 +10,97 @@ const LineItemTable = ({
                            onAddRow,
                            onRemoveRow
                        }) => {
-    const lastRowRef = useRef();
-
-    useEffect(() => {
-        if (lastRowRef.current) {
-            lastRowRef.current.focus();
-        }
-    }, [items.length]);
-
-    const totalQuantity = items.reduce((sum, row) => sum + parseFloat(row.qty || 0), 0);
-    const totalCifInr = items.reduce((sum, row) => sum + parseFloat(row.cif_inr || 0), 0);
-    const totalCifUsd = items.reduce((sum, row) => sum + parseFloat(row.cif_fc || 0), 0);
-
     return (
-        <>
-            <Table bordered size="sm">
-                <thead>
-                <tr>
-                    <th>SR No Display</th>
-                    <th>Qty</th>
-                    <th>CIF FC</th>
-                    <th>CIF INR</th>
-                    <th></th>
-                </tr>
-                </thead>
-                <tbody>
-                {items.map((item, idx) => {
-                    const isDuplicate = selectedSrNumbers.filter(v => v === item.sr_number?.value).length > 1;
-                    return (
-                        <tr key={idx} className={isDuplicate ? 'bg-danger bg-opacity-25' : ''}>
-                            <td>
-                                <AsyncSrNumberSelect
-                                    value={item.sr_number ?? ""}
-                                    onChange={(selected) => onItemChange(idx, 'sr_number', selected)}
-                                    excludeIds={selectedSrNumbers.filter(id => id !== item.sr_number?.id)}
-                                />
-                                <Form.Control.Feedback type="invalid">{errors[`item_${idx}_sr`]}</Form.Control.Feedback>
-                            </td>
-                            <td>
-                                <Form.Control
-                                    ref={idx === items.length - 1 ? lastRowRef : null}
-                                    size="sm"
-                                    value={item.qty ?? ""}
-                                    isInvalid={!!errors[`item_${idx}_qty`]}
-                                    onChange={(e) => onItemChange(idx, 'qty', e.target.value)}
-                                />
-                                <Form.Control.Feedback
-                                    type="invalid">{errors[`item_${idx}_qty`]}</Form.Control.Feedback>
-                            </td>
-                            <td>
-                                <Form.Control
-                                    size="sm"
-                                    value={item.cif_fc ?? ""}
-                                    isInvalid={!!errors[`item_${idx}_fc`]}
-                                    onChange={(e) => onItemChange(idx, 'cif_fc', e.target.value)}
-                                />
-                                <Form.Control.Feedback type="invalid">{errors[`item_${idx}_fc`]}</Form.Control.Feedback>
-                            </td>
-                            <td>
-                                <Form.Control
-                                    size="sm"
-                                    value={item.cif_inr ?? ""}
-                                    isInvalid={!!errors[`item_${idx}_inr`]}
-                                    onChange={(e) => onItemChange(idx, 'cif_inr', e.target.value)}
-                                />
-                                <Form.Control.Feedback
-                                    type="invalid">{errors[`item_${idx}_inr`]}</Form.Control.Feedback>
-                            </td>
-                            <td>
-                                <Button
-                                    variant="outline-danger"
-                                    size="sm"
-                                    onClick={() => onRemoveRow(idx)}
-                                >
-                                    Delete
-                                </Button>
-                            </td>
-                        </tr>
-                    );
-                })}
-                <tr className="table-light">
-                    <td><strong>Totals</strong></td>
-                    <td><strong>{totalQuantity}</strong></td>
-                    <td><strong>{totalCifUsd.toLocaleString(undefined, {maximumFractionDigits: 2})}</strong></td>
-                    <td><strong>{totalCifInr.toLocaleString(undefined, {maximumFractionDigits: 2})}</strong></td>
-                    <td></td>
-                </tr>
-                </tbody>
-            </Table>
-            <Button size="sm" variant="outline-primary" onClick={onAddRow}>+ Add Item</Button>
-        </>
+        <div className="border p-2 rounded">
+            <h6>Item Details</h6>
+            {items.map((item, index) => (
+                <Row key={index} className="mb-2 align-items-end">
+                    <Col md={4}>
+                        <Form.Label>License (SR) Number</Form.Label>
+                        <AsyncSrNumberSelect
+                            value={item.sr_number}
+                            onChange={(v) => onItemChange(index, 'sr_number', v)}
+                            excludeIds={selectedSrNumbers.filter((id, i) => i !== index)}
+                            placeholder="Select SR"
+                            styles={{
+                                control: (base) => ({
+                                    ...base,
+                                    minHeight: '32px',
+                                    fontSize: '0.875rem',
+                                    borderColor: errors[`item_${index}_sr`] ? 'red' : base.borderColor,
+                                    boxShadow: errors[`item_${index}_sr`] ? '0 0 0 0.2rem rgba(255,0,0,0.25)' : base.boxShadow
+                                }),
+                            }}
+                            name={`item_${index}_sr`}
+                        />
+                        {errors[`item_${index}_sr`] && (
+                            <div className="text-danger small">{errors[`item_${index}_sr`]}</div>
+                        )}
+                    </Col>
+
+                    <Col md={2}>
+                        <Form.Label>Quantity</Form.Label>
+                        <Form.Control
+                            size="sm"
+                            type="number"
+                            value={item.qty}
+                            name={`item_${index}_qty`}
+                            isInvalid={!!errors[`item_${index}_qty`]}
+                            onChange={(e) => onItemChange(index, 'qty', e.target.value)}
+                        />
+                        <Form.Control.Feedback type="invalid">
+                            {errors[`item_${index}_qty`]}
+                        </Form.Control.Feedback>
+                    </Col>
+
+                    <Col md={2}>
+                        <Form.Label>CIF (FC)</Form.Label>
+                        <Form.Control
+                            size="sm"
+                            type="number"
+                            value={item.cif_fc}
+                            name={`item_${index}_cif_fc`}
+                            isInvalid={!!errors[`item_${index}_fc`]}
+                            onChange={(e) => onItemChange(index, 'cif_fc', e.target.value)}
+                        />
+                        <Form.Control.Feedback type="invalid">
+                            {errors[`item_${index}_fc`]}
+                        </Form.Control.Feedback>
+                    </Col>
+
+                    <Col md={2}>
+                        <Form.Label>CIF (INR)</Form.Label>
+                        <Form.Control
+                            size="sm"
+                            type="number"
+                            value={item.cif_inr}
+                            name={`item_${index}_cif_inr`}
+                            isInvalid={!!errors[`item_${index}_inr`]}
+                            onChange={(e) => onItemChange(index, 'cif_inr', e.target.value)}
+                        />
+                        <Form.Control.Feedback type="invalid">
+                            {errors[`item_${index}_inr`]}
+                        </Form.Control.Feedback>
+                    </Col>
+
+                    <Col md={2} className="d-flex align-items-end">
+                        <Button
+                            variant="danger"
+                            size="sm"
+                            onClick={() => onRemoveRow(index)}
+                        >
+                            Remove
+                        </Button>
+                    </Col>
+                </Row>
+            ))}
+
+            <div className="mt-2">
+                <Button variant="primary" size="sm" onClick={onAddRow}>
+                    + Add Item
+                </Button>
+            </div>
+        </div>
     );
 };
 

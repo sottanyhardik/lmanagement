@@ -75,28 +75,21 @@ const BillOfEntryList = () => {
 
             const res = await axios.get('/api/bill-of-entries/', {params});
             const newEntries = res.data.results;
-            const totalCount = res.data.count;
-
-            console.log('Page:', page);
-            console.log('New Entries:', newEntries.length);
-            console.log('Total Count:', totalCount);
-            console.log('Entries before:', entries.length);
+            const hasNextPage = res.data.next !== null;
 
             setEntries(prev => (page === 1 ? newEntries : [...prev, ...newEntries]));
-
-            const loadedTotal = (page === 1 ? newEntries.length : entries.length + newEntries.length);
-            setHasMore(loadedTotal < totalCount);
+            setHasMore(hasNextPage);
         } catch (err) {
             toast.error('Failed to fetch BOE data');
         } finally {
             setLoading(false);
         }
-    }, [page, searchQuery, sortField, sortOrder, filters, entries.length]);
+    }, [page, searchQuery, sortField, sortOrder, filters]);
 
     useEffect(() => {
         setEntries([]);
-        setHasMore(true);
         setPage(1);
+        setHasMore(true);
     }, [searchQuery, sortField, sortOrder, filters]);
 
     useEffect(() => {
@@ -104,9 +97,12 @@ const BillOfEntryList = () => {
     }, [page]);
 
     useEffect(() => {
+        const delay = 200;
+        let timeout;
         if (inView && hasMore && !loading) {
-            setPage(prev => prev + 1);
+            timeout = setTimeout(() => setPage(prev => prev + 1), delay);
         }
+        return () => clearTimeout(timeout);
     }, [inView, hasMore, loading]);
 
     const sortOptions = [
@@ -280,9 +276,9 @@ const BillOfEntryList = () => {
                 onSaved={fetchData}
             />
 
-            <div ref={loadMoreRef} className="text-center my-4">
+            <div ref={loadMoreRef} className="text-center my-4" style={{minHeight: '40px'}}>
                 {loading && <div className="spinner-border text-primary" role="status"/>}
-                {!hasMore && <span className="text-muted">No more entries</span>}
+                {!hasMore && !loading && <span className="text-muted">No more entries</span>}
             </div>
         </Container>
     );

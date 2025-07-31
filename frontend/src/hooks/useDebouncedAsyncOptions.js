@@ -1,48 +1,54 @@
-import {useCallback, useRef} from 'react';
+import {useMemo, useRef} from 'react';
 import axios from '../api/axiosInstance';
 import debounce from 'lodash.debounce';
 
 /**
- * Custom hook to create a debounced async options loader for react-select
+ * Debounced loader hook for react-select async
  * @param {string} url - API endpoint
- * @param {string} searchParam - query param name to search (e.g. 'name')
- * @param {string} valueKey - field used for option.value (e.g. 'id')
- * @param {object} additionalParams - any static query parameters (optional)
- * @returns {function} debounced loader function
+ * @param {string} searchParam - query param (e.g. 'name')
+ * @param {string} valueKey - key for option.value (e.g. 'id')
+ * @param {object} additionalParams - extra query parameters
  */
-export const useDebouncedAsyncOptions = (url, searchParam = 'search', valueKey = 'id', additionalParams = {}) => {
+export const useDebouncedAsyncOptions = (
+    url,
+    searchParam = 'search',
+    valueKey = 'id',
+    additionalParams = {}
+) => {
     const cacheRef = useRef({});
 
+    // Stable function to fetch options
     const fetchOptions = async (inputValue) => {
-        const key = `${url}::${inputValue}`;
-        if (cacheRef.current[key]) {
-            return cacheRef.current[key];
+        const cacheKey = `${url}::${inputValue}::${JSON.stringify(additionalParams)}`;
+        if (cacheRef.current[cacheKey]) {
+            return cacheRef.current[cacheKey];
         }
 
         try {
             const params = {
                 [searchParam]: inputValue,
-                ...additionalParams
+                ...additionalParams,
             };
 
             const res = await axios.get(url, {params});
             const results = Array.isArray(res.data?.results) ? res.data.results : res.data;
 
-            const options = results.map(item => ({
+            const options = results.map((item) => ({
                 value: item[valueKey],
-                label: item.name || item.display_name || String(item[valueKey]),
-                data: item
+                label: item.display_name || item.name || String(item[valueKey]),
+                data: item,
             }));
 
-            cacheRef.current[key] = options;
+            cacheRef.current[cacheKey] = options;
             return options;
         } catch (err) {
-            console.error(`[useDebouncedAsyncOptions] Failed to fetch options from ${url}`, err);
+            console.error(`[useDebouncedAsyncOptions] Error fetching ${url}`, err);
             return [];
         }
     };
 
-    const debouncedLoader = useCallback(debounce(fetchOptions, 300), [url, searchParam, valueKey]);
+    // ✅ useMemo ensures same hook order
+    const debouncedFetch = useMemo(() => debounce(fetchOptions, 300), []);
 
-    return debouncedLoader;
+    return debouncedFetch;
 };

@@ -6,13 +6,15 @@ from .serializers import LicenseImportItemsSelectSerializer
 
 
 class LicenseImportItemsViewSet(viewsets.ReadOnlyModelViewSet):
-    queryset = LicenseImportItemsModel.objects.select_related('license').all()
+    queryset = LicenseImportItemsModel.objects.select_related('license').all().order_by(
+        '-license__license_expiry_date').distinct()
     serializer_class = LicenseImportItemsSelectSerializer
     filter_backends = [filters.SearchFilter]
 
     def get_queryset(self):
+
         queryset = super().get_queryset()
-        search = self.request.query_params.get('search')
+        search = self.request.query_params.get('display_name')
         if search and ' - ' in search:
             license_part, sr_part = search.split(' - ', 1)
             queryset = queryset.filter(
@@ -21,7 +23,7 @@ class LicenseImportItemsViewSet(viewsets.ReadOnlyModelViewSet):
             )
         elif search:
             queryset = queryset.filter(
-                Q(license__license_number__icontains=search) |
-                Q(serial_number__icontains=search)
+                Q(license__license_number__istartswith=search) |
+                Q(license__license_number__iendswith=search)
             )
-        return queryset
+        return queryset.distinct()

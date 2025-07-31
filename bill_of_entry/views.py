@@ -1,9 +1,13 @@
 # Create your views here.
+import datetime
 from datetime import date
 from decimal import Decimal
 
+from django.db.models import Prefetch
 from django.db.models import Q
+from django.http import HttpResponse
 from django.http import HttpResponseRedirect
+from django.http import JsonResponse
 from django.urls import reverse, reverse_lazy
 from django.views.generic import DetailView, FormView, DeleteView, UpdateView, CreateView
 from django_filters.views import FilterView
@@ -11,6 +15,10 @@ from django_tables2 import SingleTableView
 from django_tables2.export import ExportMixin
 from easy_pdf.views import PDFTemplateResponseMixin
 from extra_views import UpdateWithInlinesView, InlineFormSetFactory
+from openpyxl import Workbook
+from openpyxl.styles import Font, Border, Side
+from openpyxl.utils import get_column_letter
+from rest_framework.views import APIView
 
 from allotment.forms import TlForm
 from bill_of_entry.models import RowDetails
@@ -18,6 +26,8 @@ from core.utils import render_to_pdf
 from lmanagement.tasks import fetch_data_to_model
 from . import forms, tables, filters
 from . import models as bill_of_entry
+from .filters import BillOfEntryFilter
+from .models import BillOfEntryModel
 
 
 class BillOfEntryView(FilterView, ExportMixin, SingleTableView):
@@ -282,42 +292,46 @@ class GenerateTransferLetterView(FormView):
                 return self.form_invalid(form)
 
 
-from rest_framework.views import APIView
-from django.http import JsonResponse
-
-
 class BillOfEntryExportView(APIView):
     # permission_classes = [IsAuthenticated]
 
     def get(self, request, *args, **kwargs):
         export_type = request.headers.get('Accept', '')
 
-        queryset = BillOfEntryModel.objects.all()
-        f = BillOfEntryFilter(request.GET, queryset=queryset)
-        filtered = f.qs
-
-        response = HttpResponse(content_type='application/pdf')
-        response['Content-Disposition'] = 'attachment; filename="bill_of_entries.pdf"'
+        # Use only necessary fields with select_related and prefetch_related
+        queryset = BillOfEntryFilter(
+            request.GET,
+            queryset=BillOfEntryModel.objects.select_related('company', 'port').prefetch_related(
+                Prefetch(
+                    'item_details',
+                    queryset=RowDetails.objects.select_related(
+                        'sr_number__license',
+                        'sr_number__item'
+                    ).only(
+                        'id', 'qty', 'cif_fc', 'cif_inr', 'sr_number__license__license_number',
+                        'sr_number__serial_number', 'sr_number__item__name'
+                    )
+                )
+            )
+        ).qs.only(
+            'id', 'bill_of_entry_number', 'bill_of_entry_date',
+            'invoice_no', 'product_name', 'exchange_rate',
+            'company__name', 'port__code'
+        )
 
         context = {
-            'object_list': filtered,
+            'object_list': queryset,
             'today': date.today(),
         }
-        return render_to_pdf('bill_of_entry/bill_export_pdf.html', context)
 
-
-# views.py
-from rest_framework.views import APIView
-from django.http import HttpResponse
-from openpyxl import Workbook
-from .models import BillOfEntryModel
-from .filters import BillOfEntryFilter
-import datetime
+        # Use optimized render_to_pdf
+        response = render_to_pdf('bill_of_entry/bill_export_pdf.html', context)
+        response['Content-Disposition'] = 'attachment; filename="bill_of_entries.pdf"'
+        response['Content-Type'] = 'application/pdf'
+        return response
 
 
 class ExportBOEExcelView(APIView):
-    # permission_classes = [IsAuthenticated]
-
     def get(self, request, *args, **kwargs):
         queryset = BillOfEntryFilter(
             request.GET,
@@ -333,12 +347,29 @@ class ExportBOEExcelView(APIView):
         ws.title = "Pending BOE"
         ws.append(["Pending Bills", "", "", "", datetime.date.today()])
 
+        bold_font = Font(bold=True)
+        thin_border = Border(
+            left=Side(style='thin'),
+            right=Side(style='thin'),
+            top=Side(style='thin'),
+            bottom=Side(style='thin')
+        )
+
+        def apply_border_and_font(row_idx, col_count, font=None):
+            for col in range(1, col_count + 1):
+                cell = ws.cell(row=row_idx, column=col)
+                cell.border = thin_border
+                if font:
+                    cell.font = font
+
         companies = {}
         for boe in queryset:
             companies.setdefault(boe.company.name, []).append(boe)
 
         for company_name, boes in companies.items():
             ws.append([company_name])
+            company_row = ws.max_row
+            ws.cell(row=company_row, column=1).font = bold_font
 
             product_groups = {}
             for boe in boes:
@@ -347,14 +378,20 @@ class ExportBOEExcelView(APIView):
             for product_name, items in product_groups.items():
                 ws.append([
                     "Sr No", "BE No.", "BE Dt.", "Port", "Qty", "Unit Price", "Value ($)",
-                    "Exc Rt.", "Value (INR)", "Item Name", "Invoice", "DFIA No.", "DFIA Qty", "DFIA $", "DFIA INR"
+                    "Exc Rt.", "Value (INR)", "Item Name", "Invoice",
+                    "DFIA No.", "DFIA Sr No.", "DFIA Qty", "DFIA $", "DFIA INR"
                 ])
+                header_row = ws.max_row
+                apply_border_and_font(header_row, 16, bold_font)
+
+                start_row = ws.max_row + 1
 
                 for idx, boe in enumerate(items, start=1):
                     license_rows = []
                     for detail in boe.item_details.all():
                         license_rows.append([
-                            detail.sr_number.license.license_number,
+                            detail.sr_number.license.license_number,  # DFIA No
+                            detail.sr_number.serial_number,  # DFIA Sr No
                             detail.qty,
                             detail.cif_fc,
                             detail.cif_inr,
@@ -366,7 +403,7 @@ class ExportBOEExcelView(APIView):
                     total_inr = boe.get_total_inr
                     invoice = boe.invoice_no or '-'
                     item_name = boe.product_name or (
-                        boe.item_details.first().sr_number.item if boe.item_details.exists() else '-'
+                        boe.item_details.first().sr_number.item.name if boe.item_details.exists() else '-'
                     )
 
                     ws.append([
@@ -381,22 +418,46 @@ class ExportBOEExcelView(APIView):
                         total_inr,
                         item_name,
                         invoice,
-                        "", "", "", ""  # DFIA placeholder
+                        "", "", "", "", ""
                     ])
+                    main_row = ws.max_row
+                    apply_border_and_font(main_row, 16)
 
                     for lic_row in license_rows:
                         ws.append(["", "", "", "", "", "", "", "", "", "", "", *lic_row])
+                        lic_row_row = ws.max_row
+                        apply_border_and_font(lic_row_row, 16)
 
-                # Totals row
+                end_row = ws.max_row
                 ws.append([
                     "-", "-", "-", "Total",
-                    sum(b.get_total_quantity for b in items),
+                    f"=SUM(E{start_row}:E{end_row})",  # Qty
                     "-",
-                    sum(b.get_total_fc for b in items),
+                    f"=SUM(G{start_row}:G{end_row})",  # Value ($)
                     "-",
-                    sum(b.get_total_inr for b in items)
+                    f"=SUM(I{start_row}:I{end_row})",  # Value (INR)
+                    "", "", "", "",
+                    f"=SUM(M{start_row}:N{end_row})",  # DFIA Qty
+                    f"=SUM(N{start_row}:O{end_row})",  # DFIA $
+                    f"=SUM(O{start_row}:P{end_row})"  # DFIA INR
                 ])
+                total_row = ws.max_row
+                apply_border_and_font(total_row, 16, bold_font)
                 ws.append([])
+
+        # Auto-fit columns
+        for col in ws.columns:
+            max_length = 0
+            column = col[0].column
+            column_letter = get_column_letter(column)
+            for cell in col:
+                try:
+                    if cell.value:
+                        max_length = max(max_length, len(str(cell.value)))
+                except:
+                    pass
+            adjusted_width = max_length + 2
+            ws.column_dimensions[column_letter].width = adjusted_width
 
         response = HttpResponse(
             content_type='application/vnd.openxmlformats-officedocument.spreadsheetml.sheet'

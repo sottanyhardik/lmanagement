@@ -2,14 +2,19 @@ import React from 'react';
 import AsyncSelect from 'react-select/async';
 import {useDebouncedAsyncOptions} from '../../hooks/useDebouncedAsyncOptions';
 
-const AsyncCompanySelect = ({value, onChange, isMulti = false, placeholder = "Select Company"}) => {
+const AsyncCompanySelect = ({
+                                value,
+                                onChange,
+                                isMulti = false,
+                                placeholder = "Select Company"
+                            }) => {
     const loadOptions = useDebouncedAsyncOptions('/api/companies/');
 
-    const toOption = (v) => ({label: v.name, value: v.id, data: v});
+    const toOption = (v) => v ? {label: v.name, value: v.id, data: v} : null;
 
     const formattedValue = isMulti
         ? (value || []).map(toOption)
-        : value ? toOption(value) : null;
+        : toOption(value);
 
     const handleChange = (selected) => {
         if (isMulti) {
@@ -22,12 +27,12 @@ const AsyncCompanySelect = ({value, onChange, isMulti = false, placeholder = "Se
     return (
         <AsyncSelect
             cacheOptions
-            defaultOptions
             loadOptions={loadOptions}
             isMulti={isMulti}
             value={formattedValue}
             onChange={handleChange}
             placeholder={placeholder}
+            defaultOptions={false} // disables initial fetch
         />
     );
 };
