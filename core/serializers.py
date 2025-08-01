@@ -1,7 +1,7 @@
 from rest_framework import serializers
 
 from .models import CompanyModel, PortModel, ItemHeadModel, ItemNameModel, HSCodeModel, SIONImportModel, \
-    SIONExportModel, SionNormClassModel, HeadSIONNormsModel, TransferLetterModel
+    SIONExportModel, SionNormClassModel, HeadSIONNormsModel, TransferLetterModel, InvoiceEntity
 
 
 # ports/serializers.py
@@ -11,11 +11,10 @@ class PortOptionSerializer(serializers.ModelSerializer):
         fields = ['id', 'code', 'name']
 
 
-# companies/serializers.py
 class CompanyOptionSerializer(serializers.ModelSerializer):
     class Meta:
         model = CompanyModel
-        fields = ['id', 'name', 'address_line_1', 'address_line_2']
+        fields = ['id', 'name', 'address_line_1', 'address_line_2', 'pan', 'gst_number']
 
 
 class CompanySerializer(serializers.ModelSerializer):
@@ -153,3 +152,9 @@ class SionNormClassSerializer(serializers.ModelSerializer):
             SIONImportModel.objects.create(norm_class=instance, **item)
 
         return instance
+
+
+class InvoiceEntitySerializer(serializers.ModelSerializer):
+    class Meta:
+        model = InvoiceEntity
+        fields = '__all__'

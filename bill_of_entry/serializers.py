@@ -2,11 +2,12 @@ from rest_framework import serializers
 
 from allotment.models import AllotmentModel
 from allotment.serializers import AllotmentOptionSerializer
-from core.models import CompanyModel, PortModel
+from core.models import CompanyModel, PortModel, InvoiceEntity
 from core.serializers import PortOptionSerializer, CompanyOptionSerializer
 from license.models import LicenseImportItemsModel
 from license.serializers import LicenseImportItemsSelectSerializer
 from .models import BillOfEntryModel, RowDetails
+from .models import Invoice, InvoiceItem
 
 
 class RowDetailsSerializer(serializers.ModelSerializer):
@@ -93,4 +94,101 @@ class BillOfEntryWriteSerializer(serializers.ModelSerializer):
             for item in items_data:
                 RowDetails.objects.create(bill_of_entry=instance, **item)
 
+        return instance
+
+
+class InvoiceItemSerializer(serializers.ModelSerializer):
+    class Meta:
+        model = InvoiceItem
+        fields = ['sr_number', 'license_no', 'hsn_code', 'qty', 'cif_fc', 'cif_inr', 'rate', 'amount']
+
+
+from datetime import date
+
+
+class InvoiceSerializer(serializers.ModelSerializer):
+    from_entity_id = serializers.IntegerField(write_only=True)
+    to_company = CompanyOptionSerializer(write_only=True)
+    billing_mode = serializers.ChoiceField(choices=['kg', 'cif_inr'])
+    items = InvoiceItemSerializer(many=True)
+    bills_of_entry_id = serializers.IntegerField(write_only=True, required=False)
+
+    class Meta:
+        model = Invoice
+        fields = [
+            'id', 'from_entity_id', 'to_company',
+            'billing_mode', 'total_qty', 'total_cif', 'total_amount',
+            'items', 'invoice_number', 'invoice_date', 'bills_of_entry_id'
+        ]
+        read_only_fields = ['invoice_number', 'invoice_date']
+
+    def generate_invoice_number(self, entity_name):
+        today = date.today()
+        fy_start = today.year if today.month >= 4 else today.year - 1
+        fy_end = fy_start + 1
+        fy = f"{fy_start}-{str(fy_end)[-2:]}"
+        prefix = entity_name[:3].upper()
+
+        max_serial = Invoice.objects.filter(
+            invoice_number__startswith=f"{prefix}/{fy}"
+        ).order_by('-invoice_number').first()
+
+        if max_serial and max_serial.invoice_number:
+            try:
+                last_serial = int(max_serial.invoice_number.split('/')[-1])
+            except (IndexError, ValueError):
+                last_serial = 0
+        else:
+            last_serial = 0
+
+        new_serial = last_serial + 1
+        return f"{prefix}/{fy}/{new_serial:03d}"
+
+    def create(self, validated_data):
+        items_data = validated_data.pop('items')
+        from_entity_id = validated_data.pop('from_entity_id')
+        to_company_data = validated_data.pop('to_company')
+        boe_id = validated_data.pop('bills_of_entry_id', None)
+        if boe_id:
+            validated_data['bills_of_entry'] = BillOfEntryModel.objects.get(pk=boe_id)
+        from_entity = InvoiceEntity.objects.get(pk=from_entity_id)
+        invoice_number = self.generate_invoice_number(from_entity.name)
+
+        validated_data['from_entity'] = from_entity
+        validated_data['invoice_number'] = invoice_number
+        validated_data.update({
+            'to_company_name': to_company_data.get('name', ''),
+            'to_company_pan': to_company_data.get('pan', ''),
+            'to_company_gst': to_company_data.get('gst', ''),
+            'to_company_address_line_1': to_company_data.get('address_line_1', ''),
+            'to_company_address_line_2': to_company_data.get('address_line_2', ''),
+        })
+
+        invoice = Invoice.objects.create(**validated_data)
+        for item in items_data:
+            InvoiceItem.objects.create(invoice=invoice, **item)
+        return invoice
+
+    def update(self, instance, validated_data):
+        items_data = validated_data.pop('items')
+        from_entity_id = validated_data.pop('from_entity_id', None)
+        to_company_data = validated_data.pop('to_company', None)
+
+        if from_entity_id:
+            instance.from_entity = InvoiceEntity.objects.get(pk=from_entity_id)
+
+        if to_company_data:
+            instance.to_company_name = to_company_data.get('name', '')
+            instance.to_company_pan = to_company_data.get('pan', '')
+            instance.to_company_gst = to_company_data.get('gst', '')
+            instance.to_company_address_line_1 = to_company_data.get('address_line_1', '')
+            instance.to_company_address_line_2 = to_company_data.get('address_line_2', '')
+
+        for attr, value in validated_data.items():
+            setattr(instance, attr, value)
+
+        instance.save()
+        instance.items.all().delete()
+        for item in items_data:
+            InvoiceItem.objects.create(invoice=instance, **item)
         return instance

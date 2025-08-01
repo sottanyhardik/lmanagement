@@ -3,16 +3,18 @@ from django.urls import path, include
 from rest_framework.routers import DefaultRouter
 
 from . import views
-from .api import BillOfEntryViewSet, BillOfEntryBulkDeleteView
+from .api import BillOfEntryViewSet, BillOfEntryBulkDeleteView, InvoiceViewSet, InvoicePDFView
 
 router = DefaultRouter()
 router.register(r'bill-of-entries', BillOfEntryViewSet, basename='bill-of-entry')
+router.register(r'invoices', InvoiceViewSet, basename='invoice')
 
 urlpatterns = [
     # urls.py
     path("api/bill-of-entries/export-excel/", views.ExportBOEExcelView.as_view(), name="export_boe_excel"),
     path('api/bill-of-entries/export/pdf', views.BillOfEntryExportView.as_view(), name='bill-of-entry-export'),
     path('api/bill-of-entries/bulk-delete/', BillOfEntryBulkDeleteView.as_view(), name='bill-of-entry-bulk-delete'),
+    path('api/invoices/<int:pk>/pdf/', InvoicePDFView.as_view(), name='invoice-pdf'),
     path('api/', include(router.urls)),
 
     path('', login_required(views.BillOfEntryView.as_view()), name='bill-of-entry-list'),

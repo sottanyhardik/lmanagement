@@ -2,6 +2,7 @@ import React, {useRef, useState} from 'react';
 import {Accordion, Badge, Card, Col, Collapse, Form, Row, Tab, Table, Tabs} from 'react-bootstrap';
 import BillOfEntryForm from './BillOfEntryForm';
 import TransferLetterForm from './TransferLetterForm';
+import InvoiceForm from './InvoiceForm';
 
 const GroupedAccordion = ({
                               groups,
@@ -163,7 +164,7 @@ const GroupedAccordion = ({
                                                             <TransferLetterForm boe={entry} autoDownload/>
                                                         </Tab>
                                                         <Tab eventKey="invoice" title="🧾 Generate Invoice">
-                                                            <div className="text-muted">Coming soon...</div>
+                                                            <InvoiceForm boe={entry}/>
                                                         </Tab>
                                                     </Tabs>
                                                 </Card.Body>

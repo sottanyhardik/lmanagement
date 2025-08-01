@@ -4,7 +4,7 @@ from rest_framework.routers import DefaultRouter
 
 from . import views
 from .api import CompanyViewSet, PortViewSet, ItemHeadViewSet, ItemNameViewSet, HSCodeViewSet, SionNormClassViewSet, \
-    HeadSIONNormsViewSet, FetchBOEData, UploadLedgerAPIView, TransferLetterViewSet  # ✅
+    HeadSIONNormsViewSet, FetchBOEData, UploadLedgerAPIView, TransferLetterViewSet, InvoiceEntityReadOnlyViewSet  # ✅
 
 router = DefaultRouter()
 router.register(r'companies', CompanyViewSet, basename='company')
@@ -15,6 +15,7 @@ router.register(r'hs-codes', HSCodeViewSet, basename='hs_code')
 router.register(r'sion-classes', SionNormClassViewSet, basename='sion_norms')
 router.register(r'head-norms', HeadSIONNormsViewSet, basename='head_norms')
 router.register(r'transfer-letters', TransferLetterViewSet, basename='transfer-letters')
+router.register(r'invoice-entities', InvoiceEntityReadOnlyViewSet, basename='invoice-entity')
 
 urlpatterns = [
     path('api/', include(router.urls)),

@@ -1,12 +1,15 @@
 from django_filters.rest_framework import DjangoFilterBackend
+from easy_pdf.views import PDFTemplateView
 from rest_framework import filters, viewsets
-from rest_framework import status, permissions
+from rest_framework import permissions
+from rest_framework import status
+from rest_framework.generics import get_object_or_404
 from rest_framework.response import Response
 from rest_framework.views import APIView
 
 from .filters import BillOfEntryFilter
-from .models import BillOfEntryModel
-from .serializers import BillOfEntrySerializer, BillOfEntryWriteSerializer
+from .models import BillOfEntryModel, Invoice
+from .serializers import BillOfEntrySerializer, BillOfEntryWriteSerializer, InvoiceSerializer
 
 
 class BillOfEntryViewSet(viewsets.ModelViewSet):
@@ -36,3 +39,17 @@ class BillOfEntryBulkDeleteView(APIView):
 
         deleted_count, _ = BillOfEntryModel.objects.filter(id__in=ids).delete()
         return Response({'message': f'{deleted_count} entries deleted successfully.'}, status=status.HTTP_200_OK)
+
+
+class InvoiceViewSet(viewsets.ModelViewSet):
+    queryset = Invoice.objects.all()
+    serializer_class = InvoiceSerializer
+
+
+class InvoicePDFView(PDFTemplateView):
+    template_name = 'bill_of_entry/invoice_template.html'
+    download_filename = 'invoice.pdf'
+
+    def get_context_data(self, **kwargs):
+        invoice = get_object_or_404(Invoice, pk=self.kwargs['pk'])
+        return {'invoice': invoice}

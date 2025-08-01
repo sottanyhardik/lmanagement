@@ -1,20 +1,13 @@
 # Create your models here.
 
-# Create your models here.
+from django.contrib.auth.models import AbstractUser
+from django.contrib.auth.models import User
+from django.core.validators import RegexValidator
+from django.db import models
 from django.urls import reverse
 from django.utils.functional import cached_property
 
-"""Declare models for YOUR_APP app."""
-
-from django.contrib.auth.models import AbstractUser
-
-from django.contrib.auth.models import AbstractUser  ## A new class is imported. ##
-from django.core.validators import RegexValidator
-
 alpha = RegexValidator(r'^[a-zA-Z ]*$', 'Only alpha characters are allowed.')
-
-from django.db import models
-from django.contrib.auth.models import User
 
 
 class AuditModel(models.Model):
@@ -35,7 +28,23 @@ class AuditModel(models.Model):
 
 class CompanyModel(AuditModel):
     iec = models.CharField(max_length=10, unique=True)
-    pan = models.CharField(max_length=20, null=True, blank=True)
+    pan = models.CharField(
+        max_length=15,
+        null=True,
+        blank=True,
+        validators=[
+            RegexValidator(regex=r'^[A-Z]{5}[0-9]{4}[A-Z]$', message="Enter a valid PAN number.")
+        ]
+    )
+    gst_number = models.CharField(
+        max_length=15,
+        null=True,
+        blank=True,
+        validators=[
+            RegexValidator(regex=r'^\d{2}[A-Z]{5}\d{4}[A-Z]{1}[1-9A-Z]{1}Z[0-9A-Z]{1}$',
+                           message="Enter a valid GST number.")
+        ]
+    )
     name = models.CharField(max_length=255, null=True, blank=True)
     contact_person = models.CharField(max_length=255, null=True, blank=True)
     phone_number = models.CharField(max_length=255, null=True, blank=True)
@@ -43,17 +52,9 @@ class CompanyModel(AuditModel):
     address = models.TextField(null=True, blank=True)
     address_line_1 = models.TextField(null=True, blank=True)
     address_line_2 = models.TextField(null=True, blank=True)
-    director_1 = models.TextField(null=True, blank=True)
-    director_2 = models.TextField(null=True, blank=True)
-    is_fetch = models.BooleanField(default=False)
-    failed = models.IntegerField(default=0)
-    is_ge = models.BooleanField(default=True)
 
     def __str__(self):
-        if self.name:
-            return self.name
-        else:
-            return self.iec
+        return self.name if self.name else self.iec
 
     def get_absolute_url(self):
         return reverse('company-list')
@@ -225,6 +226,29 @@ class UnitPriceModel(AuditModel):
     name = models.CharField(max_length=255)
     unit_price = models.FloatField(default=0)
     label = models.CharField(max_length=255, default='')
+
+    def __str__(self):
+        return self.name
+
+
+ACCOUNT_TYPES = (
+    ('current', 'Current'),
+    ('saving', 'Saving'),
+)
+
+
+class InvoiceEntity(models.Model):
+    name = models.CharField(max_length=255)
+    address_line_1 = models.TextField()
+    address_line_2 = models.TextField(blank=True)
+    pan_number = models.CharField(max_length=10)
+    gst_number = models.CharField(max_length=15)
+    logo = models.ImageField(upload_to='entity_logos/', null=True, blank=True)
+
+    bank_account_number = models.CharField(max_length=30)
+    bank_name = models.CharField(max_length=100)
+    ifsc_code = models.CharField(max_length=11)
+    account_type = models.CharField(max_length=10, choices=ACCOUNT_TYPES)
 
     def __str__(self):
         return self.name
