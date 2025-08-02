@@ -3,7 +3,7 @@ from rest_framework import serializers
 from allotment.models import AllotmentModel
 from allotment.serializers import AllotmentOptionSerializer
 from core.models import CompanyModel, PortModel, InvoiceEntity
-from core.serializers import PortOptionSerializer, CompanyOptionSerializer
+from core.serializers import PortOptionSerializer, CompanyOptionSerializer, InvoiceEntitySerializer
 from license.models import LicenseImportItemsModel
 from license.serializers import LicenseImportItemsSelectSerializer
 from .models import BillOfEntryModel, RowDetails
@@ -108,7 +108,14 @@ from datetime import date
 
 class InvoiceSerializer(serializers.ModelSerializer):
     from_entity_id = serializers.IntegerField(write_only=True)
-    to_company = CompanyOptionSerializer(write_only=True)
+    from_entity = InvoiceEntitySerializer(read_only=True)
+
+    # Expose read-only fields for to_company details
+    to_company_name = serializers.CharField()
+    to_company_pan = serializers.CharField()
+    to_company_gst = serializers.CharField()
+    to_company_address_line_1 = serializers.CharField()
+    to_company_address_line_2 = serializers.CharField()
     billing_mode = serializers.ChoiceField(choices=['kg', 'cif_inr'])
     items = InvoiceItemSerializer(many=True)
     bills_of_entry_id = serializers.IntegerField(write_only=True, required=False)
@@ -116,7 +123,9 @@ class InvoiceSerializer(serializers.ModelSerializer):
     class Meta:
         model = Invoice
         fields = [
-            'id', 'from_entity_id', 'to_company',
+            'id', 'from_entity_id', 'from_entity',
+            'to_company_name', 'to_company_pan', 'to_company_gst',
+            'to_company_address_line_1', 'to_company_address_line_2',
             'billing_mode', 'total_qty', 'total_cif', 'total_amount',
             'items', 'invoice_number', 'invoice_date', 'bills_of_entry_id'
         ]
@@ -159,7 +168,7 @@ class InvoiceSerializer(serializers.ModelSerializer):
         validated_data.update({
             'to_company_name': to_company_data.get('name', ''),
             'to_company_pan': to_company_data.get('pan', ''),
-            'to_company_gst': to_company_data.get('gst', ''),
+            'to_company_gst': to_company_data.get('gst_number', ''),
             'to_company_address_line_1': to_company_data.get('address_line_1', ''),
             'to_company_address_line_2': to_company_data.get('address_line_2', ''),
         })
@@ -174,21 +183,42 @@ class InvoiceSerializer(serializers.ModelSerializer):
         from_entity_id = validated_data.pop('from_entity_id', None)
         to_company_data = validated_data.pop('to_company', None)
 
+        if to_company_data:
+            validated_data.update({
+                'to_company_name': to_company_data.get('name', ''),
+                'to_company_pan': to_company_data.get('pan', ''),
+                'to_company_gst': to_company_data.get('gst_number', ''),
+                'to_company_address_line_1': to_company_data.get('address_line_1', ''),
+                'to_company_address_line_2': to_company_data.get('address_line_2', ''),
+            })
+
         if from_entity_id:
             instance.from_entity = InvoiceEntity.objects.get(pk=from_entity_id)
-
-        if to_company_data:
-            instance.to_company_name = to_company_data.get('name', '')
-            instance.to_company_pan = to_company_data.get('pan', '')
-            instance.to_company_gst = to_company_data.get('gst', '')
-            instance.to_company_address_line_1 = to_company_data.get('address_line_1', '')
-            instance.to_company_address_line_2 = to_company_data.get('address_line_2', '')
 
         for attr, value in validated_data.items():
             setattr(instance, attr, value)
 
         instance.save()
-        instance.items.all().delete()
-        for item in items_data:
-            InvoiceItem.objects.create(invoice=instance, **item)
+
+        # Updating or creating items
+        existing_items = {item.sr_number_id: item for item in instance.items.all()}
+        new_sr_ids = set()
+
+        for item_data in items_data:
+            sr_id = item_data['sr_number'].id if hasattr(item_data['sr_number'], 'id') else item_data['sr_number']
+            new_sr_ids.add(sr_id)
+
+            if sr_id in existing_items:
+                item = existing_items[sr_id]
+                for key, val in item_data.items():
+                    setattr(item, key, val)
+                item.save()
+            else:
+                InvoiceItem.objects.create(invoice=instance, **item_data)
+
+        # Optionally delete removed items
+        for sr_id, item in existing_items.items():
+            if sr_id not in new_sr_ids:
+                item.delete()
+
         return instance
