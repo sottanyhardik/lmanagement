@@ -48,6 +48,12 @@ class InvoiceViewSet(viewsets.ModelViewSet):
     filter_backends = [DjangoFilterBackend]
     filterset_fields = ['bills_of_entry']
 
+    def perform_destroy(self, instance):
+        bills_of_entry = instance.bills_of_entry
+        bills_of_entry.invoice_no = None
+        bills_of_entry.save()
+        instance.delete()
+
 
 class InvoicePDFView(PDFTemplateView):
     template_name = 'bill_of_entry/invoice_template.html'

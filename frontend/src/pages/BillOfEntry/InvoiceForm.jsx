@@ -4,7 +4,7 @@ import EntitySelect from './EntitySelect.jsx';
 import axios from '../../api/axiosInstance';
 import {toast} from 'react-toastify';
 
-const InvoiceForm = ({boe}) => {
+const InvoiceForm = ({boe, onSaved}) => {
     const [loading, setLoading] = useState(true);
     const [entity, setEntity] = useState(null);
     const [fromCompany, setFromCompany] = useState({});
@@ -157,9 +157,29 @@ const InvoiceForm = ({boe}) => {
             setInvoice(inv);
             setIsEditing(false);
             toast.success('Invoice saved');
+            if (onSaved) onSaved(boe.id);
         } catch (err) {
             console.error('Save invoice error:', err.response?.data || err);
             toast.error('Save failed');
+        }
+    };
+    const handleDelete = async () => {
+        if (!invoice?.id) {
+            toast.error('No invoice to delete.');
+            return;
+        }
+
+        if (!window.confirm('Are you sure you want to delete this invoice?')) return;
+
+        try {
+            await axios.delete(`/api/invoices/${invoice.id}/`);
+            toast.success('Invoice deleted');
+            setInvoice(null);
+            setIsEditing(true);
+            if (onSaved) onSaved(boe.id);
+        } catch (err) {
+            console.error('Delete invoice error:', err.response?.data || err);
+            toast.error('Delete failed');
         }
     };
     const handleBillingModeChange = mode => {
@@ -276,6 +296,7 @@ const InvoiceForm = ({boe}) => {
 
                 <Button onClick={() => setIsEditing(true)}>Edit Invoice</Button>
                 <Button className="ms-2" onClick={handleGenerate}>Download Invoice</Button>
+                <Button className="ms-2 btn-danger" onClick={handleDelete}>Delete Invoice</Button> {/* ✅ NEW */}
             </div>
         );
     }

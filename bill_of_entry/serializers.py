@@ -99,7 +99,7 @@ class InvoiceSerializer(serializers.ModelSerializer):
         invoice = Invoice.objects.create(**validated_data)
         invoice.total_amount_in_words = number_to_words(round(invoice.total_amount, 0))
         invoice.save()
-
+        BillOfEntryModel.objects.filter(id=boe_id).update(invoice_no=invoice.invoice_number)
         for item in items_data:
             InvoiceItem.objects.create(invoice=invoice, **item)
 
@@ -126,7 +126,6 @@ class InvoiceSerializer(serializers.ModelSerializer):
             setattr(instance, attr, value)
         instance.total_amount_in_words = number_to_words(instance.total_amount)
         instance.save()
-
         existing_items = {item.sr_number_id: item for item in instance.items.all()}
         new_sr_ids = set()
 

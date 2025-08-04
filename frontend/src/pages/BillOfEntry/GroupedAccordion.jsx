@@ -18,15 +18,14 @@ const GroupedAccordion = ({
     const [editMode, setEditMode] = useState({});
     const focusedRef = useRef({});
 
-    const handleSaved = (updatedEntry) => {
-        onSaved(updatedEntry, {refreshGroup: true});
-        if (updatedEntry?.id) {
-            setTimeout(() => {
-                setEditMode(prev => ({...prev, [updatedEntry.id]: false}));
-                setActiveTab(prev => ({...prev, [updatedEntry.id]: 'view'}));
-                focusedRef.current[updatedEntry.id]?.scrollIntoView({behavior: 'smooth', block: 'center'});
-            }, 100);
-        }
+    const handleSaved = (entryId) => {
+        if (!entryId) return;
+        onSaved(entryId); // Trigger updateSingleEntry from parent
+        setTimeout(() => {
+            setEditMode(prev => ({...prev, [entryId]: false}));
+            setActiveTab(prev => ({...prev, [entryId]: 'view'}));
+            focusedRef.current[entryId]?.scrollIntoView({behavior: 'smooth', block: 'center'});
+        }, 100);
     };
 
     const formatNumber = (value) => {
@@ -164,7 +163,8 @@ const GroupedAccordion = ({
                                                             <TransferLetterForm boe={entry} autoDownload/>
                                                         </Tab>
                                                         <Tab eventKey="invoice" title="🧾 Generate Invoice">
-                                                            <InvoiceForm boe={entry}/>
+                                                            <InvoiceForm boe={entry}
+                                                                         onSaved={handleSaved}/>
                                                         </Tab>
                                                     </Tabs>
                                                 </Card.Body>

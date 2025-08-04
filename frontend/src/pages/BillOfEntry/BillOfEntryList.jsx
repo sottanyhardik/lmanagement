@@ -119,6 +119,20 @@ const BillOfEntryList = () => {
         return () => clearTimeout(timeout);
     }, [inView, hasMore, loading]);
 
+    const updateSingleEntry = async (id) => {
+        try {
+            const {data} = await axios.get(`/api/bill-of-entries/${id}/`)
+            setEntries(prev => prev.map(e => e.id === id ? data : e));
+
+        } catch {
+            try {
+                const {data} = await axios.get(`/api/bill-of-entries/${id.id}/`);
+                setEntries(prev => prev.map(e => e.id === id ? data : e));
+            } catch (err) {
+                toast.error('Failed to fetch entry');
+            }
+        }
+    };
 
     const sortOptions = [
         {label: 'BOE Date ⬇️', value: 'bill_of_entry_date:desc'},
@@ -288,7 +302,7 @@ const BillOfEntryList = () => {
                 selectedIds={selectedIds}
                 toggleSelect={toggleSelect}
                 toggleSelectAll={toggleSelectAll}
-                onSaved={fetchData}
+                onSaved={updateSingleEntry}
             />
 
             <div ref={loadMoreRef} className="text-center my-4" style={{minHeight: '40px'}}>
