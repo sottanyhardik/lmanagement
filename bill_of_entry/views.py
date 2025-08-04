@@ -194,7 +194,7 @@ class DownloadPendingBillView(PDFTemplateResponseMixin, FilterView):
         context = super().get_context_data(**kwargs)
         queryset = self.filterset_class(self.request.GET, queryset=self.get_queryset()).qs
         total_list = [Decimal(data.get_total_inr) for data in queryset]
-        context['total_cif'] = sum(total_list)
+        context['total_cif_fc'] = sum(total_list)
         import datetime
         context['today'] = datetime.datetime.now().date
         return context
@@ -211,8 +211,8 @@ class DownloadPortView(PDFTemplateResponseMixin, FilterView):
     def get_context_data(self, **kwargs):
         context = super().get_context_data(**kwargs)
         queryset = self.filterset_class(self.request.GET, queryset=self.get_queryset()).qs
-        total_list = [Decimal(data.get_total_inr) for data in queryset]
-        context['total_cif'] = sum(total_list)
+        total_list_inr = [Decimal(data.get_total_inr) for data in queryset]
+        context['get_total_inr'] = sum(total_list)
         import datetime
         context['today'] = datetime.datetime.now().date
         return context

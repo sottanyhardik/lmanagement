@@ -19,7 +19,8 @@ class BillOfEntryViewSet(viewsets.ModelViewSet):
     # permission_classes = [IsAuthenticated]
     filter_backends = [DjangoFilterBackend, filters.SearchFilter, filters.OrderingFilter]
     filterset_class = BillOfEntryFilter
-    search_fields = ['bill_of_entry_number', 'invoice_no', 'product_name']
+    search_fields = ['bill_of_entry_number', 'invoice_no', 'product_name',
+                     'item_details__sr_number__license__license_number']
     ordering_fields = ['bill_of_entry_date', 'bill_of_entry_number', 'exchange_rate']
     ordering = ['company__name']
 
@@ -44,6 +45,8 @@ class BillOfEntryBulkDeleteView(APIView):
 class InvoiceViewSet(viewsets.ModelViewSet):
     queryset = Invoice.objects.all()
     serializer_class = InvoiceSerializer
+    filter_backends = [DjangoFilterBackend]
+    filterset_fields = ['bills_of_entry']
 
 
 class InvoicePDFView(PDFTemplateView):
@@ -52,4 +55,43 @@ class InvoicePDFView(PDFTemplateView):
 
     def get_context_data(self, **kwargs):
         invoice = get_object_or_404(Invoice, pk=self.kwargs['pk'])
-        return {'invoice': invoice}
+        entity = invoice.from_entity
+        to = {
+            'name': invoice.to_company_name,
+            'address_line_1': invoice.to_company_address_line_1 or '',
+            'address_line_2': invoice.to_company_address_line_2 or '',
+            'pan': invoice.to_company_pan,
+            'gst_number': invoice.to_company_gst_number,
+        }
+
+        items = invoice.items.all()
+        bank = {
+            'accountNo': entity.bank_account_number,
+            'bankName': entity.bank_name,
+            'ifsc': entity.ifsc_code,
+            'accountType': entity.get_account_type_display(),
+        }
+
+        context = {
+            'invoice': invoice,
+            'entity': entity,
+            'to_company': to,
+            'items': [
+                {
+                    'licenseNo': str(item.license_no).zfill(10),
+                    'hsnCode': item.hsn_code,
+                    'qty': str(float(item.qty or 0)),
+                    'cifUsd': str(float(item.cif_fc or 0)),
+                    'exchangeRate': str(round(float(item.cif_inr or 0) / float(item.cif_fc or 1), 2)),
+                    'cifInr': str(float(item.cif_inr or 0)),
+                    'rate': str(float(item.rate or 0)),
+                    'amount': str(float(item.amount or 0))
+                } for item in items
+            ],
+            'amount_in_words': getattr(invoice, 'total_amount_in_words', ''),
+            'bank': bank
+        }
+        return context
+
+    def get_download_filename(self):
+        return f"{self.invoice.invoice_number}.pdf"

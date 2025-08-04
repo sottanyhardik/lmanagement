@@ -25,6 +25,7 @@ const BillOfEntryList = () => {
     const [allExpanded, setAllExpanded] = useState(true);
     const [hasMore, setHasMore] = useState(true);
     const [newEntry, setNewEntry] = useState(null);
+    const [refreshKey, setRefreshKey] = useState(0);
 
     const [filters, setFilters] = useState({
         company_objs: [],
@@ -78,9 +79,10 @@ const BillOfEntryList = () => {
             const hasNextPage = res.data.next !== null;
 
             setEntries(prev => {
+                if (page === 1) return newEntries;
                 const combined = [...prev, ...newEntries];
                 const uniqueEntries = Array.from(new Map(combined.map(e => [e.id, e])).values());
-                return page === 1 ? newEntries : uniqueEntries;
+                return uniqueEntries;
             });
             setHasMore(hasNextPage);
         } catch (err) {
@@ -90,15 +92,23 @@ const BillOfEntryList = () => {
         }
     }, [page, searchQuery, sortField, sortOrder, filters]);
 
+
     useEffect(() => {
         setEntries([]);
         setPage(1);
         setHasMore(true);
+        setRefreshKey(prev => prev + 1); // Triggers refresh-based fetch
     }, [searchQuery, sortField, sortOrder, filters]);
 
     useEffect(() => {
         fetchData();
     }, [page]);
+
+    useEffect(() => {
+        if (page === 1) {
+            fetchData(); // on refreshKey (filters/search/sort change)
+        }
+    }, [refreshKey]);
 
     useEffect(() => {
         const delay = 200;
@@ -109,15 +119,6 @@ const BillOfEntryList = () => {
         return () => clearTimeout(timeout);
     }, [inView, hasMore, loading]);
 
-    useEffect(() => {
-        let timer;
-        if (!loading && hasMore && entries.length > 0) {
-            timer = setTimeout(() => {
-                setPage(prev => prev + 1);
-            }, 300); // delay to avoid rapid calls
-        }
-        return () => clearTimeout(timer);
-    }, [entries, hasMore, loading]);
 
     const sortOptions = [
         {label: 'BOE Date ⬇️', value: 'bill_of_entry_date:desc'},

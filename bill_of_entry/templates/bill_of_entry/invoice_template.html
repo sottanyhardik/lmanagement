@@ -4,76 +4,211 @@
 <head>
     <meta charset="UTF-8">
     <style>
+        @page {
+            size: A4;
+            margin: 20px 20px 20px 20px; /* Top, right, bottom, left */
+            padding: 20px 20px 20px 20px;
+            border: 2px solid {{ entity.bill_colour|default:"#333" }};
+        }
+
         body {
-            font-family: sans-serif;
+            font-family: 'Segoe UI', sans-serif;
             font-size: 12px;
+            color: #333;
+            margin: 0;
+            padding: 0;
+        }
+
+        header {
+            position: fixed;
+            top: 0;
+            left: 0;
+            right: 0;
+            height: 100px;
+            padding: 10px 40px;
+            border-bottom: 2px solid{{ entity.bill_colour|default:"#333" }};
+            background: #f0f8ff;
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+        }
+
+        h2 {
+            text-align: center;
+            color: {{ entity.bill_colour|default:"#333" }};
+            text-decoration: underline;
         }
 
         table {
             width: 100%;
             border-collapse: collapse;
-            margin-bottom: 15px;
+            margin: 10px 0;
+        }
+
+        strong {
+            color: {{ entity.bill_colour|default:"#333" }};
+        }
+
+        thead {
+            background-color: #e6f2ff;
         }
 
         th, td {
             border: 1px solid #000;
-            padding: 5px;
+            padding: 2px;
         }
 
-        .no-border td {
-            border: none;
+        .section-title {
+            font-weight: bold;
+            margin-top: 20px;
+            text-decoration: underline;
+            color: {{ entity.bill_colour|default:"#333" }};
+        }
+
+        .bank-details {
+            margin-top: 10px;
+            line-height: 1.6;
+        }
+
+        .page {
+            height: auto;
+        }
+
+        .footer {
+            position: fixed;
+            bottom: -10px;
+            left: 0;
+            right: 0;
+            height: 40px;
+            font-size: 10px;
+            color: #555;
+            text-align: center;
+            border-top: 1px solid #aaa;
+            padding-top: 5px;
+            background: #f9f9f9;
         }
     </style>
 </head>
 <body>
-<h2>Invoice</h2>
-<p><strong>From:</strong> {{ entity.name }}<br/>
-    {{ entity.address }}<br/>
-    PAN: {{ entity.pan }}<br/>
-    GST: {{ entity.gst_number }}</p>
+<div class="page">
+    <header>
+        <table width="100%" style="border: none;">
+            <tr>
+                <td style="width: 40%; vertical-align: top; text-align: center!important; padding: 5px;">
+                    {% if entity.logo %}
+                        <div style="text-align: center; margin-bottom: 20px;">
+                            <img src="{{ entity.logo.url }}" alt="Logo"
+                                 style="max-height: 80px; max-width: 200px; width: auto; height: auto; display: block; margin-left: auto; margin-right: auto;"/>
+                        </div>
+                    {% endif %}
+                </td>
+                <td style="text-align: right; width: 60%; vertical-align: top; font-size: 25px;padding: 5px;">
+                    <strong>{{ entity.name }}</strong><br>
+                    {{ entity.address_line_1 }}<br>
+                    {{ entity.address_line_2 }}<br>
+                    PAN: {{ entity.pan_number }} | GST: {{ entity.gst_number }}
+                </td>
+            </tr>
+        </table>
+    </header>
 
-<p><strong>To:</strong> {{ to_company.name }}<br/>
-    {{ to_company.address }}<br/>
-    PAN: {{ to_company.pan }}<br/>
-    GST: {{ to_company.gst_number }}</p>
-
-<table>
-    <thead>
-    <tr>
-        <th>License No</th>
-        <th>HSN</th>
-        <th>Qty (KG)</th>
-        <th>CIF $</th>
-        <th>Ex. Rate</th>
-        <th>CIF INR</th>
-        <th>Rate</th>
-        <th>Amount</th>
-    </tr>
-    </thead>
-    <tbody>
-    {% for item in items %}
+    <h2>Invoice</h2>
+    <h3>
+        <table>
+            <tr>
+                <td colspan="8">Invoice No. <strong>{{ invoice.invoice_number }}</strong></td>
+                <td colspan="4">Date: <strong>{{ invoice.invoice_date }}</strong></td>
+            </tr>
+        </table>
+    </h3>
+    <table>
         <tr>
-            <td>{{ item.licenseNo }}</td>
-            <td>{{ item.hsnCode }}</td>
-            <td>{{ item.qty }}</td>
-            <td>{{ item.cifUsd }}</td>
-            <td>{{ item.exchangeRate }}</td>
-            <td>{{ item.cifInr }}</td>
-            <td>{{ item.rate }}</td>
-            <td>{{ item.amount }}</td>
+            <td style="text-align: left!important;">
+                <p class="section-title">Bill To:</p>
+
+                <strong>{{ to_company.name }}</strong><br/>
+                {{ to_company.address_line_1 }}<br/>
+                {{ to_company.address_line_2 }}<br/>
+                PAN: {{ to_company.pan }}<br/>
+                GST: {{ to_company.gst_number }}
+            </td>
         </tr>
-    {% endfor %}
-    </tbody>
-</table>
+    </table>
+    </p>
 
-<p><strong>Total Amount in Words:</strong> {{ amount_in_words }}</p>
+    <table>
+        <thead>
+        <tr style="text-align: center;">
+            <th><strong>License No</strong></th>
+            <th><strong>HSN</strong></th>
+            {% if invoice.billing_mode == 'kg' %}
+                <th><strong>Qty (KG)</strong></th>
+            {% else %}
+                <th><strong>CIF $</strong></th>
+                <th><strong>Ex. Rate</strong></th>
+                <th><strong>CIF INR</strong></th>
+            {% endif %}
+            <th><strong>Rate</strong></th>
+            <th><strong>Amount</strong></th>
+        </tr>
+        </thead>
+        <tbody>
+        {% for item in items %}
+            <tr>
+                <td style="text-align: center;">{{ item.licenseNo }}</td>
+                <td style="text-align: center;">{{ item.hsnCode }}</td>
+                {% if invoice.billing_mode == 'kg' %}
+                    <td style="text-align: right;">{{ item.qty }}</td>
+                {% else %}
+                    <td style="text-align: right;">{{ item.cifUsd }}</td>
+                    <td style="text-align: right;">{{ item.exchangeRate }}</td>
+                    <td style="text-align: right;">{{ item.cifInr }}</td>
+                {% endif %}
+                <td style="text-align: right;">{{ item.rate }}</td>
+                <td style="text-align: right;">{{ item.amount }}</td>
+            </tr>
+        {% endfor %}
+        </tbody>
+        <tfoot>
+        <tr style="text-align: right;">
+            <td colspan="2" style="text-align: right;"><strong>Total</strong></td>
+            {% if invoice.billing_mode == 'kg' %}
+                <td><strong>{{ invoice.total_qty }}</strong></td>
+            {% else %}
+                <td><strong>{{ invoice.total_cif_fc }}</strong></td>
+                <td>-</td>
+                <td><strong>{{ invoice.total_cif_inr }}</strong></td>
+            {% endif %}
+            <td>-</td>
+            <td><strong>{{ invoice.total_amount }}</strong></td>
+        </tr>
+        </tfoot>
+    </table>
 
-<h4>Bank Details</h4>
-<p>
-    A/C No: {{ bank.accountNo }}<br/>
-    Bank Name: {{ bank.bankName }}<br/>
-    IFSC: {{ bank.ifsc }}<br/>
-    Account Type: {{ bank.accountType }}
-</p>
+    <p><strong>Total Amount in Words:</strong> {{ amount_in_words }}</p>
+    <table>
+        <tr>
+            <td colspan="6">
+                <strong>Remark:</strong>
+                <br/>
+                Bill OF Entry No. {{ invoice.bills_of_entry.bill_of_entry_number }}<br>
+                Dated. {{ invoice.bills_of_entry.bill_of_entry_date }}
+
+            </td>
+        </tr>
+    </table>
+    <p class="section-title">Bank Details:</p>
+    <div class="bank-details">
+        <strong>Account No:</strong> {{ bank.accountNo }}<br/>
+        <strong>Bank Name:</strong> {{ bank.bankName }}<br/>
+        <strong>IFSC:</strong> {{ bank.ifsc }}<br/>
+        <strong>Account Type:</strong> {{ bank.accountType }}
+    </div>
+</div>
+<div class="footer">
+    <strong>Note:</strong>
+    This is a system-generated invoice. {% if entity.email %}For queries, contact:
+    {{ entity.email|default:"support@example.com" }}{% endif %}
+</div>
 </body>
 </html>

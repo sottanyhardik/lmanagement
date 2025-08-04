@@ -1,11 +1,19 @@
 from datetime import datetime
 
+import num2words
 from django.http import HttpResponse
 from django.template.loader import get_template
 from django.utils.dateparse import parse_datetime, parse_date
 from django_tables2 import SingleTableView
 from django_tables2.export import ExportMixin
 from xhtml2pdf import pisa
+
+
+def number_to_words(amount):
+    try:
+        return num2words.num2words(amount, to='currency', lang='en_IN').replace('euro', 'rupees').capitalize()
+    except Exception:
+        return ""
 
 
 class PagedFilteredTableView(ExportMixin, SingleTableView):

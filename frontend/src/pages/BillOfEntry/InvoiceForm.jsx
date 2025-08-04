@@ -18,7 +18,7 @@ const InvoiceForm = ({boe}) => {
     useEffect(() => {
         async function init() {
             if (!boe) return setLoading(false);
-
+            console.log(boe);
             setToCompany({
                 id: boe.company.id,
                 name: boe.company.name || '',
@@ -40,10 +40,8 @@ const InvoiceForm = ({boe}) => {
                 amount: 0
             }));
             setItems(defaultItems);
-
             try {
-                const {data} = await axios.get('/api/invoices/', {params: {bills_of_entry: boe.id}});
-                const arr = Array.isArray(data) ? data : data.results || [];
+                const arr = boe.invoices || [];
                 if (arr.length > 0) {
                     const inv = arr[0];
                     inv.items = inv.items.map(it => ({
@@ -58,6 +56,14 @@ const InvoiceForm = ({boe}) => {
                     setEntity(inv.from_entity);
                     setFromCompany(inv.from_entity);
                     setItems(inv.items);
+                    setToCompany({
+                        id: boe.company.id,
+                        name: inv.to_company_name || '',
+                        address_line_1: inv.to_company_address_line_1 || '',
+                        address_line_2: inv.to_company_address_line_2 || '',
+                        pan: inv.to_company_pan || '',
+                        gst_number: inv.to_company_gst_number || ''
+                    });
                 }
             } catch (err) {
                 console.error('Fetch invoice error:', err);
@@ -70,12 +76,12 @@ const InvoiceForm = ({boe}) => {
     }, [boe]);
 
 
-    const computeTotals = arr =>
-        arr.reduce((acc, it) => ({
-            qty: parseFloat(acc.qty + (Number(it.qty) || 0)).toFixed(2),
-            cif_fc: parseFloat(acc.cif_fc + (Number(it.cif_fc) || 0)).toFixed(2),
-            cif_inr: parseFloat(acc.cif_inr + (Number(it.cif_inr) || 0)).toFixed(2),
-            amount: parseFloat(acc.amount + (Number(it.amount) || 0)).toFixed(2)
+    const computeTotals = arr => {
+        const result = arr.reduce((acc, it) => ({
+            qty: acc.qty + (Number(it.qty) || 0),
+            cif_fc: acc.cif_fc + (Number(it.cif_fc) || 0),
+            cif_inr: acc.cif_inr + (Number(it.cif_inr) || 0),
+            amount: acc.amount + (Number(it.amount) || 0)
         }), {
             qty: 0,
             cif_fc: 0,
@@ -83,6 +89,13 @@ const InvoiceForm = ({boe}) => {
             amount: 0
         });
 
+        return {
+            qty: parseFloat(result.qty.toFixed(2)),
+            cif_fc: parseFloat(result.cif_fc.toFixed(2)),
+            cif_inr: parseFloat(result.cif_inr.toFixed(2)),
+            amount: parseFloat(result.amount.toFixed(2))
+        };
+    };
     const dataForTotals = invoice && !isEditing ? invoice.items : items;
     const totals = computeTotals(dataForTotals || []);
 
@@ -105,12 +118,12 @@ const InvoiceForm = ({boe}) => {
                 to_company: toCompany,
                 to_company_name: toCompany.name,
                 to_company_pan: toCompany.pan,
-                to_company_gst: toCompany.gst_number,
+                to_company_gst_number: toCompany.gst_number,
                 to_company_address_line_1: toCompany.address_line_1,
                 to_company_address_line_2: toCompany.address_line_2,
                 billing_mode: billingMode,
                 items: items.map(it => ({
-                    sr_number: it.sr_id,
+                    sr_number: it.sr_id || it.sr_number,
                     license_no: it.license_no,
                     hsn_code: it.hsn_code,
                     qty: it.qty,
@@ -118,7 +131,12 @@ const InvoiceForm = ({boe}) => {
                     cif_inr: it.cif_inr,
                     rate: it.rate,
                     amount: parseFloat(parseFloat(it.amount).toFixed(2))
-                }))
+                })),
+                'total_amount': totals.amount,
+                'total_qty': totals.qty,
+                'total_cif_fc': totals.cif_fc,
+                'total_cif_inr': totals.cif_inr,
+
             };
             console.log(payload);
             let res;
@@ -154,13 +172,22 @@ const InvoiceForm = ({boe}) => {
     };
 
     const handleGenerate = () => {
-        if (!invoice?.id) return toast.error('Save first');
-        const link = document.createElement('a');
-        link.href = `/api/invoices/${invoice.id}/pdf/`;
-        link.download = `${invoice.invoice_number}.pdf`;
-        link.click();
-    };
+        if (!invoice?.id) {
+            toast.error('Please save the invoice before generating the PDF.');
+            return;
+        }
 
+        const url = `/api/invoices/${invoice.id}/pdf/`;
+        const filename = `${invoice.invoice_number || 'invoice'}.pdf`;
+
+        const link = document.createElement('a');
+        link.href = url;
+        link.setAttribute('download', filename);
+        link.setAttribute('target', '_blank');  // Optional: open in new tab
+        document.body.appendChild(link);
+        link.click();
+        document.body.removeChild(link); // Clean up
+    };
     if (loading) return <Spinner/>;
 
     if (!isEditing && invoice) {
@@ -178,7 +205,7 @@ const InvoiceForm = ({boe}) => {
                     <Col md={6}>
                         <h6>To Company</h6>
                         <div>{toCompany.name}</div>
-                        <div>PAN: {invoice.to_company_pan} | GST: {invoice.to_company_gst}</div>
+                        <div>PAN: {invoice.to_company_pan} | GST: {invoice.to_company_gst_number}</div>
                     </Col>
                 </Row>
 
@@ -303,15 +330,28 @@ const InvoiceForm = ({boe}) => {
             <Row className="mb-3">
                 <Col md={4}>
                     <Form.Label>To Company</Form.Label>
-                    <Form.Control value={toCompany.name} readOnly/>
+                    <Form.Control
+                        value={toCompany.name}
+                        onChange={e => setToCompany(prev => ({...prev, name: e.target.value}))}
+                        placeholder="Enter Company Name"
+                    />
                 </Col>
                 <Col md={4}>
                     <Form.Label>PAN</Form.Label>
-                    <Form.Control value={toCompany.pan} readOnly/>
+                    <Form.Control
+                        value={toCompany.pan}
+                        onChange={e => setToCompany(prev => ({...prev, pan: e.target.value}))}
+                        placeholder="Enter Pan Card Number.."
+                    />
                 </Col>
                 <Col md={4}>
                     <Form.Label>GST</Form.Label>
-                    <Form.Control value={toCompany.gst_number} readOnly/>
+                    <Form.Control
+                        value={toCompany.gst_number}
+                        onChange={e => setToCompany(prev => ({...prev, gst_number: e.target.value}))}
+                        placeholder="Enter GST Number.."
+                    />
+
                 </Col>
             </Row>
             {/* Billing Mode */}
@@ -331,7 +371,9 @@ const InvoiceForm = ({boe}) => {
                     <th>License</th>
                     <th>HSN</th>
                     {billingMode === 'kg' ? (
-                        <th>Qty</th>
+                        <>
+                            <th>Qty</th>
+                        </>
                     ) : (
                         <>
                             <th>CIF $</th>
@@ -377,9 +419,14 @@ const InvoiceForm = ({boe}) => {
                 </tbody>
                 <tfoot>
                 <tr>
-                    <td colSpan={billingMode === 'kg' ? 1 : 3}><strong>Total</strong></td>
+                    <td colSpan={3}>
+                        <strong>Total</strong></td>
                     {billingMode === 'kg' ? (
-                        <td>{totals.qty}</td>
+                        <>
+                            <td>{totals.qty}</td>
+                            <td>-</td>
+                            <td>{totals.amount}</td>
+                        </>
                     ) : (
                         <>
                             <td>{totals.cif_fc}</td>

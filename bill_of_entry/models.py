@@ -1,6 +1,6 @@
 from decimal import Decimal, DivisionByZero
 
-from django.core.validators import MinValueValidator
+from django.core.validators import MinValueValidator, RegexValidator
 from django.db import models
 from django.db.models import Sum
 from django.db.models.signals import post_save, post_delete
@@ -168,16 +168,33 @@ class Invoice(models.Model):
                                        null=True, on_delete=models.CASCADE)
     from_entity = models.ForeignKey(InvoiceEntity, on_delete=models.CASCADE)
     to_company_name = models.CharField(max_length=255)
-    to_company_pan = models.CharField(max_length=20)
-    to_company_gst = models.CharField(max_length=20)
+    to_company_pan = models.CharField(
+        max_length=15,
+        null=True,
+        blank=True,
+        validators=[
+            RegexValidator(regex=r'^[A-Z]{5}[0-9]{4}[A-Z]$', message="Enter a valid PAN number.")
+        ]
+    )
+    to_company_gst_number = models.CharField(
+        max_length=15,
+        null=True,
+        blank=True,
+        validators=[
+            RegexValidator(regex=r'^\d{2}[A-Z]{5}\d{4}[A-Z]{1}[1-9A-Z]{1}Z[0-9A-Z]{1}$',
+                           message="Enter a valid GST number.")
+        ]
+    )
     to_company_address_line_1 = models.TextField()
     to_company_address_line_2 = models.TextField(blank=True)
     invoice_number = models.CharField(max_length=50, unique=True)
     invoice_date = models.DateField(auto_now_add=True)
     billing_mode = models.CharField(max_length=10, choices=[('kg', 'KG'), ('cif', 'CIF')])
     total_qty = models.DecimalField(max_digits=12, decimal_places=3, default=0)
-    total_cif = models.DecimalField(max_digits=15, decimal_places=2, default=0)
+    total_cif_fc = models.DecimalField(max_digits=15, decimal_places=2, default=0)
+    total_cif_inr = models.DecimalField(max_digits=15, decimal_places=2, default=0)
     total_amount = models.DecimalField(max_digits=15, decimal_places=2, default=0)
+    total_amount_in_words = models.TextField(null=True, blank=True)
 
 
 class InvoiceItem(models.Model):

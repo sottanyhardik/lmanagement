@@ -1,22 +1,19 @@
 import React, {useEffect, useState} from 'react';
 import {Form} from 'react-bootstrap';
-import axios from '../../api/axiosInstance';
+import {fetchEntities} from '../../Cache/entityCache';
 
 const EntitySelect = ({value, onChange}) => {
     const [options, setOptions] = useState([]);
     const [loading, setLoading] = useState(true);
 
     useEffect(() => {
-        axios.get('/api/invoice-entities/')
-            .then(res => {
-                const data = Array.isArray(res.data) ? res.data : res.data.results || [];
-                setOptions(data);
-            })
-            .catch(err => {
-                console.error('Failed to load entities:', err);
-                setOptions([]);
-            })
-            .finally(() => setLoading(false));
+        async function loadEntities() {
+            const entities = await fetchEntities();
+            setOptions(entities);
+            setLoading(false);
+        }
+
+        loadEntities();
     }, []);
 
     const handleChange = (e) => {
@@ -28,7 +25,7 @@ const EntitySelect = ({value, onChange}) => {
     return (
         <Form.Select value={value?.id || ''} onChange={handleChange} disabled={loading}>
             <option value="">Select Entity</option>
-            {Array.isArray(options) && options.map(ent => (
+            {options.map(ent => (
                 <option key={ent.id} value={ent.id}>
                     {ent.name} — {ent.pan_number || 'No PAN'} — {ent.gst_number || 'No GST'}
                 </option>

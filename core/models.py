@@ -249,6 +249,8 @@ class InvoiceEntity(models.Model):
     bank_name = models.CharField(max_length=100)
     ifsc_code = models.CharField(max_length=11)
     account_type = models.CharField(max_length=10, choices=ACCOUNT_TYPES)
+    bill_colour = models.CharField(max_length=10, null=True, blank=True)
+    signature = models.ImageField(upload_to='entity_signature/', null=True, blank=True)
 
     def __str__(self):
         return self.name

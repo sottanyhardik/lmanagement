@@ -212,6 +212,7 @@ class UploadLedgerAPIView(APIView):
 class TransferLetterViewSet(viewsets.ReadOnlyModelViewSet):  # ReadOnly to restrict to GET only
     queryset = TransferLetterModel.objects.all()
     serializer_class = TransferLetterSerializer
+    pagination_class = None  # ❗ Disable pagination
 
 
 class InvoiceEntityReadOnlyViewSet(viewsets.ReadOnlyModelViewSet):

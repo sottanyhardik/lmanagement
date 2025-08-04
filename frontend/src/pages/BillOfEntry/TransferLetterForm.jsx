@@ -2,6 +2,7 @@ import React, {useEffect, useState} from 'react';
 import {Button, Col, Form, Row, Spinner, Table} from 'react-bootstrap';
 import axios from '../../api/axiosInstance';
 import {toast} from 'react-toastify';
+import {fetchTransferLetterTemplates} from '../../Cache/templateCache';
 
 const TransferLetterForm = ({boe, autoDownload = false}) => {
     const [templates, setTemplates] = useState([]);
@@ -19,8 +20,7 @@ const TransferLetterForm = ({boe, autoDownload = false}) => {
     useEffect(() => {
         const fetchTemplates = async () => {
             try {
-                const res = await axios.get('/api/transfer-letters/');
-                const data = res.data?.results || res.data;
+                const data = await fetchTransferLetterTemplates();
                 setTemplates(Array.isArray(data) ? data : []);
             } catch (err) {
                 toast.error('Failed to load TL templates');
@@ -87,6 +87,7 @@ const TransferLetterForm = ({boe, autoDownload = false}) => {
                 link.click();
             }
         } catch (err) {
+            console.error('Failed to generate TL:', err);
             toast.error('Failed to generate TL');
         } finally {
             setGenerating(false);
