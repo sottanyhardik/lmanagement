@@ -3,6 +3,7 @@ import {Button, Col, Form, Row, Spinner, Table} from 'react-bootstrap';
 import EntitySelect from './EntitySelect.jsx';
 import axios from '../../api/axiosInstance';
 import {toast} from 'react-toastify';
+import ValidatedInput from '../../components/ValidatedInput';
 
 const InvoiceForm = ({boe, onSaved}) => {
     const [loading, setLoading] = useState(true);
@@ -13,12 +14,13 @@ const InvoiceForm = ({boe, onSaved}) => {
     const [items, setItems] = useState([]);
     const [invoice, setInvoice] = useState(null);
     const [isEditing, setIsEditing] = useState(true);
+    const [errors, setErrors] = useState({});
 
     // Load BOE and existing invoice
     useEffect(() => {
         async function init() {
             if (!boe) return setLoading(false);
-            console.log(boe);
+
             setToCompany({
                 id: boe.company.id,
                 name: boe.company.name || '',
@@ -27,7 +29,7 @@ const InvoiceForm = ({boe, onSaved}) => {
                 pan: boe.company.pan || '',
                 gst_number: boe.company.gst_number || ''
             });
-
+            validate();
             const defaultItems = boe.item_details.map(d => ({
                 sr_id: d.sr_number.id,
                 license_no: d.sr_number.display_name.split('-')[0].replace(/^0+/, ''),
@@ -108,9 +110,42 @@ const InvoiceForm = ({boe, onSaved}) => {
             ? arr[idx].qty * rate
             : (arr[idx].cif_inr * rate) / 100;
         setItems(arr);
+        validate();
     };
     const removeItem = idx => setItems(prev => prev.filter((_, i) => i !== idx));
+    const validate = () => {
+        const newErrors = {};
+        const PAN_REGEX = /^[A-Z]{5}[0-9]{4}[A-Z]$/;
+        const GST_REGEX = /^[0-9]{2}[A-Z]{5}[0-9]{4}[A-Z]{1}[1-9A-Z]{1}[Z]{1}[0-9A-Z]{1}$/;
+        if (!toCompany.name) newErrors.to_company_name = 'Company name is required.';
+        if (!toCompany.pan) {
+            newErrors.to_company_pan = 'PAN number is required.';
+        } else if (!PAN_REGEX.test(toCompany.pan.toUpperCase())) {
+            newErrors.to_company_pan = 'Invalid PAN format.';
+        }
+
+        if (!toCompany.gst_number) {
+            newErrors.to_company_gst = 'GST number is required.';
+        } else if (!GST_REGEX.test(toCompany.gst_number.toUpperCase())) {
+            newErrors.to_company_gst = 'Invalid GST format.';
+        }
+
+        if (!entity?.id) newErrors.from_entity = 'From Company is required.';
+
+        items.forEach((it, idx) => {
+            if (!it.rate || isNaN(it.rate)) {
+                newErrors[`item_${idx}_rate`] = 'Valid rate is required.';
+            }
+        });
+
+        setErrors(newErrors);
+        return Object.keys(newErrors).length === 0;
+    };
     const handleSave = async () => {
+        if (!validate()) {
+            toast.error('Please fix validation errors.');
+            return;
+        }
         try {
             const payload = {
                 bills_of_entry_id: boe.id,
@@ -159,8 +194,30 @@ const InvoiceForm = ({boe, onSaved}) => {
             toast.success('Invoice saved');
             if (onSaved) onSaved(boe.id);
         } catch (err) {
-            console.error('Save invoice error:', err.response?.data || err);
-            toast.error('Save failed');
+            const apiErrors = err.response?.data;
+            console.error('Save invoice error:', apiErrors || err);
+
+            // Flatten Django-style nested errors to match our field names
+            const newErrors = {};
+            if (apiErrors && typeof apiErrors === 'object') {
+                for (const key in apiErrors) {
+                    if (Array.isArray(apiErrors[key])) {
+                        newErrors[key] = apiErrors[key].join(', ');
+                    } else if (typeof apiErrors[key] === 'object') {
+                        for (const subKey in apiErrors[key]) {
+                            const fullKey = `${key}_${subKey}`;
+                            if (Array.isArray(apiErrors[key][subKey])) {
+                                newErrors[fullKey] = apiErrors[key][subKey].join(', ');
+                            } else {
+                                newErrors[fullKey] = apiErrors[key][subKey];
+                            }
+                        }
+                    }
+                }
+            }
+
+            setErrors(newErrors);
+            toast.error('Save failed. Please check the form for issues.');
         }
     };
     const handleDelete = async () => {
@@ -304,6 +361,19 @@ const InvoiceForm = ({boe, onSaved}) => {
     // Render edit form if editing or no invoice exists
     return (
         <Form className="p-3 bg-light rounded">
+            {Object.keys(errors).length > 0 && (
+                console.log(errors),
+                    <div className="alert alert-danger py-2 small">
+                        <strong className="d-block mb-1">Please resolve the following validation issues:</strong>
+                        <ul className="mb-0 ps-3">
+                            {Object.entries(errors).map(([field, msg], i) => (
+                                <li key={i}>
+                                    <span className="text-capitalize">{field.replace(/_/g, ' ')}</span>: {msg}
+                                </li>
+                            ))}
+                        </ul>
+                    </div>
+            )}
             <Form.Group className="mb-3">
                 <Form.Label>From Company</Form.Label>
                 <EntitySelect value={entity} onChange={setEntity}/>
@@ -350,27 +420,31 @@ const InvoiceForm = ({boe, onSaved}) => {
 
             <Row className="mb-3">
                 <Col md={4}>
-                    <Form.Label>To Company</Form.Label>
-                    <Form.Control
+                    <ValidatedInput
+                        label="To Company"
                         value={toCompany.name}
                         onChange={e => setToCompany(prev => ({...prev, name: e.target.value}))}
                         placeholder="Enter Company Name"
+                        error={errors.to_company_name} // ✅ Simplified
                     />
                 </Col>
                 <Col md={4}>
-                    <Form.Label>PAN</Form.Label>
-                    <Form.Control
+                    <ValidatedInput
+                        label="PAN"
                         value={toCompany.pan}
                         onChange={e => setToCompany(prev => ({...prev, pan: e.target.value}))}
-                        placeholder="Enter Pan Card Number.."
+                        placeholder="Enter PAN Number"
+                        error={errors.to_company_pan}
                     />
+
                 </Col>
                 <Col md={4}>
-                    <Form.Label>GST</Form.Label>
-                    <Form.Control
+                    <ValidatedInput
+                        label="GST"
                         value={toCompany.gst_number}
                         onChange={e => setToCompany(prev => ({...prev, gst_number: e.target.value}))}
-                        placeholder="Enter GST Number.."
+                        placeholder="Enter GST Number"
+                        error={errors.to_company_gst}
                     />
 
                 </Col>
