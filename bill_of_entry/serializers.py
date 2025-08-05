@@ -34,6 +34,7 @@ class InvoiceSerializer(serializers.ModelSerializer):
     billing_mode = serializers.ChoiceField(choices=['kg', 'cif_inr'])
     items = InvoiceItemSerializer(many=True)
     bills_of_entry_id = serializers.IntegerField(write_only=True, required=False)
+    invoice_number = serializers.CharField(required=False, allow_blank=True)
 
     class Meta:
         model = Invoice
@@ -45,7 +46,7 @@ class InvoiceSerializer(serializers.ModelSerializer):
             'items', 'invoice_number', 'invoice_date', 'bills_of_entry_id', 'total_amount_in_words'
         ]
         read_only_fields = [
-            'invoice_number', 'invoice_date',
+            'invoice_date',
             'to_company_name', 'to_company_pan', 'to_company_gst_number',
             'to_company_address_line_1', 'to_company_address_line_2',
         ]
@@ -77,12 +78,14 @@ class InvoiceSerializer(serializers.ModelSerializer):
         from_entity_id = validated_data.pop('from_entity_id')
         to_company_data = validated_data.pop('to_company')
         boe_id = validated_data.pop('bills_of_entry_id', None)
+        invoice_number = validated_data.pop('invoice_number', None)
 
         if boe_id:
             validated_data['bills_of_entry'] = BillOfEntryModel.objects.get(pk=boe_id)
 
         from_entity = InvoiceEntity.objects.get(pk=from_entity_id)
-        invoice_number = self.generate_invoice_number(from_entity.name)
+        if not invoice_number:
+            invoice_number = self.generate_invoice_number(from_entity.name)
 
         validated_data['from_entity'] = from_entity
         validated_data['invoice_number'] = invoice_number

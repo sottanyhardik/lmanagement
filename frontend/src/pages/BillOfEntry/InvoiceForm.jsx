@@ -1,8 +1,8 @@
 import React, {useEffect, useState} from 'react';
 import {Button, Col, Form, Row, Spinner, Table} from 'react-bootstrap';
 import EntitySelect from './EntitySelect.jsx';
-import axios from '../../api/axiosInstance';
 import {toast} from 'react-toastify';
+import axios from '../../api/axiosInstance';
 import ValidatedInput from '../../components/ValidatedInput';
 
 const InvoiceForm = ({boe, onSaved}) => {
@@ -150,6 +150,7 @@ const InvoiceForm = ({boe, onSaved}) => {
             const payload = {
                 bills_of_entry_id: boe.id,
                 from_entity_id: entity.id,
+                invoice_number: invoice?.invoice_number || '',  // ✅ include this
                 to_company: toCompany,
                 to_company_name: toCompany.name,
                 to_company_pan: toCompany.pan,
@@ -248,7 +249,8 @@ const InvoiceForm = ({boe, onSaved}) => {
         }));
     };
 
-    const handleGenerate = () => {
+
+    const handleGenerate = async () => {
         if (!invoice?.id) {
             toast.error('Please save the invoice before generating the PDF.');
             return;
@@ -257,14 +259,28 @@ const InvoiceForm = ({boe, onSaved}) => {
         const url = `/api/invoices/${invoice.id}/pdf/`;
         const filename = `${invoice.invoice_number || 'invoice'}.pdf`;
 
-        const link = document.createElement('a');
-        link.href = url;
-        link.setAttribute('download', filename);
-        link.setAttribute('target', '_blank');  // Optional: open in new tab
-        document.body.appendChild(link);
-        link.click();
-        document.body.removeChild(link); // Clean up
+        try {
+            const res = await axios.get(url, {
+                responseType: 'blob'  // ✅ important for binary data
+            });
+
+            const blob = new Blob([res.data], {type: 'application/pdf'});
+            const blobUrl = window.URL.createObjectURL(blob);
+
+            const link = document.createElement('a');
+            link.href = blobUrl;
+            link.setAttribute('download', filename);
+            document.body.appendChild(link);
+            link.click();
+            document.body.removeChild(link);
+
+            window.URL.revokeObjectURL(blobUrl);
+        } catch (err) {
+            console.error('Download error:', err);
+            toast.error('Failed to download invoice PDF.');
+        }
     };
+
     if (loading) return <Spinner/>;
 
     if (!isEditing && invoice) {
@@ -376,7 +392,30 @@ const InvoiceForm = ({boe, onSaved}) => {
             )}
             <Form.Group className="mb-3">
                 <Form.Label>From Company</Form.Label>
-                <EntitySelect value={entity} onChange={setEntity}/>
+                <div className={errors.from_entity ? 'border border-danger rounded p-2' : ''}>
+                    <EntitySelect
+                        value={entity}
+                        onChange={(val) => {
+                            setEntity(val);
+                            setTimeout(validate, 0); // validate after state update
+                        }}
+                    />
+                    {errors.from_entity && (
+                        <div className="text-danger small mt-1">{errors.from_entity}</div>
+                    )}
+                </div>
+                <Form.Group className="mb-3">
+                    <ValidatedInput
+                        label="Invoice Number (optional)"
+                        value={invoice?.invoice_number || ''}
+                        onChange={e => {
+                            const val = e.target.value;
+                            setInvoice(prev => ({...prev, invoice_number: val}));
+                        }}
+                        placeholder="Leave blank to auto-generate"
+                        error={errors.invoice_number}
+                    />
+                </Form.Group>
                 {fromCompany.name && (
                     <div className="d-flex justify-content-between align-items-start border rounded p-4 bg-white">
                         {/* Left: Company Details */}
@@ -423,7 +462,12 @@ const InvoiceForm = ({boe, onSaved}) => {
                     <ValidatedInput
                         label="To Company"
                         value={toCompany.name}
-                        onChange={e => setToCompany(prev => ({...prev, name: e.target.value}))}
+                        onChange={e => {
+                            const val = e.target.value.toUpperCase();
+                            setToCompany(prev => ({...prev, name: val}));
+                            setTimeout(validate, 0); // ensure latest state is used
+                        }}
+
                         placeholder="Enter Company Name"
                         error={errors.to_company_name} // ✅ Simplified
                     />
@@ -432,7 +476,12 @@ const InvoiceForm = ({boe, onSaved}) => {
                     <ValidatedInput
                         label="PAN"
                         value={toCompany.pan}
-                        onChange={e => setToCompany(prev => ({...prev, pan: e.target.value}))}
+                        onChange={e => {
+                            const val = e.target.value.toUpperCase();
+                            setToCompany(prev => ({...prev, pan: val}));
+                            setTimeout(validate, 0); // ensure latest state is used
+                        }}
+
                         placeholder="Enter PAN Number"
                         error={errors.to_company_pan}
                     />
@@ -442,7 +491,11 @@ const InvoiceForm = ({boe, onSaved}) => {
                     <ValidatedInput
                         label="GST"
                         value={toCompany.gst_number}
-                        onChange={e => setToCompany(prev => ({...prev, gst_number: e.target.value}))}
+                        onChange={e => {
+                            const val = e.target.value.toUpperCase();
+                            setToCompany(prev => ({...prev, gst_number: val}));
+                            setTimeout(validate, 0); // ensure latest state is used
+                        }}
                         placeholder="Enter GST Number"
                         error={errors.to_company_gst}
                     />
