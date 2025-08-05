@@ -13,6 +13,8 @@ import {groupEntries} from '../../utils/groupEntries';
 import {useBulkSelect} from '../../hooks/useBulkSelect';
 import DeleteSelectedButton from './DeleteSelectedButton';
 import GroupedAccordion from './GroupedAccordion';
+import dayjs from 'dayjs'; // If not already imported
+
 
 const BillOfEntryList = () => {
     const [entries, setEntries] = useState([]);
@@ -26,11 +28,13 @@ const BillOfEntryList = () => {
     const [hasMore, setHasMore] = useState(true);
     const [newEntry, setNewEntry] = useState(null);
     const [refreshKey, setRefreshKey] = useState(0);
+    const [triggeredByFilter, setTriggeredByFilter] = useState(false);
 
     const [filters, setFilters] = useState({
         company_objs: [],
         exclude_company_objs: [],
         port_objs: [],
+        exclude_port_objs: [],
         product_name: '',
         from_date: '',
         to_date: '',
@@ -68,6 +72,10 @@ const BillOfEntryList = () => {
                 ...(filters.port_objs.length > 0 && {
                     port__in: filters.port_objs.map(p => p.id).join(','),
                 }),
+                ...(filters.exclude_port_objs.length > 0 && {
+                    exclude_port__in: filters.exclude_port_objs.map(p => p.id).join(','),
+                }),
+
                 ...(filters.product_name && {product_name: filters.product_name}),
                 ...(filters.from_date && {from_date: filters.from_date}),
                 ...(filters.to_date && {to_date: filters.to_date}),
@@ -86,6 +94,7 @@ const BillOfEntryList = () => {
             });
             setHasMore(hasNextPage);
         } catch (err) {
+            console.error('Failed to Fetch BOE:', err);
             toast.error('Failed to fetch BOE data');
         } finally {
             setLoading(false);
@@ -94,10 +103,12 @@ const BillOfEntryList = () => {
 
 
     useEffect(() => {
+        // This will only reset the page when filter/sort/search changes
         setEntries([]);
         setPage(1);
         setHasMore(true);
-        setRefreshKey(prev => prev + 1); // Triggers refresh-based fetch
+        setTriggeredByFilter(true); // prevent scroll-based increment
+        setRefreshKey(prev => prev + 1);
     }, [searchQuery, sortField, sortOrder, filters]);
 
     useEffect(() => {
@@ -105,19 +116,24 @@ const BillOfEntryList = () => {
     }, [page]);
 
     useEffect(() => {
-        if (page === 1) {
-            fetchData(); // on refreshKey (filters/search/sort change)
+        if (triggeredByFilter) {
+            fetchData().then(() => {
+                setTriggeredByFilter(false);
+            });
         }
-    }, [refreshKey]);
+    }, [refreshKey]); // triggered by search/sort/filter change
+
 
     useEffect(() => {
         const delay = 200;
         let timeout;
-        if (inView && hasMore && !loading) {
-            timeout = setTimeout(() => setPage(prev => prev + 1), delay);
+        if (inView && hasMore && !loading && !triggeredByFilter) {
+            timeout = setTimeout(() => {
+                setPage(prev => prev + 1);
+            }, delay);
         }
         return () => clearTimeout(timeout);
-    }, [inView, hasMore, loading]);
+    }, [inView, hasMore, loading, triggeredByFilter]);
 
     const updateSingleEntry = async (id) => {
         try {
@@ -129,6 +145,7 @@ const BillOfEntryList = () => {
                 const {data} = await axios.get(`/api/bill-of-entries/${id.id}/`);
                 setEntries(prev => prev.map(e => e.id === id ? data : e));
             } catch (err) {
+                console.error('Failed to Fetch BOE:', err);
                 toast.error('Failed to fetch entry');
             }
         }
@@ -151,6 +168,7 @@ const BillOfEntryList = () => {
             company_objs: [],
             exclude_company_objs: [],
             port_objs: [],
+            exclude_port_objs: [],
             product_name: '',
             from_date: '',
             to_date: '',
@@ -175,6 +193,10 @@ const BillOfEntryList = () => {
             ...(filters.port_objs.length > 0 && {
                 port__in: filters.port_objs.map(p => p.id).join(','),
             }),
+            ...(filters.exclude_company_objs.length > 0 && {
+                exclude_port__in: filters.exclude_company_objs.map(c => c.id).join(','),
+            }),
+
             ...(filters.product_name && {product_name: filters.product_name}),
             ...(filters.from_date && {from_date: filters.from_date}),
             ...(filters.to_date && {to_date: filters.to_date}),
@@ -200,23 +222,42 @@ const BillOfEntryList = () => {
             a.remove();
             window.URL.revokeObjectURL(url);
         } catch (error) {
+            console.error('Failed to export Excel:', error);
             toast.error('Failed to export Excel');
         }
     };
 
+
     const handleExportPDF = async () => {
         try {
-            toast.info('Downloading PDF. Please wait..');
+            toast.info('Downloading PDF. Please wait...');
             const res = await axios.get(`/api/bill-of-entries/export/pdf?${buildExportParams()}`, {
                 responseType: 'blob',
             });
+
             const blob = new Blob([res.data], {type: 'application/pdf'});
             const url = window.URL.createObjectURL(blob);
-            const newTab = window.open();
-            if (newTab) newTab.location.href = url;
-            else toast.error('Popup blocked! Please allow popups.');
+
+            // Generate filename using current date/time
+            const timestamp = dayjs().format('YYYY-MM-DD_HH-mm-ss');
+            const filename = `Export_data_${timestamp}.pdf`;
+
+            // Try to open in new tab
+            const link = document.createElement('a');
+            link.href = url;
+            link.download = filename;
+            document.body.appendChild(link);
+            link.click();
+            document.body.removeChild(link);
+
+            // Optional: also open in new tab if needed
+            // const newTab = window.open();
+            // if (newTab) newTab.location.href = url;
+            // else toast.error('Popup blocked! Please allow popups.');
+
             setTimeout(() => window.URL.revokeObjectURL(url), 1000);
         } catch (err) {
+            console.error('PDF export failed:', err);
             toast.error('Failed to export PDF');
         }
     };
@@ -245,6 +286,8 @@ const BillOfEntryList = () => {
                                         onChange={v => setFilters(prev => ({...prev, exclude_company_objs: v}))}/>,
                     <AsyncPortSelect key="port" value={filters.port_objs} isMulti
                                      onChange={v => setFilters(prev => ({...prev, port_objs: v}))}/>,
+                    <AsyncPortSelect key="port" value={filters.exclude_port_objs} isMulti placeholder="Exclude Port"
+                                     onChange={v => setFilters(prev => ({...prev, exclude_port_objs: v}))}/>,
                     <Form.Control key="product" size="sm" placeholder="Product Name" value={filters.product_name}
                                   onChange={e => setFilters(prev => ({...prev, product_name: e.target.value}))}/>,
                     <YesNoRadio key="is_invoice" label="Has Invoice?" value={filters.is_invoice}

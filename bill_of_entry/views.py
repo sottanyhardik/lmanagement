@@ -337,7 +337,7 @@ class ExportBOEExcelView(APIView):
         wb = Workbook()
         ws = wb.active
         ws.title = "Pending BOE"
-        ws.append(["Pending Bills", "", "", "", datetime.date.today()])
+        ws.append(["Pending Bills", "", "", "", date.today()])
 
         bold_font = Font(bold=True)
         thin_border = Border(

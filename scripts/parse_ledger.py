@@ -40,7 +40,7 @@ def parse_license_data(rows):
                 "lic_date": row[7],
                 "row": []
             }
-        elif row[0].strip() == "RA No.":
+        elif row[0].strip().replace(' ', '') == "RANo.":
             current["port"] = row[5]
         elif row[0].strip() == "IEC":
             if len(row[1]) == 9:
