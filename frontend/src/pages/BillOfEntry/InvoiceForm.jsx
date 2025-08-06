@@ -499,8 +499,36 @@ const InvoiceForm = ({boe, onSaved}) => {
                         placeholder="Enter GST Number"
                         error={errors.to_company_gst}
                     />
+                </Col>
+                <Col md={4}>
+                    <ValidatedInput
+                        label="Address Line 1"
+                        value={toCompany.address_line_1}
+                        onChange={e => {
+                            const val = e.target.value.toUpperCase();
+                            setToCompany(prev => ({...prev, address_line_1: val}));
+                            setTimeout(validate, 0); // ensure latest state is used
+                        }}
+                        placeholder="Enter Address Line 1.."
+                        error={errors.address_line_1}
+                    />
 
                 </Col>
+                <Col md={4}>
+                    <ValidatedInput
+                        label="Address Line 2"
+                        value={toCompany.address_line_2}
+                        onChange={e => {
+                            const val = e.target.value.toUpperCase();
+                            setToCompany(prev => ({...prev, address_line_2: val}));
+                            setTimeout(validate, 0); // ensure latest state is used
+                        }}
+                        placeholder="Enter Address Line 2.."
+                        error={errors.address_line_2}
+                    />
+
+                </Col>
+
             </Row>
             {/* Billing Mode */}
             <Form.Group className="mb-3">

@@ -1,4 +1,6 @@
 {% load static %}
+{% load indian_format %}
+{% load clean_cents %}
 <!DOCTYPE html>
 <html>
 <head>
@@ -158,14 +160,14 @@
                 <td style="text-align: center;">{{ item.licenseNo }}</td>
                 <td style="text-align: center;">{{ item.hsnCode }}</td>
                 {% if invoice.billing_mode == 'kg' %}
-                    <td style="text-align: right;">{{ item.qty }}</td>
+                    <td style="text-align: right;">{{ item.qty|indian_format }}</td>
                 {% else %}
-                    <td style="text-align: right;">{{ item.cifUsd }}</td>
-                    <td style="text-align: right;">{{ item.exchangeRate }}</td>
-                    <td style="text-align: right;">{{ item.cifInr }}</td>
+                    <td style="text-align: right;">{{ item.cifUsd|indian_format }}</td>
+                    <td style="text-align: right;">{{ item.exchangeRate|indian_format }}</td>
+                    <td style="text-align: right;">{{ item.cifInr|indian_format }}</td>
                 {% endif %}
-                <td style="text-align: right;">{{ item.rate }}</td>
-                <td style="text-align: right;">{{ item.amount }}</td>
+                <td style="text-align: right;">{{ item.rate|indian_format }}</td>
+                <td style="text-align: right;">{{ item.amount|indian_format }}</td>
             </tr>
         {% endfor %}
         </tbody>
@@ -173,19 +175,19 @@
         <tr style="text-align: right;">
             <td colspan="2" style="text-align: right;"><strong>Total</strong></td>
             {% if invoice.billing_mode == 'kg' %}
-                <td><strong>{{ invoice.total_qty }}</strong></td>
+                <td><strong>{{ invoice.total_qty|indian_format }}</strong></td>
             {% else %}
-                <td><strong>{{ invoice.total_cif_fc }}</strong></td>
+                <td><strong>{{ invoice.total_cif_fc|indian_format }}</strong></td>
                 <td>-</td>
-                <td><strong>{{ invoice.total_cif_inr }}</strong></td>
+                <td><strong>{{ invoice.total_cif_inr|indian_format }}</strong></td>
             {% endif %}
             <td>-</td>
-            <td><strong>{{ invoice.total_amount }}</strong></td>
+            <td><strong>{{ invoice.total_amount|indian_format }}</strong></td>
         </tr>
         </tfoot>
     </table>
 
-    <p><strong>Total Amount in Words:</strong> {{ amount_in_words }}</p>
+    <p><strong>Total Amount in Words:</strong> {{ amount_in_words|clean_cents }}</p>
     <table>
         <tr>
             <td colspan="6">
@@ -197,13 +199,34 @@
             </td>
         </tr>
     </table>
-    <p class="section-title">Bank Details:</p>
-    <div class="bank-details">
-        <strong>Account No:</strong> {{ bank.accountNo }}<br/>
-        <strong>Bank Name:</strong> {{ bank.bankName }}<br/>
-        <strong>IFSC:</strong> {{ bank.ifsc }}<br/>
-        <strong>Account Type:</strong> {{ bank.accountType }}
-    </div>
+    <table>
+        <tr>
+            <td>
+                <p class="section-title">Bank Details:</p>
+                <div class="bank-details">
+                    <strong>Account No:</strong> {{ bank.accountNo }}<br/>
+                    <strong>Bank Name:</strong> {{ bank.bankName }}<br/>
+                    <strong>IFSC:</strong> {{ bank.ifsc }}<br/>
+                    <strong>Account Type:</strong> {{ bank.accountType }}
+                </div>
+            </td>
+            <td>
+                {% if entity.signature %}
+
+                    <p class="section-title">Authorised Signatory</p>
+                    <div class="bank-details">
+                        <div style="text-align: center;">
+                            <img src="{{ entity.signature.url }}" alt="Signature"
+                                 style="height: 60px; width: auto; display: block; margin: 0 auto; filter: brightness(0) contrast(1.5);"/>
+                            <strong>Hardik Sottany</strong>
+
+                        </div>
+                    </div>
+                {% endif %}
+            </td>
+
+        </tr>
+    </table>
 </div>
 <div class="footer">
     <strong>Note:</strong>
