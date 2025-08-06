@@ -1,6 +1,9 @@
 from django.db.models import Q
-from rest_framework import viewsets, filters
+from rest_framework import filters
+from rest_framework import viewsets
 
+from license.models import LicenseDetailsModel
+from license.serializers import LicenseDetailsSerializer
 from .models import LicenseImportItemsModel
 from .serializers import LicenseImportItemsSelectSerializer
 
@@ -27,3 +30,8 @@ class LicenseImportItemsViewSet(viewsets.ReadOnlyModelViewSet):
                 Q(license__license_number__iendswith=search)
             )
         return queryset.distinct()
+
+
+class LicenseDetailsViewSet(viewsets.ModelViewSet):
+    queryset = LicenseDetailsModel.objects.all().prefetch_related('export_license', 'import_license')
+    serializer_class = LicenseDetailsSerializer

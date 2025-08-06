@@ -16,12 +16,12 @@ import ItemHeadList from './pages/ItemHeadList';
 import HSCodeList from './pages/HSCodeList';
 import SionNormList from './pages/Sion/SionNormList';
 import BillOfEntryList from './pages/BillOfEntry/BillOfEntryList'
-
 import IcegateCaptchaForm from './pages/IcegateCaptchaForm.jsx';
 import LedgerUpload from './pages/LedgerUpload.jsx';
 import AuthContext from '../src/context/AuthContext';
 import {ToastContainer} from 'react-toastify';
 import 'react-toastify/dist/ReactToastify.css';
+import LicenseListPage from "./pages/License/LicenseListPage";
 
 
 // import UserList from './components/User/UserList';
@@ -133,6 +133,14 @@ function App() {
                         element={
                             <PrivateRoute>
                                 <BillOfEntryList/>
+                            </PrivateRoute>
+                        }
+                    />
+                    <Route
+                        path="/licenses/dfia"
+                        element={
+                            <PrivateRoute>
+                                <LicenseListPage/>
                             </PrivateRoute>
                         }
                     />

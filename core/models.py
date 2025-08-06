@@ -129,10 +129,7 @@ class SionNormClassModel(AuditModel):
     norm_class = models.CharField(max_length=10, unique=True)
 
     def __str__(self):
-        if self.description:
-            return "{0} | {1}".format(self.norm_class, self.description)
-        else:
-            return "{0}".format(self.norm_class)
+        return "{0}".format(self.norm_class)
 
     def get_absolute_url(self):
         return reverse('Sion-detail', kwargs={'pk': self.pk})
@@ -251,6 +248,7 @@ class InvoiceEntity(models.Model):
     account_type = models.CharField(max_length=10, choices=ACCOUNT_TYPES)
     bill_colour = models.CharField(max_length=10, null=True, blank=True)
     signature = models.ImageField(upload_to='entity_signature/', null=True, blank=True)
+    stamp = models.ImageField(upload_to='entity_stamp/', null=True, blank=True)
 
     def __str__(self):
         return self.name

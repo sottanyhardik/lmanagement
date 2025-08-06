@@ -216,11 +216,26 @@
                     <p class="section-title">Authorised Signatory</p>
                     <div class="bank-details">
                         <div style="text-align: center;">
-                            <img src="{{ entity.signature.url }}" alt="Signature"
-                                 style="height: 60px; width: auto; display: block; margin: 0 auto; filter: brightness(0) contrast(1.5);"/>
-                            <strong>Hardik Sottany</strong>
-
+                            <table border="0" cellspacing="0" cellpadding="0"
+                                   style="margin: 0 auto; border-collapse: collapse;">
+                                <tr style="border: none;">
+                                    <td style="padding: 0 20px; border: none;">
+                                        <img src="{{ entity.signature.url }}" alt="Signature"
+                                             style="height: 60px; width: auto; filter: brightness(0) contrast(1.5);"/>
+                                    </td>
+                                    <td style="padding: 0 20px; border: none;">
+                                        <img src="{{ entity.stamp.url }}" alt="Stamp"
+                                             style="height: 100px; width: auto; filter: brightness(0) contrast(1.5);"/>
+                                    </td>
+                                </tr>
+                                <tr style="border: none;">
+                                    <td style="text-align: center; padding-top: 5px; border: none;">
+                                        <strong>Hardik Sottany</strong>
+                                    </td>
+                                </tr>
+                            </table>
                         </div>
+
                     </div>
                 {% endif %}
             </td>
