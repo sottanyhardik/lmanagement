@@ -75,3 +75,11 @@ def safe_parse_datetime(value):
 def safe_parse_date(value):
     dt = safe_parse_datetime(value)
     return dt.date() if dt else None
+
+
+def get_entity_prefix(entity_name):
+    words = entity_name.strip().split()
+    if len(words) > 1:
+        return ''.join(word[0] for word in words).upper()
+    else:
+        return entity_name[:3].upper()

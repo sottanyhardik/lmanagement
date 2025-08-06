@@ -1,5 +1,6 @@
 from rest_framework import serializers
 
+from core.serializers import CompanyOptionSerializer, PortOptionSerializer
 from license.models import LicenseDetailsModel, LicenseExportItemModel, LicenseImportItemsModel
 
 
@@ -32,6 +33,8 @@ class LicenseImportItemSerializer(serializers.ModelSerializer):
 
 
 class LicenseDetailsSerializer(serializers.ModelSerializer):
+    exporter = CompanyOptionSerializer()
+    port = PortOptionSerializer()
     export_items = LicenseExportItemSerializer(source='export_license', many=True, read_only=True)
     import_items = LicenseImportItemSerializer(source='import_license', many=True, read_only=True)
 

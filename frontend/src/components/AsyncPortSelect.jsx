@@ -1,7 +1,7 @@
 // components/AsyncPortSelect.jsx
 import React from 'react';
 import AsyncSelect from 'react-select/async';
-import {useDebouncedAsyncOptions} from '../../hooks/useDebouncedAsyncOptions';
+import {useDebouncedAsyncOptions} from '../hooks/useDebouncedAsyncOptions.js';
 
 const AsyncPortSelect = ({value, onChange, isMulti = false, placeholder = "Select Port"}) => {
     const loadOptions = useDebouncedAsyncOptions('/api/ports/');

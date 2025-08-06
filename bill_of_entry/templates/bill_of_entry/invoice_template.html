@@ -215,27 +215,23 @@
 
                     <p class="section-title">Authorised Signatory</p>
                     <div class="bank-details">
-                        <div style="text-align: center;">
-                            <table border="0" cellspacing="0" cellpadding="0"
-                                   style="margin: 0 auto; border-collapse: collapse;">
-                                <tr style="border: none;">
-                                    <td style="padding: 0 20px; border: none;">
+                        <table width="100%" style="margin-top: 10px; border: none;">
+                            <tr>
+                                <td style="width: 50%; text-align: left; vertical-align: top; border: none;">
+                                    {% if entity.signature %}
                                         <img src="{{ entity.signature.url }}" alt="Signature"
                                              style="height: 60px; width: auto; filter: brightness(0) contrast(1.5);"/>
-                                    </td>
-                                    <td style="padding: 0 20px; border: none;">
+                                        <div style="margin-top: 5px; font-weight: bold;">Hardik Sottany</div>
+                                    {% endif %}
+                                </td>
+                                <td style="width: 40%; text-align: right; vertical-align: top; border: none;">
+                                    {% if entity.stamp %}
                                         <img src="{{ entity.stamp.url }}" alt="Stamp"
-                                             style="height: 100px; width: auto; filter: brightness(0) contrast(1.5);"/>
-                                    </td>
-                                </tr>
-                                <tr style="border: none;">
-                                    <td style="text-align: center; padding-top: 5px; border: none;">
-                                        <strong>Hardik Sottany</strong>
-                                    </td>
-                                </tr>
-                            </table>
-                        </div>
-
+                                             style="height: 150px; width: auto; opacity: 0.15;"/>
+                                    {% endif %}
+                                </td>
+                            </tr>
+                        </table>
                     </div>
                 {% endif %}
             </td>

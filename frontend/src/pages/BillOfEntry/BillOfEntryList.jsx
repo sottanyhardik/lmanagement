@@ -4,8 +4,8 @@ import {Card, Container, Form} from 'react-bootstrap';
 import {toast} from 'react-toastify';
 import BillOfEntryForm from './BillOfEntryForm';
 import ListControls from '../../components/ListControls';
-import AsyncCompanySelect from './AsyncCompanySelect';
-import AsyncPortSelect from './AsyncPortSelect';
+import AsyncCompanySelect from '../../components/AsyncCompanySelect.jsx';
+import AsyncPortSelect from '../../components/AsyncPortSelect.jsx';
 import useUrlSync from '../../hooks/useUrlSync';
 import axios from '../../api/axiosInstance';
 import YesNoRadio from '../../components/YesNoRadio';
@@ -94,8 +94,7 @@ const BillOfEntryList = () => {
             });
             setHasMore(hasNextPage);
         } catch (err) {
-            console.error('Failed to Fetch BOE:', err);
-            toast.error('Failed to fetch BOE data');
+            toast.error('Failed to fetch BOE data List');
         } finally {
             setLoading(false);
         }

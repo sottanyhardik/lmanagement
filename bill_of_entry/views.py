@@ -312,7 +312,7 @@ class BillOfEntryExportView(APIView):
         )
 
         context = {
-            'object_list': queryset,
+            'object_list': queryset.order_by('company'),
             'today': date.today(),
         }
 

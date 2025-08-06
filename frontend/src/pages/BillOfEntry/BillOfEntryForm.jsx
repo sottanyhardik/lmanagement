@@ -1,7 +1,7 @@
 import React, {useCallback, useEffect, useMemo, useRef, useState} from 'react';
 import {Button, Col, Form, Row} from 'react-bootstrap';
-import AsyncCompanySelect from './AsyncCompanySelect';
-import AsyncPortSelect from './AsyncPortSelect';
+import AsyncCompanySelect from '../../components/AsyncCompanySelect.jsx';
+import AsyncPortSelect from '../../components/AsyncPortSelect.jsx';
 import AsyncAllotmentSelect from './AsyncAllotmentSelect';
 import axios from '../../api/axiosInstance';
 import {toast} from 'react-toastify';

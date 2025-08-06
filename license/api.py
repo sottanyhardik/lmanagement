@@ -33,5 +33,5 @@ class LicenseImportItemsViewSet(viewsets.ReadOnlyModelViewSet):
 
 
 class LicenseDetailsViewSet(viewsets.ModelViewSet):
-    queryset = LicenseDetailsModel.objects.all().prefetch_related('export_license', 'import_license')
+    queryset = LicenseDetailsModel.objects.all().prefetch_related('export_license', 'import_license').distinct()
     serializer_class = LicenseDetailsSerializer

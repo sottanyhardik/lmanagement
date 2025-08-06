@@ -6,7 +6,7 @@ from allotment.models import AllotmentModel
 from allotment.serializers import AllotmentOptionSerializer
 from core.models import CompanyModel, PortModel, InvoiceEntity
 from core.serializers import PortOptionSerializer, CompanyOptionSerializer, InvoiceEntitySerializer
-from core.utils import number_to_words
+from core.utils import number_to_words, get_entity_prefix
 from license.models import LicenseImportItemsModel
 from license.serializers import LicenseImportItemsSelectSerializer
 from .models import BillOfEntryModel, RowDetails
@@ -56,7 +56,7 @@ class InvoiceSerializer(serializers.ModelSerializer):
         fy_start = today.year if today.month >= 4 else today.year - 1
         fy_end = fy_start + 1
         fy = f"{fy_start}-{str(fy_end)[-2:]}"
-        prefix = entity_name[:3].upper()
+        prefix = get_entity_prefix(entity_name)
 
         max_serial = Invoice.objects.filter(
             invoice_number__startswith=f"{prefix}/{fy}"
