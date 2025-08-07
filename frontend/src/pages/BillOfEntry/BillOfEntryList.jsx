@@ -13,6 +13,7 @@ const BillOfEntryList = () => {
     const {
         entries,
         expanded,
+        setExpanded,
         loading,
         newEntry,
         allExpanded,
@@ -37,7 +38,7 @@ const BillOfEntryList = () => {
         handleExportPDF,
         updateSingleEntry,
         fetchData,
-        setAllExpanded
+        setAllExpanded,
     } = useBillOfEntryListManager();
 
     return (

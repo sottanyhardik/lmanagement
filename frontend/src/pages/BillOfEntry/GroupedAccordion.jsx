@@ -92,16 +92,23 @@ const GroupedAccordion = ({
                                                 />
                                                 <div onClick={() => toggle(entry.id)}
                                                      style={{cursor: 'pointer', flex: 1}}>
-                                                    <Row className="gx-3">
-                                                        <Col><strong className="text-primary">BOE
+                                                    <Row
+                                                        className="gx-3 flex-nowrap overflow-auto align-items-center small text-nowrap">
+                                                        <Col className="flex-shrink-0"><strong className="text-primary">BOE
                                                             #{entry.bill_of_entry_number}</strong></Col>
-                                                        <Col>Date: {entry.bill_of_entry_date}</Col>
-                                                        <Col>Product: {entry.product_name}</Col>
-                                                        <Col>Qty: {formatNumber(entry.get_total_quantity)}</Col>
-                                                        <Col>CIF $: {formatNumber(entry.get_total_fc)}</Col>
-                                                        <Col>Exc Rt: {formatNumber(entry.exchange_rate)}</Col>
-                                                        <Col>Invoice: {entry.invoice_no || '-'}</Col>
-                                                        <Col className="text-end text-success">INR
+                                                        <Col
+                                                            className="flex-shrink-0">Date: {entry.bill_of_entry_date}</Col>
+                                                        <Col
+                                                            className="flex-shrink-0">Product: {entry.product_name}</Col>
+                                                        <Col
+                                                            className="flex-shrink-0">Qty: {formatNumber(entry.get_total_quantity)}</Col>
+                                                        <Col className="flex-shrink-0">CIF
+                                                            $: {formatNumber(entry.get_total_fc)}</Col>
+                                                        <Col className="flex-shrink-0">Exc
+                                                            Rt: {formatNumber(entry.exchange_rate)}</Col>
+                                                        <Col
+                                                            className="flex-shrink-0">Invoice: {entry.invoice_no || '-'}</Col>
+                                                        <Col className="flex-shrink-0 text-end text-success">INR
                                                             ₹{formatNumber(entry.get_total_inr)}</Col>
                                                     </Row>
                                                 </div>

@@ -228,6 +228,7 @@ const useBillOfEntryListManager = () => {
     return {
         entries,
         expanded,
+        setExpanded,
         loading,
         newEntry,
         allExpanded,
