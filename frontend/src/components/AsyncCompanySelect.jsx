@@ -1,6 +1,6 @@
 import React from 'react';
 import AsyncSelect from 'react-select/async';
-import {useDebouncedAsyncOptions} from '../hooks/useDebouncedAsyncOptions.js';
+import {useDebouncedAsyncOptions} from '../hooks/useDebouncedAsyncOptions';
 
 const AsyncCompanySelect = ({
                                 value,

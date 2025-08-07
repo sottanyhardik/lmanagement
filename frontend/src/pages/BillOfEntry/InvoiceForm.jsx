@@ -29,7 +29,6 @@ const InvoiceForm = ({boe, onSaved}) => {
                 pan: boe.company.pan || '',
                 gst_number: boe.company.gst_number || ''
             });
-            validate();
             const defaultItems = boe.item_details.map(d => ({
                 sr_id: d.sr_number.id,
                 license_no: d.sr_number.display_name.split('-')[0].replace(/^0+/, ''),
@@ -117,16 +116,18 @@ const InvoiceForm = ({boe, onSaved}) => {
         const newErrors = {};
         const PAN_REGEX = /^[A-Z]{5}[0-9]{4}[A-Z]$/;
         const GST_REGEX = /^[0-9]{2}[A-Z]{5}[0-9]{4}[A-Z]{1}[1-9A-Z]{1}[Z]{1}[0-9A-Z]{1}$/;
+        const pan = toCompany.pan?.trim().toUpperCase() || '';
+        const gst = toCompany.gst_number?.trim().toUpperCase() || '';
         if (!toCompany.name) newErrors.to_company_name = 'Company name is required.';
-        if (!toCompany.pan) {
+        if (!pan) {
             newErrors.to_company_pan = 'PAN number is required.';
-        } else if (!PAN_REGEX.test(toCompany.pan.toUpperCase())) {
+        } else if (!PAN_REGEX.test(pan)) {
             newErrors.to_company_pan = 'Invalid PAN format.';
         }
-
-        if (!toCompany.gst_number) {
+        
+        if (!gst) {
             newErrors.to_company_gst = 'GST number is required.';
-        } else if (!GST_REGEX.test(toCompany.gst_number.toUpperCase())) {
+        } else if (!GST_REGEX.test(gst)) {
             newErrors.to_company_gst = 'Invalid GST format.';
         }
 

@@ -124,17 +124,16 @@ const BillOfEntryForm = ({entry, isNew = false, onClose, onSaved}) => {
                 return;
             } else {
                 setExchangeRateError(false);
+
+                if (field === 'cif_fc') {
+                    const fc = parseFloat(value || 0);
+                    item.cif_inr = (fc * rate).toFixed(2);
+                } else if (field === 'cif_inr') {
+                    const inr = parseFloat(value || 0);
+                    item.cif_fc = (inr / rate).toFixed(2);
+                }
             }
         }
-
-        if (field === 'cif_fc') {
-            const fc = parseFloat(value || 0);
-            item.cif_inr = (fc * rate).toFixed(2);
-        } else if (field === 'cif_inr') {
-            const inr = parseFloat(value || 0);
-            item.cif_fc = (inr / rate).toFixed(2);
-        }
-
         updatedItems[index] = item;
         setData(prev => ({...prev, item_details: updatedItems}));
         setErrors(prev => {

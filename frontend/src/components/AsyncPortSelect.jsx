@@ -1,7 +1,7 @@
 // components/AsyncPortSelect.jsx
 import React from 'react';
 import AsyncSelect from 'react-select/async';
-import {useDebouncedAsyncOptions} from '../hooks/useDebouncedAsyncOptions.js';
+import {useDebouncedAsyncOptions} from '../hooks/useDebouncedAsyncOptions';
 
 const AsyncPortSelect = ({value, onChange, isMulti = false, placeholder = "Select Port"}) => {
     const loadOptions = useDebouncedAsyncOptions('/api/ports/');
@@ -28,10 +28,10 @@ const AsyncPortSelect = ({value, onChange, isMulti = false, placeholder = "Selec
     return (
         <AsyncSelect
             cacheOptions
-            defaultOptions={false} // ✅ disables fetch on mount
-            loadOptions={loadOptions} // ✅ fetches only on typing
+            defaultOptions={false} // âœ… disables fetch on mount
+            loadOptions={loadOptions} // âœ… fetches only on typing
             isMulti={isMulti}
-            value={formattedValue} // ✅ supports prefilled display
+            value={formattedValue} // âœ… supports prefilled display
             onChange={handleChange}
             isClearable
             placeholder={placeholder}

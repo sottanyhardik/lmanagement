@@ -20,7 +20,7 @@ const LineItemTable = ({
                         <AsyncSrNumberSelect
                             value={item.sr_number}
                             onChange={(v) => onItemChange(index, 'sr_number', v)}
-                            excludeIds={selectedSrNumbers.filter((id, i) => i !== index)}
+                            excludeIds={items.map((it, i) => i !== index ? it.sr_number?.value : null).filter(Boolean)}
                             placeholder="Select SR"
                             styles={{
                                 control: (base) => ({
