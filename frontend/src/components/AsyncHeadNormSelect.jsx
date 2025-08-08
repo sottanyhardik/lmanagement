@@ -1,6 +1,6 @@
 import React from 'react';
 import AsyncSelect from 'react-select/async';
-import axios from '../../api/axiosInstance';
+import axios from '../api/axiosInstance.js';
 
 const AsyncHeadNormSelect = ({value, onChange}) => {
     const loadOptions = async (inputValue) => {
@@ -14,6 +14,9 @@ const AsyncHeadNormSelect = ({value, onChange}) => {
 
     return (
         <AsyncSelect
+            classNamePrefix="react-select"
+            className="underline-select"
+
             cacheOptions
             defaultOptions
             loadOptions={loadOptions}

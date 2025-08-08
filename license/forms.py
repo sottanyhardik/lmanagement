@@ -1,4 +1,5 @@
 from django import forms
+
 from core import models as core_model, custom_widgets
 from . import models as license_model
 
@@ -41,7 +42,7 @@ class ImportItemsForm(forms.ModelForm):
         required=False
     )
 
-    item = forms.ModelChoiceField(
+    items = forms.ModelChoiceField(
         queryset=core_model.ItemNameModel.objects.all(),
         widget=custom_widgets.ItemWidget,
         required=False
@@ -49,7 +50,8 @@ class ImportItemsForm(forms.ModelForm):
 
     class Meta:
         model = license_model.LicenseImportItemsModel
-        fields = ['serial_number', 'hs_code', 'item','description', 'quantity', 'old_quantity', 'cif_fc', 'comment', 'is_restrict']
+        fields = ['serial_number', 'hs_code', 'items', 'description', 'quantity', 'old_quantity', 'cif_fc', 'comment',
+                  'is_restrict']
 
     def __init__(self, *args, **kwargs):
         super(ImportItemsForm, self).__init__(*args, **kwargs)
@@ -85,7 +87,7 @@ class LicenseDetailsForm(forms.ModelForm):
         fields = ['scheme_code', 'notification_number', 'license_number', 'license_date', 'license_expiry_date',
                   'file_number', 'exporter', 'port', 'registration_number', 'registration_date', 'user_restrictions',
                   'user_comment', 'purchase_status', 'is_au', 'is_not_registered', 'user_comment',
-                  'ge_file_number','is_mnm','condition_sheet']
+                  'ge_file_number', 'is_mnm', 'condition_sheet']
 
     def __init__(self, *args, **kwargs):
         super(LicenseDetailsForm, self).__init__(*args, **kwargs)

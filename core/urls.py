@@ -4,7 +4,8 @@ from rest_framework.routers import DefaultRouter
 
 from . import views
 from .api import CompanyViewSet, PortViewSet, ItemHeadViewSet, ItemNameViewSet, HSCodeViewSet, SionNormClassViewSet, \
-    HeadSIONNormsViewSet, FetchBOEData, UploadLedgerAPIView, TransferLetterViewSet, InvoiceEntityReadOnlyViewSet  # ✅
+    HeadSIONNormsViewSet, FetchBOEData, UploadLedgerAPIView, TransferLetterViewSet, InvoiceEntityReadOnlyViewSet, \
+    ChoicesAPIView  # ✅
 
 router = DefaultRouter()
 router.register(r'companies', CompanyViewSet, basename='company')
@@ -18,6 +19,7 @@ router.register(r'transfer-letters', TransferLetterViewSet, basename='transfer-l
 router.register(r'invoice-entities', InvoiceEntityReadOnlyViewSet, basename='invoice-entity')
 
 urlpatterns = [
+    path('api/choices/', ChoicesAPIView.as_view(), name='choices'),
     path('api/', include(router.urls)),
     path('api/iecgate/fetch', FetchBOEData.as_view(), name='fetch-boe-details'),
     path('api/ledger/upload/', UploadLedgerAPIView.as_view(), name='upload-ledger-api'),

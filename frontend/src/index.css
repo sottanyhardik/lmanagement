@@ -1,8 +1,5 @@
-/* index.css (Themed for Bootstrap + custom branding) */
-
 :root {
     --primary-color: #e16123;
-    --bs-pagination-active-bg: #e16123;
     --primary-hover: #cc541f;
     --primary-text: #ffffff;
     --bg-dark: #242424;
@@ -10,10 +7,11 @@
     --card-bg: #f7f7f7;
     --dropdown-bg: #333333;
     --dropdown-hover: #444444;
-    --bs-dropdown-link-active-bg: #242424 !important;
+    --bs-pagination-active-bg: var(--primary-color);
+    --bs-dropdown-link-active-bg: var(--bg-dark) !important;
 }
 
-/* Global Base Styles */
+/* ---------- Global Base Styles ---------- */
 body {
     margin: 0;
     font-family: 'Segoe UI', sans-serif;
@@ -21,9 +19,8 @@ body {
     color: var(--bg-dark);
 }
 
-/* Links */
-a {
-    color: var(--primary-color);
+a, .text-primary {
+    color: var(--primary-color) !important;
     text-decoration: none;
 }
 
@@ -32,17 +29,7 @@ a:hover {
     text-decoration: underline;
 }
 
-a,
-.text-primary {
-    color: var(--primary-color) !important;
-}
-
-/* Typography */
-.text-primary {
-    color: var(--primary-color) !important;
-}
-
-/* Buttons */
+/* ---------- Buttons ---------- */
 .btn-primary {
     background-color: var(--primary-color);
     border-color: var(--primary-color);
@@ -71,35 +58,139 @@ a,
     border-color: var(--primary-color);
 }
 
-/* Inputs and Form Controls */
-input,
-select,
-textarea {
-    border-radius: 6px;
+/* ---------- Form Controls: Unified Underline Style ---------- */
+input.form-control,
+textarea.form-control,
+select.form-select {
+    border: none !important;
+    border-bottom: 1px solid #ccc !important;
+    border-radius: 0 !important;
+    background: transparent !important;
+    box-shadow: none !important;
+    padding: 2px 0;
 }
 
-input:focus,
-select:focus,
-textarea:focus {
-    border-color: var(--primary-color);
-    box-shadow: 0 0 0 0.1rem rgba(225, 97, 35, 0.25);
-    outline: none;
+input.form-control:focus,
+textarea.form-control:focus,
+select.form-select:focus {
+    border-bottom: 1px solid #000 !important;
+    box-shadow: none !important;
+    outline: none !important;
 }
 
-/* Cards */
+textarea.form-control {
+    resize: none;
+    min-height: 30px;
+}
+
+/* Disabled & Readonly States */
+input.form-control[readonly],
+textarea.form-control[readonly],
+input.form-control:disabled,
+textarea.form-control:disabled,
+select.form-select:disabled {
+    color: #6c757d !important;
+    border-bottom-color: #e0e0e0 !important;
+    background: transparent !important;
+    cursor: not-allowed;
+    opacity: 1 !important;
+}
+
+/* ---------- react-select / AsyncSelect ---------- */
+/* Shared control styles */
+.react-select__control,
+.underline-select .react-select__control {
+    border: none !important;
+    border-bottom: 1px solid #ccc !important;
+    border-radius: 0 !important;
+    background-color: transparent !important;
+    box-shadow: none !important;
+    min-height: 30px !important;
+}
+
+.react-select__control:hover,
+.underline-select .react-select__control:hover {
+    border-bottom: 1px solid #000 !important;
+}
+
+.react-select__value-container,
+.underline-select .react-select__value-container {
+    padding: 0 !important;
+}
+
+.react-select__multi-value,
+.underline-select .react-select__multi-value {
+    background-color: transparent !important;
+    padding: 0 2px;
+}
+
+.react-select__multi-value__label,
+.underline-select .react-select__multi-value__label {
+    font-weight: bold;
+    color: #000;
+}
+
+.react-select__multi-value__remove,
+.underline-select .react-select__multi-value__remove {
+    color: #000;
+    cursor: pointer;
+}
+
+.react-select__clear-indicator,
+.react-select__dropdown-indicator,
+.react-select__indicator-separator,
+.underline-select .react-select__clear-indicator,
+.underline-select .react-select__dropdown-indicator,
+.underline-select .react-select__indicator-separator {
+    display: none !important;
+}
+
+/* Disabled State */
+.react-select__control--is-disabled,
+.underline-select .react-select__control--is-disabled {
+    border-bottom-color: #e0e0e0 !important;
+}
+
+.react-select--is-disabled .react-select__single-value,
+.react-select--is-disabled .react-select__multi-value__label,
+.underline-select .react-select--is-disabled .react-select__single-value,
+.underline-select .react-select--is-disabled .react-select__multi-value__label {
+    color: #6c757d !important;
+}
+
+/* Simulated Readonly (using custom class) */
+.underline-select.readonly .react-select__control {
+    border-bottom-color: #e0e0e0 !important;
+    cursor: default;
+}
+
+.underline-select.readonly .react-select__input-container {
+    display: none !important;
+}
+
+.underline-select.readonly .react-select__value-container {
+    pointer-events: none;
+}
+
+/* ---------- Components ---------- */
 .card {
     border-radius: 0.75rem;
     background-color: var(--card-bg);
     box-shadow: 0 4px 16px rgba(0, 0, 0, 0.1);
+    transition: all 0.3s ease-in-out;
 }
 
-/* Custom Dark Background (e.g., Navbar) */
+.badge-primary {
+    background-color: var(--primary-color);
+    color: var(--primary-text);
+}
+
 .bg-dark-custom {
     background-color: var(--bg-dark) !important;
     color: var(--text-light);
 }
 
-/* Navbar */
+/* ---------- Navbar ---------- */
 .navbar .nav-link {
     color: var(--text-light) !important;
     font-weight: 500;
@@ -114,7 +205,7 @@ textarea:focus {
     font-weight: bold;
 }
 
-/* Dropdowns */
+/* ---------- Dropdown ---------- */
 .dropdown-menu {
     background-color: var(--dropdown-bg);
     border: none;
@@ -132,12 +223,20 @@ textarea:focus {
     outline: 1px solid var(--primary-color);
 }
 
-/* Badge */
-.badge-primary {
-    background-color: var(--primary-color);
-    color: var(--primary-text);
+/* Make form controls fill the cell height and align underline to bottom */
+td > .form-control,
+td > .react-select__control {
+    height: 100% !important;
+    display: flex !important;
+    align-items: flex-end !important;
+    padding-bottom: 2px !important; /* maintains underline visibility */
+    margin-bottom: 0 !important;
 }
 
-.card, .collapse {
-    transition: all 0.3s ease-in-out;
+td {
+    vertical-align: bottom;
+}
+
+.react-select__control {
+    align-items: flex-end !important;
 }

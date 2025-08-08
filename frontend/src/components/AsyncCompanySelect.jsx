@@ -26,6 +26,8 @@ const AsyncCompanySelect = ({
 
     return (
         <AsyncSelect
+            classNamePrefix="react-select"
+            className="underline-select"
             cacheOptions
             loadOptions={loadOptions}
             isMulti={isMulti}

@@ -1,6 +1,6 @@
 import React from 'react';
 import {Button, Col, Form, Row, Table} from 'react-bootstrap';
-import AsyncHeadNormSelect from './AsyncHeadNormSelect';
+import AsyncHeadNormSelect from '../../components/AsyncHeadNormSelect.jsx';
 
 const NormForm = ({
                       normData,

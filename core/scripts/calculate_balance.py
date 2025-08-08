@@ -6,7 +6,8 @@ from license.helper import round_down
 def calculate_available_quantity(instance):
     from license.models import N2015
     credit = float(instance.quantity)
-    if instance.item and instance.item.head and instance.item.head.is_restricted:
+    item = instance.items.all().first()
+    if item and item.head and item.head.is_restricted:
         if instance.old_quantity or instance.license.notification_number == N2015:
             credit = instance.old_quantity or instance.quantity
     value = round_down(float(credit) - float(calculate_debited_quantity(instance)) - float(calculate_allotted_quantity(
@@ -44,8 +45,9 @@ def calculate_allotted_value(instance):
 def calculate_available_value(instance):
     available_value = instance.license.get_balance_cif
     balance_value = available_value
-    if instance.item:
-        head = instance.item.head
+    item = instance.items.first()
+    if item:
+        head = item.head
     else:
         head = None
     if instance.license and instance.license.get_per_cif and head and head.is_restricted:

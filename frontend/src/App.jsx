@@ -16,6 +16,7 @@ import ItemHeadList from './pages/ItemHeadList';
 import HSCodeList from './pages/HSCodeList';
 import SionNormList from './pages/Sion/SionNormList';
 import BillOfEntryList from './pages/BillOfEntry/BillOfEntryList'
+import LicenseList from './pages/License/LicenseList';
 import IcegateCaptchaForm from './pages/IcegateCaptchaForm.jsx';
 import LedgerUpload from './pages/LedgerUpload.jsx';
 import AuthContext from '../src/context/AuthContext';
@@ -135,6 +136,15 @@ function App() {
                             </PrivateRoute>
                         }
                     />
+                    <Route
+                        path="/licenses/dfia"
+                        element={
+                            <PrivateRoute>
+                                <LicenseList/>
+                            </PrivateRoute>
+                        }
+                    />
+
                 </Route>
             </Routes>
             <ToastContainer position="top-right" autoClose={3000}/>

@@ -1,7 +1,7 @@
 from decimal import Decimal
 
 from django.db import models
-from django.db.models import Sum, IntegerField
+from django.db.models import Sum, IntegerField, Count
 from django.db.models.functions import Coalesce
 from django.db.models.signals import post_save
 from django.dispatch import receiver
@@ -10,6 +10,8 @@ from django.utils.functional import cached_property
 
 from allotment.models import AllotmentItems, Debit
 from bill_of_entry.models import RowDetails, ARO
+from bill_of_entry.tasks import update_balance_values_task
+from core.models import ItemNameModel
 from core.models import ItemNameModel
 from core.scripts.calculation import optimize_milk_distribution
 from license.helper import round_down
@@ -279,8 +281,8 @@ class LicenseDetailsModel(models.Model):
 
     @cached_property
     def import_license_grouped(self):
-        return self.import_license.select_related('item').values('hs_code__hs_code', 'item__name', 'description',
-                                                                 'item__unit_price') \
+        return self.import_license.select_related('items').values('hs_code__hs_code', 'item__name', 'description',
+                                                                  'item__unit_price') \
             .annotate(available_quantity_sum=Sum('available_quantity'),
                       quantity_sum=Sum('quantity')) \
             .order_by('item__name')
@@ -328,8 +330,9 @@ class LicenseDetailsModel(models.Model):
 
     @cached_property
     def import_license_head_grouped(self):
-        return self.import_license.select_related('item', 'item__head').values('item__head__name', 'description',
-                                                                               'item__unit_price', 'hs_code__hs_code') \
+        return self.import_license.select_related('items', 'items__head').values('items__head__name', 'description',
+                                                                                 'items__unit_price',
+                                                                                 'hs_code__hs_code') \
             .annotate(available_quantity_sum=Sum('available_quantity'),
                       quantity_sum=Sum('quantity')) \
             .order_by('item__name')
@@ -654,19 +657,19 @@ class LicenseDetailsModel(models.Model):
             return {'threeRestriction': min(available_value, max(round_down(credit_3 - conf_3), 0))}
         elif lic.first() is not None and 'E1' in str(lic.first().get('norm_class__norm_class')):
             credit_2 = credit * .02
-            result = self.import_license.filter(item__head__name='CONFECTIONERY 2% Restriction').aggregate(
+            result = self.import_license.filter(items__head__name='CONFECTIONERY 2% Restriction').aggregate(
                 total_debited_value=Coalesce(Sum('debited_value'), 0, output_field=IntegerField()),
                 total_allotted_value=Coalesce(Sum('allotted_value'), 0, output_field=IntegerField())
             )
             conf_2 = result['total_debited_value'] + result['total_allotted_value']
             credit_3 = credit * .03
-            result = self.import_license.filter(item__head__name='CONFECTIONERY 3% Restriction').aggregate(
+            result = self.import_license.filter(items__head__name='CONFECTIONERY 3% Restriction').aggregate(
                 total_debited_value=Coalesce(Sum('debited_value'), 0, output_field=IntegerField()),
                 total_allotted_value=Coalesce(Sum('allotted_value'), 0, output_field=IntegerField())
             )
             conf_3 = result['total_debited_value'] + result['total_allotted_value']
             credit_5 = credit * .05
-            result = self.import_license.filter(item__head__name='CONFECTIONERY 5% Restriction').aggregate(
+            result = self.import_license.filter(items__head__name='CONFECTIONERY 5% Restriction').aggregate(
                 total_debited_value=Coalesce(Sum('debited_value'), 0, output_field=IntegerField()),
                 total_allotted_value=Coalesce(Sum('allotted_value'), 0, output_field=IntegerField())
             )
@@ -676,7 +679,7 @@ class LicenseDetailsModel(models.Model):
                     'fiveRestriction': min(available_value, max(round_down(credit_5 - conf_5), 0))}
         elif lic.first() and 'E5' in str(lic.first().get('norm_class__norm_class')):
             credit = credit * .1
-            result = self.import_license.filter(item__head__name='BISCUIT 10% Restriction').aggregate(
+            result = self.import_license.filter(items__head__name='BISCUIT 10% Restriction').aggregate(
                 total_debited_value=Coalesce(Sum('debited_value'), 0, output_field=IntegerField()),
                 total_allotted_value=Coalesce(Sum('allotted_value'), 0, output_field=IntegerField())
             )
@@ -752,8 +755,7 @@ class LicenseImportItemsModel(models.Model):
                                 db_index=True)
     hs_code = models.ForeignKey('core.HSCodeModel', on_delete=models.CASCADE, blank=True, related_name='import_item',
                                 null=True, db_index=True)
-    item = models.ForeignKey('core.ItemNameModel', related_name='license_items', on_delete=models.CASCADE, blank=True,
-                             null=True, db_index=True)
+    items = models.ManyToManyField(ItemNameModel, blank=True, related_name="license_import_item")
     description = models.CharField(max_length=255, blank=True, db_index=True, null=True)
     duty_type = models.CharField(max_length=255)
     quantity = models.DecimalField(max_digits=15, decimal_places=2, default=0)
@@ -777,7 +779,6 @@ class LicenseImportItemsModel(models.Model):
         indexes = [
             models.Index(fields=['license']),  # âœ… Optimized indexing
             models.Index(fields=['hs_code']),  # âœ… Optimized indexing
-            models.Index(fields=['item']),  # âœ… Optimized indexing
         ]
 
     def __str__(self):
@@ -1002,14 +1003,31 @@ class LicenseInwardOutwardModel(models.Model):
 
 @receiver(post_save, sender=LicenseImportItemsModel)
 def update_balance(sender, instance, **kwargs):
-    item = instance
-    from bill_of_entry.tasks import update_balance_values_task
-    update_balance_values_task(item.id)
-    items_and_filters = filter_list()
+    update_balance_values_task(instance.id)
+
+    # Get filters for auto-tagging
+    items_and_filters = filter_list()  # e.g. [("Item1", Q(description__icontains="Item1")), ...]
+
     for item_name, query_filter in items_and_filters:
-        from core.models import ItemNameModel
-        nItem = ItemNameModel.objects.get(name=item_name)
-        LicenseImportItemsModel.objects.filter(license=instance.license).filter(query_filter).update(item=nItem)
+        try:
+            nItem = ItemNameModel.objects.get(name=item_name)
+
+            # Filter matching import items in the same license
+            matching_items = (
+                LicenseImportItemsModel.objects
+                .filter(license=instance.license)
+                .filter(query_filter)
+                .annotate(item_count=Count("items"))
+                .filter(item_count=0)  # only rows where items is empty
+            )
+
+            # Add the item to each blank row
+            for import_item in matching_items:
+                import_item.items.add(nItem)
+
+        except ItemNameModel.DoesNotExist:
+            # Skip if the item name is not found
+            continue
 
 
 class LicenseTransferModel(models.Model):

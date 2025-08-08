@@ -12,6 +12,7 @@ from rest_framework.views import APIView
 from bill_of_entry.models import BillOfEntryModel
 from bill_of_entry.scripts.boe import fetch_cookies, fetch_captcha
 from bill_of_entry.scripts.utils import port_dict
+from license.models import SCHEME_CODE_CHOICES, NOTIFICATION_NORM_CHOICES, LICENCE_PURCHASE
 from lmanagement.tasks import fetch_data_to_model
 from scripts.parse_ledger import parse_license_data
 from .filters import SionNormClassFilter
@@ -220,3 +221,14 @@ class InvoiceEntityReadOnlyViewSet(viewsets.ReadOnlyModelViewSet):
     serializer_class = InvoiceEntitySerializer
     filter_backends = [filters.SearchFilter]
     search_fields = ['name', 'pan_number', 'gst_number', 'bank_name', 'ifsc_code']
+
+
+class ChoicesAPIView(APIView):
+    # permission_classes = [IsAuthenticated]  # or IsAuthenticated if required
+
+    def get(self, request):
+        return Response({
+            'scheme_codes': [{'value': k, 'label': v} for k, v in SCHEME_CODE_CHOICES],
+            'notification_number': [{'value': k, 'label': v} for k, v in NOTIFICATION_NORM_CHOICES],
+            'purchase_status': [{'value': k, 'label': v} for k, v in LICENCE_PURCHASE],
+        })
