@@ -84,7 +84,18 @@ const useLicenseListManager = (apiUrl = '/api/licenses/') => {
             });
             setHasMore(hasNextPage);
         } catch (err) {
-            toast.error('Failed to fetch License data');
+            if (err?.response?.status === 404) {
+                setHasMore(false);                 // stop infinite scroll
+                if (page !== 1) setPage(1);         // reset to page 1 safely
+                // Optional UX: inform user when first page also 404s
+                if (page === 1) {
+                    setEntries([]);                 // clear list if needed
+                    toast.info('No data found for the current filters.');
+                }
+            } else {
+                console.error(err);
+                toast.error('Failed to fetch License data');
+            }
         } finally {
             setLoading(false);
         }
@@ -128,7 +139,7 @@ const useLicenseListManager = (apiUrl = '/api/licenses/') => {
             console.error(err);
         }
     };
-    
+
     const toggleSelect = (id) => {
         setSelectedIds(prev =>
             prev.includes(id) ? prev.filter(i => i !== id) : [...prev, id]

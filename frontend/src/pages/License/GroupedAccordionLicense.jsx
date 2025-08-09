@@ -83,11 +83,15 @@ const GroupedAccordionLicense = ({
                                                                 #: {entry.license_number}</strong>
                                                         </Col>
                                                         <Col className="flex-shrink-0">Issue
-                                                            Date: {entry.license_date}</Col>
+                                                            Date: <strong>{entry.license_date}</strong></Col>
                                                         <Col
-                                                            className="flex-shrink-0">Expiry: {entry.license_expiry_date}</Col>
+                                                            className="flex-shrink-0">Expiry:<strong> {entry.license_expiry_date}</strong></Col>
+                                                        <Col className="flex-shrink-0">Norm
+                                                            Class: <strong>{entry?.export_license?.[0]?.norm_class?.norm_class || ''}</strong></Col>
+                                                        <Col className="flex-shrink-0">Notification
+                                                            No: <strong>{entry?.notification_number || ''}</strong></Col>
                                                         <Col className="flex-shrink-0">CIF
-                                                            $: {formatNumber(entry.balance_cif)}</Col>
+                                                            $: <strong>{formatNumber(entry.balance_cif)}</strong></Col>
                                                     </Row>
                                                 </div>
                                             </Card.Header>

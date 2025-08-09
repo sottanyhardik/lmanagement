@@ -4,9 +4,9 @@ import axios from '../api/axiosInstance.js';
 
 const AsyncHeadNormSelect = ({value, onChange}) => {
     const loadOptions = async (inputValue) => {
-        const res = await axios.get(`api/head-norms/?search=${inputValue}`);
+        const res = await axios.get(`api/sion-classes/?search=${inputValue}`);
         return res.data.results.map((head) => ({
-            label: head.name,
+            label: head.norm_class,
             value: head.id,
             ...head,
         }));
@@ -19,7 +19,7 @@ const AsyncHeadNormSelect = ({value, onChange}) => {
             cacheOptions
             defaultOptions
             loadOptions={loadOptions}
-            value={value ? {label: value.name, value: value.id, ...value} : null}
+            value={value ? {label: value.norm_class, value: value.id, ...value} : null}
             getOptionLabel={(e) => e.label}
             getOptionValue={(e) => e.value}
             onChange={onChange}

@@ -29,7 +29,6 @@ const AsyncPortSelect = ({value, onChange, isMulti = false, placeholder = "Selec
         <AsyncSelect
             classNamePrefix="react-select"
             className="underline-select"
-
             cacheOptions
             defaultOptions={false} // âœ… disables fetch on mount
             loadOptions={loadOptions} // âœ… fetches only on typing

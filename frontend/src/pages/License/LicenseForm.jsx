@@ -2,10 +2,10 @@ import React, {useEffect, useState} from 'react';
 import {Button, Form, Table} from 'react-bootstrap';
 import AsyncCompanySelect from '../../components/AsyncCompanySelect';
 import AsyncPortSelect from '../../components/AsyncPortSelect';
-import AsyncHSCodeSelect from '../../components/AsyncHSCodeSelect';
-import AsyncItemSelect from '../../components/AsyncItemSelect';
 import AsyncChoiceSelect from '../../components/AsyncChoiceSelect';
 import {useLicenseChoices} from '../../hooks/useChoiceLoader';
+import ExportLicenseTable from './ExportLicenseTable';
+import ImportLicenseTable from './ImportLicenseTable';
 
 
 import {toast} from 'react-toastify';
@@ -69,7 +69,7 @@ const LicenseForm = ({entry, isNew = false, onClose, onSaved}) => {
             currency: item.currency || 'usd',
             cif_fc: item.cif_fc || '',
             cif_inr: item.cif_inr || '',
-            norm_class: item.norm_class || '',
+            norm_class_id: item.norm_class?.id || '',
         })),
         import_license: (data.import_license || []).map(item => ({
             id: item.id || null,
@@ -285,152 +285,46 @@ const LicenseForm = ({entry, isNew = false, onClose, onSaved}) => {
                 </tbody>
             </Table>
 
-            {/* Export Items */}
-            <h6 className="mt-4">Export Items</h6>
-            <Table size="sm" bordered>
-                <thead>
-                <tr>
-                    <th>Net Qty</th>
-                    <th>Unit</th>
-                    <th>Currency</th>
-                    <th>CIF FC</th>
-                    <th>CIF INR</th>
-                    <th>Norm Class</th>
-                </tr>
-                </thead>
-                <tbody>
-                {(data.export_license || []).map((item, i) => (
-                    <tr key={i}>
-                        <td><Form.Control value={item.net_quantity || ''}
-                                          onChange={e => handleItemChange('export', i, 'net_quantity', e.target.value)}/>
-                        </td>
-                        <td><Form.Control value={item.unit || ''}
-                                          onChange={e => handleItemChange('export', i, 'unit', e.target.value)}/></td>
-                        <td><Form.Control value={item.currency || ''}
-                                          onChange={e => handleItemChange('export', i, 'currency', e.target.value)}/>
-                        </td>
-                        <td><Form.Control value={item.cif_fc || ''}
-                                          onChange={e => handleItemChange('export', i, 'cif_fc', e.target.value)}/></td>
-                        <td><Form.Control value={item.cif_inr || ''}
-                                          onChange={e => handleItemChange('export', i, 'cif_inr', e.target.value)}/>
-                        </td>
-                        <td><Form.Control value={item.norm_class || ''}
-                                          onChange={e => handleItemChange('export', i, 'norm_class', e.target.value)}/>
-                        </td>
-                    </tr>
-                ))}
-                </tbody>
-            </Table>
-            <Button size="sm" variant="primary" onClick={() => {
-                const newRow = {net_quantity: '', unit: 'kg', currency: 'usd', cif_fc: '', cif_inr: '', norm_class: ''};
-                setData(prev => ({...prev, export_license: [...(prev.export_license || []), newRow]}));
-            }}>+ Add Export Item</Button>
+            <ExportLicenseTable
+                exportItems={data.export_license || []}
+                onChange={(updated) =>
+                    setData(prev => ({...prev, export_license: updated}))
+                }
+                onAdd={() =>
+                    setData(prev => ({
+                        ...prev,
+                        export_license: [
+                            ...(prev.export_license || []),
+                            {net_quantity: '', unit: 'kg', currency: 'usd', cif_fc: '', cif_inr: '', norm_class: null}
+                        ],
+                    }))
+                }
+            />
 
-            {/* Import Items */}
-            <h6 className="mt-4">Import Items</h6>
-            <Table size="sm" bordered responsive>
-                <thead className="table-light">
-                <tr>
-                    <th>Serial No</th>
-                    <th>HS Code</th>
-                    <th>Items</th>
-                    <th>Description</th>
-                    <th>Qty</th>
-                    <th>Unit</th>
-                    <th>CIF FC</th>
-                    <th>CIF INR</th>
-                </tr>
-                </thead>
-                <tbody>
-                {(data.import_license || []).map((item, i) => (
-                    <tr key={i}>
-                        <td style={{maxWidth: '20px'}}>
-                            <Form.Control
-                                value={item.serial_number || ''}
-                                onChange={e => handleItemChange('import', i, 'serial_number', e.target.value)}
-                            />
-                        </td>
-
-                        <td style={{minWidth: '100px'}}>
-                            <div className="d-flex flex-column">
-                                <AsyncHSCodeSelect
-                                    value={item.hs_code}
-                                    onChange={(v) => handleItemChange('import', i, 'hs_code', v)}
-                                />
-                            </div>
-                        </td>
-
-                        <td style={{minWidth: '120px'}}>
-                            <div className="d-flex flex-column">
-                                <AsyncItemSelect
-                                    value={item.items}
-                                    onChange={(v) => handleItemChange('import', i, 'items', v)}
-                                    isMulti
-                                />
-                            </div>
-                        </td>
-
-                        <td style={{minWidth: '200px'}}>
-                            <Form.Control
-                                as="textarea"
-                                rows={2}
-                                value={item.description || ''}
-                                onChange={e => handleItemChange('import', i, 'description', e.target.value)}
-                            />
-                        </td>
-
-                        <td style={{minWidth: '120px'}}>
-                            <Form.Control
-                                as="textarea"
-                                rows={1}
-                                style={{whiteSpace: 'normal', resize: 'none'}}
-                                value={item.quantity || ''}
-                                onChange={e => handleItemChange('import', i, 'quantity', e.target.value)}
-                            />
-                        </td>
-
-                        <td style={{minWidth: '20px'}}>
-                            <Form.Control
-                                value={item.unit || ''}
-                                onChange={e => handleItemChange('import', i, 'unit', e.target.value)}
-                            />
-                        </td>
-
-                        <td style={{minWidth: '120px'}}>
-                            <div className="d-flex flex-column">
-                                <Form.Control
-                                    value={item.cif_fc || ''}
-                                    onChange={e => handleItemChange('import', i, 'cif_fc', e.target.value)}
-                                />
-                            </div>
-                        </td>
-
-                        <td style={{minWidth: '120px'}}>
-                            <div className="d-flex flex-column">
-                                <Form.Control
-                                    value={item.cif_inr || ''}
-                                    onChange={e => handleItemChange('import', i, 'cif_inr', e.target.value)}
-                                />
-                            </div>
-                        </td>
-                    </tr>
-                ))}
-                </tbody>
-            </Table>
-
-            <Button size="sm" variant="primary" onClick={() => {
-                const newRow = {
-                    serial_number: '',
-                    description: '',
-                    quantity: '',
-                    unit: 'kg',
-                    cif_fc: '',
-                    cif_inr: '',
-                    hs_code: null,
-                    items: []
-                };
-                setData(prev => ({...prev, import_license: [...(prev.import_license || []), newRow]}));
-            }}>+ Add Import Item</Button>
+            <ImportLicenseTable
+                importItems={data.import_license || []}
+                onChange={(updated) =>
+                    setData(prev => ({...prev, import_license: updated}))
+                }
+                onAdd={() =>
+                    setData(prev => ({
+                        ...prev,
+                        import_license: [
+                            ...(prev.import_license || []),
+                            {
+                                serial_number: '',
+                                description: '',
+                                quantity: '',
+                                unit: 'kg',
+                                cif_fc: '',
+                                cif_inr: '',
+                                hs_code: null,
+                                items: []
+                            }
+                        ],
+                    }))
+                }
+            />
 
             <div className="mt-3">
                 <Button variant="success" size="sm" onClick={save} disabled={saving}>
