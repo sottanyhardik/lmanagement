@@ -1,3 +1,4 @@
+// LicenseForm.jsx
 import React, {useEffect, useState} from 'react';
 import {Button, Form, Table} from 'react-bootstrap';
 import AsyncCompanySelect from '../../components/AsyncCompanySelect';
@@ -7,15 +8,15 @@ import {useLicenseChoices} from '../../hooks/useChoiceLoader';
 import ExportLicenseTable from './ExportLicenseTable';
 import ImportLicenseTable from './ImportLicenseTable';
 
-
 import {toast} from 'react-toastify';
 import axios from '../../api/axiosInstance';
 
 const LicenseForm = ({entry, isNew = false, onClose, onSaved}) => {
-    const [data, setData] = useState(entry);
+    const [data, setData] = useState(entry || {});
     const [saving, setSaving] = useState(false);
     const [errors, setErrors] = useState({});
     const {choices} = useLicenseChoices();
+
     const handleChange = (field, value) => {
         setData(prev => ({...prev, [field]: value}));
         setErrors(prev => ({...prev, [field]: null}));
@@ -27,19 +28,28 @@ const LicenseForm = ({entry, isNew = false, onClose, onSaved}) => {
         updated[index][field] = value;
         setData(prev => ({...prev, [key]: updated}));
     };
-    const normalizeSelectField = (raw, options) => {
-        if (typeof raw === 'string') {
+
+    const normalizeSelectField = (raw, options = []) => {
+        if (raw == null) return null;
+        if (typeof raw === 'string' || typeof raw === 'number') {
             const match = options.find(opt => opt.value === raw);
-            return match || {value: raw, label: raw}; // fallback label
+            return match || {value: raw, label: String(raw)};
         }
         return raw;
     };
+
+    // helper to blank export norm on prefill (requested)
+    const blankExportNorms = (exportList = []) =>
+        exportList.map(item => ({...item, norm_class: null}));
+
     useEffect(() => {
         if (entry && choices) {
             setData({
                 ...entry,
                 purchase_status: normalizeSelectField(entry.purchase_status, choices.purchase_status),
                 notification_number: normalizeSelectField(entry.notification_number, choices.notification_number),
+                // force export norm_class blank on prefill
+                export_license: blankExportNorms(entry.export_license || []),
             });
         }
     }, [entry, choices]);
@@ -69,7 +79,7 @@ const LicenseForm = ({entry, isNew = false, onClose, onSaved}) => {
             currency: item.currency || 'usd',
             cif_fc: item.cif_fc || '',
             cif_inr: item.cif_inr || '',
-            norm_class_id: item.norm_class?.id || '',
+            norm_class_id: item.norm_class?.id ?? item.norm_class?.value ?? null,
         })),
         import_license: (data.import_license || []).map(item => ({
             id: item.id || null,
@@ -81,8 +91,75 @@ const LicenseForm = ({entry, isNew = false, onClose, onSaved}) => {
             cif_inr: item.cif_inr,
             hs_code_id: item.hs_code?.id || null,
             items_ids: (item.items || []).map(i => i.id),
-        }))
+        })),
     });
+
+    // ---- SION fetch/prefill support ----
+    const getNormId = normClass => {
+        if (normClass == null) return null;
+        if (typeof normClass === 'number' || typeof normClass === 'string') return normClass;
+        return normClass.id ?? normClass.value ?? null;
+    };
+
+    /**
+     * Fetch SION inputs for a selected norm and prefill ONLY import item descriptions
+     * starting at the provided serial number.
+     * Expects backend: GET /api/sion-classes/:id/ -> { import_norm: [{ sr_no, description, ... }, ...] }
+     */
+    const handleFetchSionInputs = async ({normClass, startSerial /*, rowIndex */}) => {
+        const normId = getNormId(normClass);
+        if (!normId) {
+            toast.warn('Please select a SION Norm first.');
+            return;
+        }
+
+        try {
+            const {data: sion} = await axios.get(`/api/sion-classes/${normId}/`);
+            const importNorms = Array.isArray(sion?.import_norm) ? sion.import_norm : [];
+            if (importNorms.length === 0) {
+                toast.info('No SION import norms found for the selected class.');
+                return;
+            }
+
+            setData(prev => {
+                const existing = [...(prev.import_license || [])];
+                const startIdx = Math.max(0, Number(startSerial || 1) - 1);
+
+                const requiredLength = startIdx + importNorms.length;
+                while (existing.length < requiredLength) {
+                    existing.push({
+                        serial_number: existing.length + 1,
+                        description: '',
+                        quantity: '',
+                        unit: 'kg',
+                        cif_fc: '',
+                        cif_inr: '',
+                        hs_code: null,
+                        items: [],
+                    });
+                }
+
+                // Prefill ONLY description
+                importNorms.forEach((n, i) => {
+                    const row = existing[startIdx + i];
+                    if (!row.description || row.description.trim() === '') {
+                        row.description = n?.description ?? row.description;
+                    }
+                });
+
+                // Re-sequence serial numbers
+                existing.forEach((r, i) => (r.serial_number = i + 1));
+
+                return {...prev, import_license: existing};
+            });
+
+            toast.success('Descriptions prefilled from SION norms.');
+        } catch (err) {
+            console.error('SION fetch error', err);
+            toast.error('Failed to fetch SION norms.');
+        }
+    };
+    // ---- end SION support ----
 
     const save = async () => {
         if (!validate()) {
@@ -101,9 +178,9 @@ const LicenseForm = ({entry, isNew = false, onClose, onSaved}) => {
                 response = await axios.patch(`/api/licenses/${data.id}/`, payload);
                 toast.success('License Updated');
             }
-            onSaved?.(response.data.id, response.data); // pass updated entry
+            onSaved?.(response.data.id, response.data);
         } catch (err) {
-            console.error('Save failed', err.response?.data || err);
+            console.error('Save failed', err?.response?.data || err);
             toast.error('Failed to save license');
         } finally {
             setSaving(false);
@@ -126,58 +203,44 @@ const LicenseForm = ({entry, isNew = false, onClose, onSaved}) => {
                         <Form.Control
                             value={data.license_number ?? ''}
                             isInvalid={!!errors.license_number}
-                            onChange={(e) => handleChange('license_number', e.target.value)}
+                            onChange={e => handleChange('license_number', e.target.value)}
                         />
                         <Form.Control.Feedback type="invalid">
                             {errors.license_number}
                         </Form.Control.Feedback>
                     </td>
-
-
                     <td>
                         <Form.Control
                             type="date"
-                            value={data.license_date}
+                            value={data.license_date || ''}
                             isInvalid={!!errors.license_date}
-                            onChange={(e) => handleChange('license_date', e.target.value)}
+                            onChange={e => handleChange('license_date', e.target.value)}
                         />
                         <Form.Control.Feedback type="invalid">
                             {errors.license_date}
                         </Form.Control.Feedback>
                     </td>
-
-
                     <td>
                         <Form.Control
                             type="date"
-                            value={data.license_expiry_date}
+                            value={data.license_expiry_date || ''}
                             isInvalid={!!errors.license_expiry_date}
-                            onChange={(e) => handleChange('license_expiry_date', e.target.value)}
+                            onChange={e => handleChange('license_expiry_date', e.target.value)}
                         />
                         <Form.Control.Feedback type="invalid">
                             {errors.license_expiry_date}
                         </Form.Control.Feedback>
                     </td>
                     <td>
-                        <AsyncCompanySelect
-                            value={data.exporter}
-                            onChange={(v) => handleChange('exporter', v)}
-                        />
-                        {errors.exporter && (
-                            <div className="text-danger small">{errors.exporter}</div>
-                        )}
+                        <AsyncCompanySelect value={data.exporter} onChange={v => handleChange('exporter', v)}/>
+                        {errors.exporter && <div className="text-danger small">{errors.exporter}</div>}
                     </td>
-
                     <td>
-                        <AsyncPortSelect
-                            value={data.port}
-                            onChange={(v) => handleChange('port', v)}
-                        />
-                        {errors.port && (
-                            <div className="text-danger small">{errors.port}</div>
-                        )}
+                        <AsyncPortSelect value={data.port} onChange={v => handleChange('port', v)}/>
+                        {errors.port && <div className="text-danger small">{errors.port}</div>}
                     </td>
                 </tr>
+
                 <tr>
                     <th style={{width: '20%'}}>Reg Number</th>
                     <th style={{width: '20%'}}>Reg Date</th>
@@ -188,34 +251,30 @@ const LicenseForm = ({entry, isNew = false, onClose, onSaved}) => {
                 <tr>
                     <td>
                         <Form.Control
-                            value={data.registration_number}
+                            value={data.registration_number || ''}
                             isInvalid={!!errors.registration_number}
-                            onChange={(e) => handleChange('registration_number', e.target.value)}
+                            onChange={e => handleChange('registration_number', e.target.value)}
                         />
                         <Form.Control.Feedback type="invalid">
                             {errors.registration_number}
                         </Form.Control.Feedback>
                     </td>
-
-
                     <td>
                         <Form.Control
                             type="date"
-                            value={data.registration_date}
+                            value={data.registration_date || ''}
                             isInvalid={!!errors.registration_date}
-                            onChange={(e) => handleChange('registration_date', e.target.value)}
+                            onChange={e => handleChange('registration_date', e.target.value)}
                         />
                         <Form.Control.Feedback type="invalid">
                             {errors.registration_date}
                         </Form.Control.Feedback>
                     </td>
-
-
                     <td>
                         <Form.Control
-                            value={data.file_number}
+                            value={data.file_number || ''}
                             isInvalid={!!errors.file_number}
-                            onChange={(e) => handleChange('file_number', e.target.value)}
+                            onChange={e => handleChange('file_number', e.target.value)}
                         />
                         <Form.Control.Feedback type="invalid">
                             {errors.file_number}
@@ -225,87 +284,78 @@ const LicenseForm = ({entry, isNew = false, onClose, onSaved}) => {
                         <AsyncChoiceSelect
                             choiceKey="scheme_codes"
                             value={data.scheme_code}
-                            onChange={(v) => handleChange('scheme_code', v)}
+                            onChange={v => handleChange('scheme_code', v)}
                         />
                     </td>
                     <td>
                         <AsyncChoiceSelect
                             choiceKey="notification_number"
                             value={data.notification_number}
-                            onChange={(v) => handleChange('notification_number', v)}
+                            onChange={v => handleChange('notification_number', v)}
                         />
-
                     </td>
-
                 </tr>
+
                 <tr>
                     <th style={{width: '20%'}}>Purchase By</th>
                     <th style={{width: '20%'}}>
                         <Form.Check
                             label="Is Registered"
                             type="switch"
-                            checked={data.is_registered}
-                            onChange={(e) => handleChange('is_registered', e.target.checked)}
+                            checked={!!data.is_registered}
+                            onChange={e => handleChange('is_registered', e.target.checked)}
                         />
                     </th>
                     <th colSpan={4}>Condition Sheet</th>
-
                 </tr>
                 <tr>
                     <td>
                         <AsyncChoiceSelect
                             choiceKey="purchase_status"
                             value={data.purchase_status}
-                            onChange={(v) => handleChange('purchase_status', v)}
+                            onChange={v => handleChange('purchase_status', v)}
                         />
                     </td>
-
-
                     <th>
                         <Form.Check
                             label="Is AU"
                             type="switch"
-                            checked={data.is_au}
-                            onChange={(e) => handleChange('is_au', e.target.checked)}
+                            checked={!!data.is_au}
+                            onChange={e => handleChange('is_au', e.target.checked)}
                         />
                     </th>
                     <td colSpan={3}>
                         <Form.Control
-                            value={data.file_number}
+                            value={data.file_number || ''}
                             isInvalid={!!errors.file_number}
-                            onChange={(e) => handleChange('file_number', e.target.value)}
+                            onChange={e => handleChange('file_number', e.target.value)}
                         />
                         <Form.Control.Feedback type="invalid">
                             {errors.file_number}
                         </Form.Control.Feedback>
                     </td>
-
                 </tr>
-
                 </tbody>
             </Table>
 
             <ExportLicenseTable
                 exportItems={data.export_license || []}
-                onChange={(updated) =>
-                    setData(prev => ({...prev, export_license: updated}))
-                }
+                onChange={updated => setData(prev => ({...prev, export_license: updated}))}
                 onAdd={() =>
                     setData(prev => ({
                         ...prev,
                         export_license: [
                             ...(prev.export_license || []),
-                            {net_quantity: '', unit: 'kg', currency: 'usd', cif_fc: '', cif_inr: '', norm_class: null}
+                            {net_quantity: '', unit: 'kg', currency: 'usd', cif_fc: '', cif_inr: '', norm_class: null},
                         ],
                     }))
                 }
+                onFetchSionInputs={handleFetchSionInputs}
             />
 
             <ImportLicenseTable
                 importItems={data.import_license || []}
-                onChange={(updated) =>
-                    setData(prev => ({...prev, import_license: updated}))
-                }
+                onChange={updated => setData(prev => ({...prev, import_license: updated}))}
                 onAdd={() =>
                     setData(prev => ({
                         ...prev,
@@ -319,8 +369,8 @@ const LicenseForm = ({entry, isNew = false, onClose, onSaved}) => {
                                 cif_fc: '',
                                 cif_inr: '',
                                 hs_code: null,
-                                items: []
-                            }
+                                items: [],
+                            },
                         ],
                     }))
                 }
@@ -330,7 +380,11 @@ const LicenseForm = ({entry, isNew = false, onClose, onSaved}) => {
                 <Button variant="success" size="sm" onClick={save} disabled={saving}>
                     {saving ? 'Saving...' : 'Save'}
                 </Button>
-                {onClose && <Button variant="secondary" size="sm" className="ms-2" onClick={onClose}>Cancel</Button>}
+                {onClose && (
+                    <Button variant="secondary" size="sm" className="ms-2" onClick={onClose}>
+                        Cancel
+                    </Button>
+                )}
             </div>
         </Form>
     );
