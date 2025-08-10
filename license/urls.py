@@ -3,6 +3,8 @@ from django.urls import path, include
 from rest_framework.routers import DefaultRouter
 
 from . import views
+from .Export.item_excel import LicenseImportItemsXLSX
+from .Export.item_pdf import LicenseImportItemsUltraWidePDF
 from .api import LicenseImportItemsViewSet, LicenseDetailsViewSet
 
 router = DefaultRouter()
@@ -10,6 +12,8 @@ router.register(r'license-import-items', LicenseImportItemsViewSet, basename='li
 router.register(r'licenses', LicenseDetailsViewSet)
 
 urlpatterns = [
+    path('api/licenses/export/pdf/', LicenseImportItemsUltraWidePDF.as_view(), name='license-details-pdf'),
+    path('api/licenses/export/excel/', LicenseImportItemsXLSX.as_view(), name="licenses-export-xlsx"),
     path('api/', include(router.urls)),
 
     path('license/report/biscuits/', login_required(views.PDFSummaryLicenseDetailView.as_view()),

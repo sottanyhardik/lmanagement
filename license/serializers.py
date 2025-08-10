@@ -46,12 +46,18 @@ class LicenseImportItemSerializer(serializers.ModelSerializer):
     items_ids = serializers.PrimaryKeyRelatedField(
         queryset=ItemNameModel.objects.all(), source='items', many=True, write_only=True
     )
+    debited_quantity = serializers.DecimalField(max_digits=20, decimal_places=4, read_only=True)
+    debited_value = serializers.DecimalField(max_digits=20, decimal_places=4, read_only=True)
+    allotted_quantity = serializers.DecimalField(max_digits=20, decimal_places=4, read_only=True)
+    allotted_value = serializers.DecimalField(max_digits=20, decimal_places=4, read_only=True)
+    available_quantity = serializers.DecimalField(max_digits=20, decimal_places=4, read_only=True)
 
     class Meta:
         model = LicenseImportItemsModel
         fields = [
-            'id', 'serial_number', 'description', 'quantity', 'unit',
-            'cif_fc', 'cif_inr', 'hs_code', 'hs_code_id', 'items', 'items_ids'
+            'id', 'serial_number', 'description', 'quantity', 'unit', 'cif_fc', 'cif_inr', 'hs_code', 'hs_code_id',
+            'items', 'items_ids', 'debited_quantity', 'debited_value', 'allotted_quantity', 'allotted_value',
+            'available_quantity'
         ]
 
 
@@ -226,7 +232,7 @@ class LicenseDetailsSerializer(serializers.ModelSerializer):
             exporter=exporter, port=port, **validated_data
         )
 
-        # export items
+        # Export items
         for item in export_items_data:
             LicenseExportItemModel.objects.create(license=license_detail, **item)
 
@@ -253,7 +259,7 @@ class LicenseDetailsSerializer(serializers.ModelSerializer):
             setattr(instance, attr, value)
         instance.save()
 
-        # Upsert export items
+        # Upsert Export items
         if export_items_data is not None:
             self._upsert_export_items(instance, export_items_data)
 

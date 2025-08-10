@@ -143,7 +143,7 @@ class SionNormClassSerializer(serializers.ModelSerializer):
             modified_by=user,
         )
 
-        # Create export norm(s)
+        # Create Export norm(s)
         for item in export_data:
             SIONExportModel.objects.create(norm_class=instance, **item)
 

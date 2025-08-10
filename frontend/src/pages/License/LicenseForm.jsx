@@ -38,7 +38,7 @@ const LicenseForm = ({entry, isNew = false, onClose, onSaved}) => {
         return raw;
     };
 
-    // helper to blank export norm on prefill (requested)
+    // helper to blank Export norm on prefill (requested)
     const blankExportNorms = (exportList = []) =>
         exportList.map(item => ({...item, norm_class: null}));
 
@@ -48,7 +48,7 @@ const LicenseForm = ({entry, isNew = false, onClose, onSaved}) => {
                 ...entry,
                 purchase_status: normalizeSelectField(entry.purchase_status, choices.purchase_status),
                 notification_number: normalizeSelectField(entry.notification_number, choices.notification_number),
-                // force export norm_class blank on prefill
+                // force Export norm_class blank on prefill
                 export_license: blankExportNorms(entry.export_license || []),
             });
         }

@@ -7,12 +7,12 @@ import AsyncNormSelect from '../../components/AsyncNormSelect';
 /**
  * ExportLicenseTable
  *
- * Renders export items and, per row, a SION Norm selector with:
+ * Renders Export items and, per row, a SION Norm selector with:
  *  - Start Serial input
  *  - "Fetch Now" button to trigger prefilling of import items in the parent
  *
  * Props
- * - exportItems: Array of export item rows
+ * - exportItems: Array of Export item rows
  * - onChange: (updatedRows) => void
  * - onAdd: () => void
  * - onFetchSionInputs: ({ normClass, startSerial, rowIndex }) => Promise<void>

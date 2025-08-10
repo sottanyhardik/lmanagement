@@ -1,0 +1,157 @@
+{# templates/license/license_list_pdf.html #}
+<!doctype html>
+<html>
+<head>
+    <meta charset="utf-8"/>
+    <style>
+        @page {
+            /* keep your default page; don't set size */
+            margin: 14mm 12mm 16mm 12mm;
+        }
+
+        body {
+            font-family: DejaVu Sans, Arial, sans-serif;
+            font-size: 11px;
+            color: #111;
+        }
+
+        .h {
+            border-bottom: 1px solid #000;
+            padding-bottom: 6px;
+            margin-bottom: 8px;
+        }
+
+        .h .t {
+            font-size: 16px;
+            font-weight: bold;
+        }
+
+        .h .m {
+            font-size: 10px;
+            color: #444;
+        }
+
+        table {
+            border-collapse: collapse;
+            border-spacing: 0;
+            width: 100%; /* ✅ fill page width */
+            table-layout: auto; /* ✅ let columns size naturally */
+        }
+
+        th, td {
+            padding: 5px 4px;
+            font-size: 10px;
+            border-bottom: 1px dotted #bbb;
+            vertical-align: top;
+            white-space: normal; /* ✅ allow wrapping */
+            word-break: break-word; /* ✅ break long words/IDs to avoid overflow */
+            overflow: visible; /* ✅ don’t clip content */
+        }
+
+        /* ❌ Remove this line from your template:
+           tr { page-break-inside: avoid; }
+           It prevents tall rows from splitting and can cause clipping.
+        */
+
+        .num {
+            text-align: right;
+        }
+
+        .badge {
+            display: inline-block;
+            padding: 1px 5px;
+            border-radius: 9px;
+            font-size: 9px;
+            border: 1px solid #bbb;
+        }
+
+        .ok {
+            background: #e6f4ea;
+            border-color: #98d4a7;
+        }
+
+        .warn {
+            background: #fdeaea;
+            border-color: #f5a3a3;
+        }
+
+        .muted {
+            background: #eee;
+            border-color: #ccc;
+        }
+
+        .small {
+            font-size: 9px;
+            color: #555;
+        }
+    </style>
+
+</head>
+<body>
+<div class="h">
+    <div class="t">{{ title }}</div>
+    <div class="m">
+        Generated: {{ today }} |
+        {% if filters.search %} Search="{{ filters.search }}"{% else %}No search{% endif %}
+        {% if filters.exporter %} | Exporter ID={{ filters.exporter }}{% endif %}
+        {% if filters.port %} | Port ID={{ filters.port }}{% endif %}
+        {% if filters.purchase_status %} | Status={{ filters.purchase_status }}{% endif %}
+        {% if filters.active %} | Active={{ filters.active }}{% endif %}
+        {% if filters.expired %} | Expired={{ filters.expired }}{% endif %}
+        {% if filters.from %} | From={{ filters.from }}{% endif %}
+        {% if filters.to %} | To={{ filters.to }}{% endif %}
+    </div>
+</div>
+
+<table>
+    <thead>
+    <tr>
+        <th>#</th>
+        <th>License No.</th>
+        <th>Date</th>
+        <th>Expiry</th>
+        <th>Exporter</th>
+        <th>Port</th>
+        <th>Purchase</th>
+        <th>Status</th>
+        <th class="num">Debited</th>
+        <th class="num">Allotted</th>
+        <th class="num">Balance CIF</th>
+    </tr>
+    </thead>
+    <tbody>
+    {% for lic in items %}
+        <tr>
+            <td>{{ forloop.counter }}</td>
+            <td>{{ lic.license_number }}</td>
+            <td>{{ lic.license_date|date:"d-M-Y" }}</td>
+            <td>{{ lic.license_expiry_date|date:"d-M-Y" }}</td>
+            <td>{% if lic.exporter %}{{ lic.exporter.name }}{% endif %}</td>
+            <td>{% if lic.port %}{{ lic.port.name }}{% endif %}</td>
+            <td>{{ lic.get_purchase_status_display }}</td>
+            <td>
+                {% if lic.is_active %}<span class="badge ok">Active</span>{% else %}
+                    <span class="badge muted">Inactive</span>{% endif %}
+                {% if lic.is_expired %} <span class="badge warn">Expired</span>{% endif %}
+                {% if lic.is_not_registered %} <span class="badge muted">Not Reg.</span>{% endif %}
+            </td>
+            <td class="num">{{ lic.get_total_debit|floatformat:2 }}</td>
+            <td class="num">{{ lic.get_total_allotment|floatformat:2 }}</td>
+            <td class="num">{{ lic.get_balance_cif|floatformat:2 }}</td>
+        </tr>
+    {% empty %}
+        <tr>
+            <td colspan="11">No data found.</td>
+        </tr>
+    {% endfor %}
+    </tbody>
+</table>
+
+<div id="footer_content" class="small">
+    Page
+    <pdf:pagenumber/>
+    of
+    <pdf:pagecount/>
+</div>
+</body>
+</html>

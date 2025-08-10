@@ -200,7 +200,7 @@ const useBillOfEntryListManager = () => {
             window.URL.revokeObjectURL(url);
         } catch (error) {
             console.error('Export Excel failed:', error);
-            toast.error('Failed to export Excel');
+            toast.error('Failed to Export Excel');
         }
     };
 
@@ -221,7 +221,7 @@ const useBillOfEntryListManager = () => {
             setTimeout(() => window.URL.revokeObjectURL(url), 1000);
         } catch (err) {
             console.error('Export PDF failed:', err);
-            toast.error('Failed to export PDF');
+            toast.error('Failed to Export PDF');
         }
     };
 
