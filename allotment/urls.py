@@ -1,16 +1,18 @@
 from django.contrib.auth.decorators import login_required
-from django.urls import path
+from django.urls import path, include
 # urls.py
 from rest_framework.routers import DefaultRouter
 
 from . import views
-from .api import AllotmentOptionViewSet
+from .api import AllotmentOptionViewSet, AllotmentViewSet
 from .views import AllotmentCopyView
 
 router = DefaultRouter()
-router.register(r'api/option-allotments', AllotmentOptionViewSet, basename='allotment')
+router.register(r'option-allotments', AllotmentOptionViewSet, basename='allotment')
+router.register(r"allotments", AllotmentViewSet, basename="allotments")
 
 urlpatterns = [
+    path('api/', include(router.urls)),
     # ex: /polls/
     path('add/', login_required(views.AllotmentCreateView.as_view()), name='allotment-add'),
     path('card/<int:pk>/', login_required(views.CardView.as_view()), name='allotment-card'),

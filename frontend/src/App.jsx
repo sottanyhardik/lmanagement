@@ -22,6 +22,7 @@ import LedgerUpload from './pages/LedgerUpload.jsx';
 import AuthContext from '../src/context/AuthContext';
 import {ToastContainer} from 'react-toastify';
 import 'react-toastify/dist/ReactToastify.css';
+import AllotmentList from "./pages/Allotment/AllotmentList";
 
 
 // import UserList from './components/User/UserList';
@@ -141,6 +142,14 @@ function App() {
                         element={
                             <PrivateRoute>
                                 <LicenseList/>
+                            </PrivateRoute>
+                        }
+                    />
+                    <Route
+                        path="/allotment"
+                        element={
+                            <PrivateRoute>
+                                <AllotmentList/>
                             </PrivateRoute>
                         }
                     />

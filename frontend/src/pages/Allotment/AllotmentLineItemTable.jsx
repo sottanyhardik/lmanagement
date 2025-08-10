@@ -1,27 +1,26 @@
 import React from 'react';
 import {Button, Col, Form, Row} from 'react-bootstrap';
+// Reuse your BOE async SR selector. Adjust the path if different in your project.
 import AsyncSrNumberSelect from '../../components/AsyncSrNumberSelect.jsx';
 
-const LineItemTable = ({
-                           items,
-                           errors = {},
-                           selectedSrNumbers = [],
-                           onItemChange,
-                           onAddRow,
-                           onRemoveRow
-                       }) => {
+const AllotmentLineItemTable = ({
+                                    items,
+                                    errors = {},
+                                    onItemChange,
+                                    onAddRow,
+                                    onRemoveRow,
+                                }) => {
     return (
         <div className="border p-2 rounded">
-            <h6>Item Details</h6>
+            <h6>Allotment Item Details</h6>
             {items.map((item, index) => (
                 <Row key={index} className="mb-2 align-items-end">
-                    <Col md={4}>
-                        <Form.Label>License (SR) Number</Form.Label>
+                    <Col md={5}>
+                        <Form.Label>License Item (SR)</Form.Label>
                         <AsyncSrNumberSelect
                             value={item.sr_number}
                             onChange={(v) => onItemChange(index, 'sr_number', v)}
-                            excludeIds={items.map((it, i) => i !== index ? it.sr_number?.value : null).filter(Boolean)}
-                            placeholder="Select SR"
+                            placeholder="Search by license no / serial / description"
                             styles={{
                                 control: (base) => ({
                                     ...base,
@@ -83,7 +82,16 @@ const LineItemTable = ({
                         </Form.Control.Feedback>
                     </Col>
 
-                    <Col md={2} className="d-flex align-items-end">
+                    <Col md={1} className="d-flex flex-column">
+                        <Form.Label>BOE?</Form.Label>
+                        <Form.Check
+                            type="checkbox"
+                            checked={!!item.is_boe}
+                            onChange={(e) => onItemChange(index, 'is_boe', e.target.checked)}
+                        />
+                    </Col>
+
+                    <Col md={12} className="d-flex align-items-end mt-2">
                         <Button
                             variant="danger"
                             size="sm"
@@ -104,4 +112,4 @@ const LineItemTable = ({
     );
 };
 
-export default LineItemTable;
+export default AllotmentLineItemTable;

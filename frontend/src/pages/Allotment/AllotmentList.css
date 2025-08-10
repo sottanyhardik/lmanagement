@@ -1,0 +1,12 @@
+.sticky-header {
+    position: sticky;
+    top: 60px; /* adjust based on your navbar */
+    z-index: 1010;
+    background: #ffffff;
+    border-bottom: 1px solid #dee2e6;
+    padding: 8px 12px;
+}
+
+.badge + .badge {
+    margin-left: 6px;
+}

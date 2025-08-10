@@ -1,6 +1,6 @@
 import React from 'react';
 import AsyncSelect from 'react-select/async';
-import axios from '../../api/axiosInstance'; // adjust path as needed
+import axios from '../api/axiosInstance.js'; // adjust path as needed
 
 const AsyncSrNumberSelect = ({
                                  value,
