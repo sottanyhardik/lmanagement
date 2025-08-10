@@ -137,13 +137,6 @@ const AllotmentList = () => {
                                 <Col md={3}><strong>Required Value:</strong> {formatNumber(a.required_value)}</Col>
                                 <Col md={3}><strong>BL Detail:</strong> {a.bl_detail || '-'}</Col>
                             </Row>
-                            <Row className="mb-3">
-                                <Col
-                                    md={6}><strong>Contact:</strong> {a.contact_person || '-'} {a.contact_number ? `(${a.contact_number})` : ''}
-                                </Col>
-                                <Col md={6}><strong>DFIA:</strong> {a.dfia_list || '-'}</Col>
-                            </Row>
-
                             <h6>Lines</h6>
                             <Table bordered size="sm" responsive>
                                 <thead className="table-light">
@@ -156,9 +149,7 @@ const AllotmentList = () => {
                                     <th>Qty</th>
                                     <th>CIF $</th>
                                     <th>CIF ₹</th>
-                                    <th>BOE?</th>
                                     <th>License</th>
-                                    <th>Regn No/Date</th>
                                     <th>Exporter</th>
                                     <th>Port</th>
                                 </tr>
@@ -174,9 +165,7 @@ const AllotmentList = () => {
                                         <td className="text-end">{formatNumber(d.qty)}</td>
                                         <td className="text-end">{formatNumber(d.cif_fc)}</td>
                                         <td className="text-end">{formatNumber(d.cif_inr)}</td>
-                                        <td className="text-center">{d.is_boe ? '✔' : ''}</td>
-                                        <td>{d.license_number}</td>
-                                        <td>{d.registration_number} / {d.registration_date}</td>
+                                        <td>{d.license_number} | {d.license_date}</td>
                                         <td>{d.exporter_name}</td>
                                         <td>{d.port_name} ({d.port_code})</td>
                                     </tr>
