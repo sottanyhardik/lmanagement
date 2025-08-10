@@ -1,14 +1,14 @@
-import React, {useState} from 'react';
-import {Badge, Card, Col, Collapse, Container, Row, Table} from 'react-bootstrap';
+import React, {useMemo, useState} from 'react';
+import {Accordion, Badge, Card, Collapse, Container, Tab, Tabs,} from 'react-bootstrap';
 import ListControls from '../../components/ListControls';
 import AllotmentFilters from './AllotmentFilters';
-import AllotmentForm from './AllotmentForm';
 import useAllotmentListManager from '../../hooks/Allotment/useAllotmentListManager';
+import AllotmentCreateForm from './forms/AllotmentCreateForm';
+import AllotmentEditMainForm from './forms/AllotmentEditMainForm';
+import AllotmentMakeForm from './forms/AllotmentMakeForm';
+import AllotmentViewPane from './panels/AllotmentViewPane';
+import AllotmentTLTab from './panels/AllotmentTLTab';
 import './AllotmentList.css';
-
-const HeaderField = ({label, children}) => (
-    <div className="me-3 small text-nowrap"><strong>{label}:</strong> {children}</div>
-);
 
 const formatNumber = (val) => {
     if (val === null || val === undefined) return '-';
@@ -16,6 +16,16 @@ const formatNumber = (val) => {
     if (isNaN(num)) return '-';
     return num.toLocaleString('en-IN', {minimumFractionDigits: 2, maximumFractionDigits: 2});
 };
+
+const calcLineTotals = (lines = []) =>
+    lines.reduce(
+        (acc, it) => ({
+            qty: acc.qty + (Number(it?.qty) || 0),
+            fc: acc.fc + (Number(it?.cif_fc) || 0),
+            inr: acc.inr + (Number(it?.cif_inr) || 0),
+        }),
+        {qty: 0, fc: 0, inr: 0}
+    );
 
 const AllotmentList = () => {
     const {
@@ -38,9 +48,28 @@ const AllotmentList = () => {
     } = useAllotmentListManager();
 
     const [expanded, setExpanded] = useState({});
+    const [activeTab, setActiveTab] = useState({});
     const [newEntry, setNewEntry] = useState(null);
 
-    const toggle = (id) => setExpanded(prev => ({...prev, [id]: !prev[id]}));
+    const toggle = (id) => setExpanded((prev) => ({...prev, [id]: !prev[id]}));
+
+    // Group: Company -> Port
+    const groups = useMemo(() => {
+        const byCompany = {};
+        (entries || []).forEach((a) => {
+            const companyName = a.company?.name || '— No Company —';
+            const portName = a.port?.name || '— No Port —';
+            if (!byCompany[companyName]) byCompany[companyName] = {ports: {}, summary: {qty: 0, fc: 0, inr: 0}};
+            if (!byCompany[companyName].ports[portName]) byCompany[companyName].ports[portName] = [];
+            byCompany[companyName].ports[portName].push(a);
+
+            const t = calcLineTotals(a.allotment_details || []);
+            byCompany[companyName].summary.qty += Number(a.required_quantity || 0);
+            byCompany[companyName].summary.fc += t.fc;
+            byCompany[companyName].summary.inr += t.inr;
+        });
+        return byCompany;
+    }, [entries]);
 
     return (
         <Container className="mt-4">
@@ -70,15 +99,7 @@ const AllotmentList = () => {
                         invoice: '',
                         estimated_arrival_date: '',
                         bl_detail: '',
-                        allotment_details: [
-                            {
-                                sr_number: null,
-                                qty: '',
-                                cif_fc: '',
-                                cif_inr: '',
-                                is_boe: false,
-                            },
-                        ],
+                        allotment_details: [{sr_number: null, qty: '', cif_fc: '', cif_inr: '', is_boe: false}],
                     })
                 }
             />
@@ -87,7 +108,7 @@ const AllotmentList = () => {
                 <Card className="mb-3 border-success">
                     <Card.Header className="bg-success text-white">New Allotment</Card.Header>
                     <Card.Body>
-                        <AllotmentForm
+                        <AllotmentCreateForm
                             entry={newEntry}
                             isNew
                             onClose={() => setNewEntry(null)}
@@ -100,105 +121,116 @@ const AllotmentList = () => {
                 </Card>
             )}
 
-            {entries.map((a) => (
-                <Card key={a.id} className="mb-3 shadow-sm">
-                    <Card.Header className="bg-white">
-                        <div
-                            className="d-flex align-items-center justify-content-between"
-                            onClick={() => toggle(a.id)}
-                            style={{cursor: 'pointer'}}
-                        >
-                            <div className="d-flex flex-wrap align-items-center">
-                                <HeaderField label="Company">{a.company?.name}</HeaderField>
-                                <HeaderField label="Item">{a.item_name}</HeaderField>
-                                <HeaderField label="Port">{a.port?.name || '-'}</HeaderField>
-                                <HeaderField label="Invoice">{a.invoice || '-'}</HeaderField>
-                                <HeaderField label="ETA">{a.estimated_arrival_date || '-'}</HeaderField>
-                            </div>
-                            <div className="text-end">
-                                <Badge bg={Number(a.balanced_quantity) > 0 ? 'warning' : 'success'} className="me-2">
-                                    Balance: {formatNumber(a.balanced_quantity)}
-                                </Badge>
-                                <Badge bg="info" className="me-2">
-                                    Allotted Qty: {formatNumber(a.alloted_quantity)}
-                                </Badge>
-                                <Badge bg="secondary">
-                                    Allotted $: {formatNumber(a.allotted_value)}
-                                </Badge>
-                            </div>
-                        </div>
-                    </Card.Header>
-                    <Collapse in={!!expanded[a.id]}>
-                        <Card.Body>
-                            <Row className="mb-3">
-                                <Col md={3}><strong>Required Qty:</strong> {formatNumber(a.required_quantity)}</Col>
-                                <Col md={3}><strong>Unit Value/Unit:</strong> {formatNumber(a.unit_value_per_unit)}
-                                </Col>
-                                <Col md={3}><strong>Required Value:</strong> {formatNumber(a.required_value)}</Col>
-                                <Col md={3}><strong>BL Detail:</strong> {a.bl_detail || '-'}</Col>
-                            </Row>
-                            <h6>Lines</h6>
-                            <Table bordered size="sm" responsive>
-                                <thead className="table-light">
-                                <tr>
-                                    <th>#</th>
-                                    <th>SR</th>
-                                    <th>Description</th>
-                                    <th>HS</th>
-                                    <th>Unit</th>
-                                    <th>Qty</th>
-                                    <th>CIF $</th>
-                                    <th>CIF ₹</th>
-                                    <th>License</th>
-                                    <th>Exporter</th>
-                                    <th>Port</th>
-                                </tr>
-                                </thead>
-                                <tbody>
-                                {(a.allotment_details || []).map((d, i) => (
-                                    <tr key={d.id || i}>
-                                        <td>{i + 1}</td>
-                                        <td>{d.serial_number}</td>
-                                        <td>{d.description}</td>
-                                        <td>{d.hs_code}</td>
-                                        <td>{d.unit}</td>
-                                        <td className="text-end">{formatNumber(d.qty)}</td>
-                                        <td className="text-end">{formatNumber(d.cif_fc)}</td>
-                                        <td className="text-end">{formatNumber(d.cif_inr)}</td>
-                                        <td>{d.license_number} | {d.license_date}</td>
-                                        <td>{d.exporter_name}</td>
-                                        <td>{d.port_name} ({d.port_code})</td>
-                                    </tr>
-                                ))}
-                                </tbody>
-                            </Table>
+            <Accordion alwaysOpen>
+                {Object.entries(groups)
+                    .sort(([a], [b]) => a.localeCompare(b))
+                    .map(([company, {ports, summary}], cIdx) => (
+                        <Accordion.Item eventKey={`company-${cIdx}`} key={company}
+                                        className="border border-primary mb-3">
+                            <Accordion.Header className="bg-light text-primary">
+                                <div className="w-100">
+                                    <div className="fw-bold fs-5 text-primary">🏢 {company}</div>
+                                    <div className="ms-2 small text-muted">
+                                        Total Required Qty: <span
+                                        className="badge bg-primary">{formatNumber(summary.qty)}</span>
+                                        {' '}| CIF $: <span className="badge bg-info">{formatNumber(summary.fc)}</span>
+                                        {' '}| INR ₹ <span
+                                        className="badge bg-success">{formatNumber(summary.inr)}</span>
+                                    </div>
+                                </div>
+                            </Accordion.Header>
 
-                            <div className="text-end">
-                                <button
-                                    className="btn btn-outline-primary btn-sm"
-                                    onClick={() => setExpanded((prev) => ({...prev, [a.id]: false}))}>
-                                    Close
-                                </button>
-                                <button
-                                    className="btn btn-primary btn-sm ms-2"
-                                    onClick={() => setExpanded((prev) => ({...prev, [a.id]: true}))}>
-                                    Expand
-                                </button>
-                            </div>
+                            <Accordion.Body className="bg-white">
+                                {Object.entries(ports)
+                                    .sort(([a], [b]) => a.localeCompare(b))
+                                    .map(([portName, list]) => (
+                                        <div key={`${company}-${portName}`} className="mb-4">
+                                            <div className="d-flex align-items-center mb-2">
+                                                <div className="fw-semibold">🛳 {portName}</div>
+                                                <div
+                                                    className="ms-2 text-muted small">({list.length} allotment{list.length > 1 ? 's' : ''})
+                                                </div>
+                                            </div>
 
-                            <hr className="my-3"/>
+                                            {list.map((a) => (
+                                                <Card key={a.id} className="mb-3 shadow-sm border border-secondary">
+                                                    <Card.Header className="bg-white border-bottom">
+                                                        <div
+                                                            className="d-flex flex-wrap align-items-center justify-content-between"
+                                                            onClick={() => toggle(a.id)}
+                                                            style={{cursor: 'pointer'}}
+                                                        >
+                                                            <div
+                                                                className="d-flex flex-wrap align-items-center small text-nowrap">
+                                                                <div className="me-3">
+                                                                    <strong>Item:</strong> {a.item_name}</div>
+                                                                <div className="me-3">
+                                                                    <strong>Invoice:</strong> {a.invoice || '-'}</div>
+                                                                <div className="me-3">
+                                                                    <strong>ETA:</strong> {a.estimated_arrival_date || '-'}
+                                                                </div>
+                                                                <div className="me-3">
+                                                                    <strong>BL:</strong> {a.bl_detail || '-'}</div>
+                                                            </div>
+                                                            <div className="text-end">
+                                                                <Badge
+                                                                    bg={Number(a.balanced_quantity) > 0 ? 'warning' : 'success'}
+                                                                    className="me-2">
+                                                                    Balance: {formatNumber(a.balanced_quantity)}
+                                                                </Badge>
+                                                                <Badge bg="info" className="me-2">
+                                                                    Allotted Qty: {formatNumber(a.alloted_quantity)}
+                                                                </Badge>
+                                                                <Badge bg="secondary">
+                                                                    Allotted $: {formatNumber(a.allotted_value)}
+                                                                </Badge>
+                                                            </div>
+                                                        </div>
+                                                    </Card.Header>
 
-                            <h6 className="mb-2">Edit</h6>
-                            <AllotmentForm
-                                entry={a}
-                                onSaved={() => {
-                                    updateSingleEntry(a.id);
-                                }}
-                            />
-                        </Card.Body>
-                    </Collapse>
-                </Card>
-            ))}
+                                                    <Collapse in={!!expanded[a.id]}>
+                                                        <Card.Body className="bg-white border-top-0">
+                                                            <Tabs
+                                                                activeKey={activeTab[a.id] || 'view'}
+                                                                onSelect={(k) => setActiveTab((prev) => ({
+                                                                    ...prev,
+                                                                    [a.id]: k
+                                                                }))}
+                                                                className="mb-3"
+                                                                justify
+                                                            >
+                                                                <Tab eventKey="view" title="📄 View">
+                                                                    <AllotmentViewPane entry={a}/>
+                                                                </Tab>
+
+                                                                <Tab eventKey="edit" title="✏️ Edit Main">
+                                                                    <AllotmentEditMainForm
+                                                                        entry={a}
+                                                                        onSaved={() => updateSingleEntry(a.id)}
+                                                                    />
+                                                                </Tab>
+
+                                                                <Tab eventKey="make" title="🧩 Make Allotment">
+                                                                    <AllotmentMakeForm
+                                                                        entry={a}
+                                                                        onSaved={() => updateSingleEntry(a.id)}
+                                                                    />
+                                                                </Tab>
+
+                                                                <Tab eventKey="tl" title="📑 TL as BOE">
+                                                                    <AllotmentTLTab entry={a}/>
+                                                                </Tab>
+                                                            </Tabs>
+                                                        </Card.Body>
+                                                    </Collapse>
+                                                </Card>
+                                            ))}
+                                        </div>
+                                    ))}
+                            </Accordion.Body>
+                        </Accordion.Item>
+                    ))}
+            </Accordion>
 
             <div ref={loadMoreRef} className="text-center my-4" style={{minHeight: '40px'}}>
                 {loading && <div className="spinner-border text-primary" role="status"/>}
