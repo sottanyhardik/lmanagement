@@ -1,4 +1,4 @@
-import React, {useMemo, useState} from 'react';
+import React, {useEffect, useMemo, useState} from 'react';
 import {Accordion, Badge, Card, Collapse, Container, Tab, Tabs,} from 'react-bootstrap';
 import ListControls from '../../components/ListControls';
 import AllotmentFilters from './AllotmentFilters';
@@ -47,8 +47,9 @@ const AllotmentList = () => {
         loadMoreRef,
     } = useAllotmentListManager();
 
-    const [expanded, setExpanded] = useState({});
-    const [activeTab, setActiveTab] = useState({});
+    const [expanded, setExpanded] = useState({});         // inner card collapses (per allotment id)
+    const [openCompanies, setOpenCompanies] = useState([]); // company accordion keys
+    const [activeTab, setActiveTab] = useState({});       // per allotment id
     const [newEntry, setNewEntry] = useState(null);
 
     const toggle = (id) => setExpanded((prev) => ({...prev, [id]: !prev[id]}));
@@ -71,6 +72,38 @@ const AllotmentList = () => {
         return byCompany;
     }, [entries]);
 
+    // Sorted companies (used for stable eventKey mapping)
+    const sortedCompanies = useMemo(
+        () => Object.keys(groups).sort((a, b) => a.localeCompare(b)),
+        [groups]
+    );
+
+    // Keep all allotment rows expanded by default whenever list changes
+    useEffect(() => {
+        const allOpen = {};
+        (entries || []).forEach((e) => {
+            allOpen[e.id] = true;
+        });
+        setExpanded(allOpen);
+    }, [entries]);
+
+    // Compute company eventKeys from the sorted order and open all by default
+    const companyKeys = useMemo(
+        () => sortedCompanies.map((_, idx) => `company-${idx}`),
+        [sortedCompanies]
+    );
+
+    useEffect(() => {
+        setOpenCompanies(companyKeys);
+    }, [companyKeys]);
+
+    const handleCompanyToggle = (ek) => {
+        if (ek == null) return;
+        setOpenCompanies((prev) =>
+            prev.includes(ek) ? prev.filter((k) => k !== ek) : [...prev, ek]
+        );
+    };
+
     return (
         <Container className="mt-4">
             <ListControls
@@ -90,7 +123,6 @@ const AllotmentList = () => {
                     setNewEntry({
                         company: null,
                         port: null,
-                        related_company: null,
                         required_quantity: '',
                         unit_value_per_unit: '',
                         item_name: '',
@@ -121,10 +153,12 @@ const AllotmentList = () => {
                 </Card>
             )}
 
-            <Accordion alwaysOpen>
-                {Object.entries(groups)
-                    .sort(([a], [b]) => a.localeCompare(b))
-                    .map(([company, {ports, summary}], cIdx) => (
+            <Accordion alwaysOpen activeKey={openCompanies} onSelect={handleCompanyToggle}>
+                {sortedCompanies.map((company, cIdx) => {
+                    const {ports, summary} = groups[company];
+                    const sortedPorts = Object.keys(ports).sort((a, b) => a.localeCompare(b));
+
+                    return (
                         <Accordion.Item eventKey={`company-${cIdx}`} key={company}
                                         className="border border-primary mb-3">
                             <Accordion.Header className="bg-light text-primary">
@@ -141,9 +175,9 @@ const AllotmentList = () => {
                             </Accordion.Header>
 
                             <Accordion.Body className="bg-white">
-                                {Object.entries(ports)
-                                    .sort(([a], [b]) => a.localeCompare(b))
-                                    .map(([portName, list]) => (
+                                {sortedPorts.map((portName) => {
+                                    const list = ports[portName] || [];
+                                    return (
                                         <div key={`${company}-${portName}`} className="mb-4">
                                             <div className="d-flex align-items-center mb-2">
                                                 <div className="fw-semibold">🛳 {portName}</div>
@@ -154,12 +188,11 @@ const AllotmentList = () => {
 
                                             {list.map((a) => (
                                                 <Card key={a.id} className="mb-3 shadow-sm border border-secondary">
-                                                    <Card.Header className="bg-white border-bottom">
+                                                    <Card.Header className="bg-white border-bottom"
+                                                                 onClick={() => toggle(a.id)}
+                                                                 style={{cursor: 'pointer'}}>
                                                         <div
-                                                            className="d-flex flex-wrap align-items-center justify-content-between"
-                                                            onClick={() => toggle(a.id)}
-                                                            style={{cursor: 'pointer'}}
-                                                        >
+                                                            className="d-flex flex-wrap align-items-center justify-content-between">
                                                             <div
                                                                 className="d-flex flex-wrap align-items-center small text-nowrap">
                                                                 <div className="me-3">
@@ -204,17 +237,13 @@ const AllotmentList = () => {
                                                                 </Tab>
 
                                                                 <Tab eventKey="edit" title="✏️ Edit Main">
-                                                                    <AllotmentEditMainForm
-                                                                        entry={a}
-                                                                        onSaved={() => updateSingleEntry(a.id)}
-                                                                    />
+                                                                    <AllotmentEditMainForm entry={a}
+                                                                                           onSaved={() => updateSingleEntry(a.id)}/>
                                                                 </Tab>
 
                                                                 <Tab eventKey="make" title="🧩 Make Allotment">
-                                                                    <AllotmentMakeForm
-                                                                        entry={a}
-                                                                        onSaved={() => updateSingleEntry(a.id)}
-                                                                    />
+                                                                    <AllotmentMakeForm entry={a}
+                                                                                       onSaved={() => updateSingleEntry(a.id)}/>
                                                                 </Tab>
 
                                                                 <Tab eventKey="tl" title="📑 TL as BOE">
@@ -226,10 +255,12 @@ const AllotmentList = () => {
                                                 </Card>
                                             ))}
                                         </div>
-                                    ))}
+                                    );
+                                })}
                             </Accordion.Body>
                         </Accordion.Item>
-                    ))}
+                    );
+                })}
             </Accordion>
 
             <div ref={loadMoreRef} className="text-center my-4" style={{minHeight: '40px'}}>

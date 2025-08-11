@@ -100,7 +100,6 @@ const AllotmentCreateForm = ({entry, isNew = false, onClose, onSaved}) => {
             const payload = {
                 company_id: data.company?.id,
                 port_id: data.port?.id || null,
-                related_company_id: data.related_company?.id || null,
                 required_quantity: Number(data.required_quantity) || 0,
                 unit_value_per_unit: Number(data.unit_value_per_unit) || 0,
                 item_name: data.item_name,
@@ -161,11 +160,6 @@ const AllotmentCreateForm = ({entry, isNew = false, onClose, onSaved}) => {
                 <Col md={4}>
                     <Form.Label>Port</Form.Label>
                     <AsyncPortSelect value={data.port ?? ''} onChange={(v) => handleChange('port', v)}/>
-                </Col>
-                <Col md={4}>
-                    <Form.Label>Related Company (optional)</Form.Label>
-                    <AsyncCompanySelect value={data.related_company ?? ''}
-                                        onChange={(v) => handleChange('related_company', v)}/>
                 </Col>
             </Row>
 

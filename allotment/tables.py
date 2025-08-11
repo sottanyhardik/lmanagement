@@ -2,8 +2,8 @@ import itertools
 
 import django_tables2 as dt2
 
-from license import models as license_model
 from allotment import models as allotment_model
+from license import models as license_model
 
 
 class AllotmentItemsTable(dt2.Table):
@@ -45,13 +45,13 @@ class AllotmentTable(dt2.Table):
     modified_on = dt2.DateTimeColumn(format='d-m-Y', verbose_name='Allotment Date')
     required_quantity = dt2.Column(verbose_name='Quantity')
     unit_value_per_unit = dt2.Column(verbose_name='Unit Price')
-    value = dt2.Column(verbose_name='Value', accessor='required_value')
+    value = dt2.Column(verbose_name='Value', accessor='required_cif_fc')
     license = dt2.Column(verbose_name='DFIA No', accessor='dfia_list')
 
     class Meta:
         model = allotment_model.AllotmentModel
         per_page = 50
-        fields = ['counter', 'type', 'modified_on', 'company', 'required_quantity', 'unit_value_per_unit','value',
+        fields = ['counter', 'type', 'modified_on', 'company', 'required_quantity', 'unit_value_per_unit', 'value',
                   'item_name', 'license', 'port', 'invoice', 'eta']
         attrs = {"class": "table table-bordered table-striped table-hover dataTable js-exportable dark-bg"}
 
@@ -84,7 +84,8 @@ class AllottedItemsTable(dt2.Table):
     class Meta:
         model = allotment_model.AllotmentItems
         per_page = 50
-        fields = ['counter', 'serial_number', 'license_number','file_number', 'license_date', 'exporter', 'license_expiry',
+        fields = ['counter', 'serial_number', 'license_number', 'file_number', 'license_date', 'exporter',
+                  'license_expiry',
                   'registration_number',
                   'registration_date', 'qty', 'cif_fc', 'notification_number']
         attrs = {"class": "table dataTable js-exportable"}

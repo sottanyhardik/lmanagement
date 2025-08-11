@@ -90,7 +90,7 @@ class AllotmentItemSerializer(serializers.ModelSerializer):
             "id",
             "item_id",  # write-only
             "item",  # read-only mini
-            "item_label",  # read-only label for UI
+            "item_label",
 
             "qty",
             "cif_fc",
@@ -166,14 +166,13 @@ class AllotmentItemSerializer(serializers.ModelSerializer):
 class AllotmentSerializer(serializers.ModelSerializer):
     """
     Serializer for AllotmentModel with nested details:
-      - company/port/related_company via *_id fields for write, mini serializers for read
+      - company/port via *_id fields for write, mini serializers for read
       - nested allotment_details upsert by id; deletes missing rows on update
       - exposes computed properties from the model
     """
     # Relations (read)
     company = CompanyMiniSerializer(read_only=True)
     port = PortMiniSerializer(read_only=True)
-    related_company = CompanyMiniSerializer(read_only=True)
 
     # Relations (write)
     company_id = serializers.PrimaryKeyRelatedField(
@@ -188,19 +187,12 @@ class AllotmentSerializer(serializers.ModelSerializer):
         required=False,
         allow_null=True,
     )
-    related_company_id = serializers.PrimaryKeyRelatedField(
-        queryset=CompanyModel.objects.all(),
-        source="related_company",
-        write_only=True,
-        required=False,
-        allow_null=True,
-    )
 
     # Nested
     allotment_details = AllotmentItemSerializer(many=True, required=False)
 
     # Computed from model (@cached_property)
-    required_value = serializers.IntegerField(read_only=True)
+    required_value = serializers.IntegerField(read_only=True)  # required_quantity * unit_value_per_unit
     dfia_list = serializers.CharField(read_only=True)
     balanced_quantity = serializers.IntegerField(read_only=True)
     alloted_quantity = serializers.IntegerField(read_only=True)  # model has one 't'
@@ -221,7 +213,9 @@ class AllotmentSerializer(serializers.ModelSerializer):
             "estimated_arrival_date",
             "bl_detail",
             "port", "port_id",
-            "related_company", "related_company_id",
+            "exchange_rate",
+            "required_cif_inr",
+            "required_cif_fc",
 
             # computed
             "required_value",
@@ -236,7 +230,6 @@ class AllotmentSerializer(serializers.ModelSerializer):
         read_only_fields = (
             "company",
             "port",
-            "related_company",
             "required_value",
             "dfia_list",
             "balanced_quantity",
@@ -246,16 +239,62 @@ class AllotmentSerializer(serializers.ModelSerializer):
 
     # ---- Parent-level validation ----
     def validate(self, attrs: Dict[str, Any]) -> Dict[str, Any]:
-        # Basic numeric guards
+        """
+        - Guard numeric fields
+        - Require exchange_rate > 0 when any required_cif_* is supplied (>0)
+        - Auto-sync CIF INR/$ if one is missing/zero (based on exchange_rate)
+        - Auto-compute unit_value_per_unit from CIF($)/required_quantity when possible
+        """
+        errors: Dict[str, Any] = {}
+
+        def to_float(v, default=None):
+            if v is None:
+                return default
+            try:
+                return float(v)
+            except (TypeError, ValueError):
+                return None
+
         rq = attrs.get("required_quantity", getattr(self.instance, "required_quantity", 0))
         uv = attrs.get("unit_value_per_unit", getattr(self.instance, "unit_value_per_unit", 0))
-        try:
-            if float(rq) < 0:
-                raise serializers.ValidationError({"required_quantity": "Must be ≥ 0."})
-            if float(uv) < 0:
-                raise serializers.ValidationError({"unit_value_per_unit": "Must be ≥ 0."})
-        except (TypeError, ValueError):
-            raise serializers.ValidationError({"_error": "Numeric fields contain invalid values."})
+        rate = attrs.get("exchange_rate", getattr(self.instance, "exchange_rate", 0))
+        cif_inr = attrs.get("required_cif_inr", getattr(self.instance, "required_cif_inr", 0))
+        cif_fc = attrs.get("required_cif_fc", getattr(self.instance, "required_cif_fc", 0))
+
+        rq_f = to_float(rq, 0)
+        uv_f = to_float(uv, 0)
+        rate_f = to_float(rate, 0)
+        cif_inr_f = to_float(cif_inr, 0)
+        cif_fc_f = to_float(cif_fc, 0)
+
+        # basic guards
+        if rq_f is None or rq_f < 0:
+            errors["required_quantity"] = "Must be ≥ 0."
+        if uv_f is None or uv_f < 0:
+            errors["unit_value_per_unit"] = "Must be ≥ 0."
+
+        # If either CIF is provided (non-zero), exchange rate must be > 0
+        if (cif_inr is not None and (cif_inr_f or 0) > 0) or (cif_fc is not None and (cif_fc_f or 0) > 0):
+            if rate_f is None or rate_f <= 0:
+                errors["exchange_rate"] = "Exchange rate (₹ per $) is required and must be > 0 when CIF is provided."
+
+        if errors:
+            raise serializers.ValidationError(errors)
+
+        # Auto-sync CIF INR/$ if one is missing/zero and the other provided
+        if rate_f and rate_f > 0:
+            if (cif_fc_f or 0) > 0 and (not cif_inr or (cif_inr_f or 0) == 0):
+                attrs["required_cif_inr"] = cif_fc_f * rate_f
+                cif_inr_f = attrs["required_cif_inr"]
+            elif (cif_inr_f or 0) > 0 and (not cif_fc or (cif_fc_f or 0) == 0):
+                attrs["required_cif_fc"] = cif_inr_f / rate_f
+                cif_fc_f = attrs["required_cif_fc"]
+
+        # Auto-compute unit_value_per_unit from CIF($) / required_quantity if possible
+        if rq_f and rq_f > 0 and (cif_fc_f or 0) > 0:
+            # Only override if caller didn't explicitly set a positive value
+            if "unit_value_per_unit" not in attrs or not uv_f:
+                attrs["unit_value_per_unit"] = cif_fc_f / rq_f
 
         # Duplicate item guard within payload (prevents unique_together errors)
         details = attrs.get("allotment_details", None)
@@ -344,4 +383,15 @@ class AllotmentOptionSerializer(serializers.ModelSerializer):
 
     class Meta:
         model = AllotmentModel
-        fields = ["id", "company", "port", "required_quantity", "invoice", "item_name", "item_details"]
+        fields = [
+            "id",
+            "company",
+            "port",
+            "required_quantity",
+            "invoice",
+            "item_name",
+            "exchange_rate",
+            "required_cif_inr",
+            "required_cif_fc",
+            "item_details",
+        ]

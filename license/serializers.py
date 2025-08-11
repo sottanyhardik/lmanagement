@@ -1,24 +1,32 @@
 from rest_framework import serializers
 
-from license.models import LicenseImportItemsModel
-
-
-class LicenseImportItemsSelectSerializer(serializers.ModelSerializer):
-    display_name = serializers.SerializerMethodField()
-
-    def get_display_name(self, obj):
-        return f"{obj.license.license_number} - {obj.serial_number}"
-
-    class Meta:
-        model = LicenseImportItemsModel
-        fields = ['id', 'display_name']
-
-
-from rest_framework import serializers
 from core.models import HSCodeModel, ItemNameModel, CompanyModel, PortModel, SionNormClassModel
 from core.serializers import HSCodeSerializer, ItemNameSerializer, CompanySerializer, PortSerializer, \
     SionNormClassSerializer
 from license.models import LicenseDetailsModel, LicenseExportItemModel, LicenseImportItemsModel
+
+
+class LicenseImportItemsSelectSerializer(serializers.ModelSerializer):
+    display_name = serializers.SerializerMethodField()
+    hs_code = serializers.CharField(source="hs_code.hs_code", read_only=True)
+    license_number = serializers.CharField(source="license.license_number", read_only=True)
+
+    class Meta:
+        model = LicenseImportItemsModel
+        fields = (
+            "id",
+            "display_name",
+            "serial_number",
+            "description",
+            "available_quantity",
+            "available_value",
+            "hs_code",
+            "license_number",
+        )
+
+    def get_display_name(self, obj):
+        parts = [f"LIC {obj.license.license_number}", f"SR {obj.serial_number}"]
+        return " • ".join(parts)
 
 
 class LicenseExportItemSerializer(serializers.ModelSerializer):

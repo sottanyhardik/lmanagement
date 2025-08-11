@@ -31,7 +31,7 @@
             </div>
             <div class="col-lg-1">
                 <label for="">Value:</label>
-                <p><b>{{ object.required_value|title }}</b></p>
+                <p><b>{{ object.required_cif_fc|title }}</b></p>
             </div>
             <div class="col-lg-1">
                 <label for="">Invoice:</label>
@@ -76,13 +76,13 @@
                    target="_blank">Download</a>
             </li>
             <li class="nav-item">
-                 <a class="nav-link" onclick="fetch_page(this)" data-toggle="pill" role="tab"
+                <a class="nav-link" onclick="fetch_page(this)" data-toggle="pill" role="tab"
                    aria-controls="pills-home" aria-selected="true" href="#div-{{ object.id }}"
                    data-url="{% url 'allotment-generate-aro' object.id %}"
                    data-target="div-{{ object.id }}">Generate Letters</a>
             </li>
             <li class="nav-item">
-                 <a class="nav-link" onclick="fetch_page(this)" data-toggle="pill" role="tab"
+                <a class="nav-link" onclick="fetch_page(this)" data-toggle="pill" role="tab"
                    aria-controls="pills-home" aria-selected="true" href="#div-{{ object.id }}"
                    data-url="{% url 'allotment-tl' object.id %}"
                    data-target="div-{{ object.id }}">Transfer Letter</a>

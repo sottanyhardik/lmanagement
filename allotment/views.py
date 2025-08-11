@@ -136,8 +136,8 @@ def allotment_data(request, pk):
     previous_allotment_cif_fc = previous_allotment_cif_fc - alloted_item_cif_fc
     new_allotment_quantity = previous_allotment_quantity + requested_allotment_quantity
     new_allotment_cif_fc = previous_allotment_cif_fc + requested_allotment_value
-    if round(allotment.required_value + 3, 2) < round(new_allotment_cif_fc, 2) or round(allotment.required_quantity,
-                                                                                        2) < round(
+    if round(allotment.required_cif_fc + 3, 2) < round(new_allotment_cif_fc, 2) or round(allotment.required_quantity,
+                                                                                         2) < round(
         new_allotment_quantity, 2):
         return JsonResponse({'message': 'Please Reduce Allotment Exceed Required',
                              'status': False}, safe=False)
@@ -238,7 +238,7 @@ class DownloadPendingAllotmentView(PDFTemplateResponseMixin, FilterView):
     def get_context_data(self, **kwargs):
         context = super().get_context_data(**kwargs)
         total = 0
-        total_list = [total + int(data.required_value) for data in self.get_queryset()]
+        total_list = [total + int(data.required_cif_fc) for data in self.get_queryset()]
         queryset = self.get_queryset().values('item_name').order_by('item_name').annotate(
             total_qty=Sum('required_quantity'), value=Sum(F('required_quantity') * F('unit_value_per_unit'))).distinct()
         context['queryset'] = queryset
@@ -400,7 +400,7 @@ class PandasDownloadPendingAllotmentView(PDFTemplateResponseMixin, FilterView):
     def get_context_data(self, **kwargs):
         context = super().get_context_data(**kwargs)
         total = 0
-        total_list = [total + int(data.required_value) for data in self.get_queryset()]
+        total_list = [total + int(data.required_cif_fc) for data in self.get_queryset()]
         queryset = self.get_queryset().values('item_name').order_by('item_name').annotate(
             total_qty=Sum('required_quantity'), value=Sum(F('required_quantity') * F('unit_value_per_unit'))).distinct()
         context['queryset'] = queryset
@@ -410,9 +410,9 @@ class PandasDownloadPendingAllotmentView(PDFTemplateResponseMixin, FilterView):
         df = pd.DataFrame(list(
             self.get_queryset().values('modified_on', 'port__code', 'required_quantity', 'unit_value_per_unit',
                                        'item_name', 'invoice', 'bl_detail', 'estimated_arrival_date')))
-        df = df.assign(required_value=round(df['required_quantity'] * df['unit_value_per_unit'], 2))
+        df = df.assign(required_cif_fc=round(df['required_quantity'] * df['unit_value_per_unit'], 2))
         context['df'] = df.groupby(['item_name']).agg(
-            {'required_quantity': 'sum', 'unit_value_per_unit': 'mean', 'required_value': 'sum'}).to_html(
+            {'required_quantity': 'sum', 'unit_value_per_unit': 'mean', 'required_cif_fc': 'sum'}).to_html(
             classes='table')
         return context
 

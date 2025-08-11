@@ -30,6 +30,9 @@ class AllotmentModel(AuditModel):
     type = models.CharField(max_length=2, choices=ROW_TYPE, default=ALLOTMENT)
     required_quantity = models.FloatField(default=0)
     unit_value_per_unit = models.FloatField(default=0)
+    exchange_rate = models.FloatField(default=0)  # INR per 1 $
+    required_cif_inr = models.FloatField(default=0)  # total CIF in INR
+    required_cif_fc = models.FloatField(default=0)
     item_name = models.CharField(max_length=255)
     contact_person = models.CharField(max_length=255, null=True, blank=True)
     contact_number = models.CharField(max_length=255, null=True, blank=True)
@@ -51,10 +54,6 @@ class AllotmentModel(AuditModel):
         else:
             return "{0} {1} {2}".format(self.item_name, self.company.name,
                                         str(self.required_quantity))
-
-    @cached_property
-    def required_value(self):
-        return round(self.required_quantity * self.unit_value_per_unit, 0)
 
     @cached_property
     def dfia_list(self):

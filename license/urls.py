@@ -5,13 +5,15 @@ from rest_framework.routers import DefaultRouter
 from . import views
 from .Export.item_excel import LicenseImportItemsXLSX
 from .Export.item_pdf import LicenseImportItemsUltraWidePDF
-from .api import LicenseImportItemsViewSet, LicenseDetailsViewSet
+from .api import LicenseImportItemsViewSet, LicenseDetailsViewSet, LicenseImportItemsSelectView
 
 router = DefaultRouter()
 router.register(r'license-import-items', LicenseImportItemsViewSet, basename='license-import-items')
 router.register(r'licenses', LicenseDetailsViewSet)
 
 urlpatterns = [
+    path("api/license-import-items/select/", LicenseImportItemsSelectView.as_view(),
+         name="license-import-items-select"),
     path('api/licenses/export/pdf/', LicenseImportItemsUltraWidePDF.as_view(), name='license-details-pdf'),
     path('api/licenses/export/excel/', LicenseImportItemsXLSX.as_view(), name="licenses-export-xlsx"),
     path('api/', include(router.urls)),

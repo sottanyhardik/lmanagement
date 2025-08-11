@@ -4,7 +4,7 @@ from django.db.models.functions import Coalesce
 from django.utils.timezone import now
 from django_filters import rest_framework as dj_filters
 from django_filters.rest_framework import DjangoFilterBackend
-from rest_framework import permissions, viewsets
+from rest_framework import permissions, viewsets, status
 from rest_framework.decorators import action
 from rest_framework.filters import SearchFilter, OrderingFilter
 from rest_framework.pagination import PageNumberPagination
@@ -69,7 +69,6 @@ class AllotmentFilter(dj_filters.FilterSet):
     # Simple id filters (support CSV lists)
     company = NumberInFilter(field_name="company_id", lookup_expr="in")
     port = NumberInFilter(field_name="port_id", lookup_expr="in")
-    related_company = NumberInFilter(field_name="related_company_id", lookup_expr="in")
 
     # Text filters
     invoice = dj_filters.CharFilter(field_name="invoice", lookup_expr="icontains")
@@ -103,7 +102,7 @@ class AllotmentFilter(dj_filters.FilterSet):
     class Meta:
         model = AllotmentModel
         fields = [
-            "company", "port", "related_company", "type", "type_in",
+            "company", "port", "type", "type_in",
             "invoice", "item_name", "date_from", "date_to",
             "has_balance", "item", "hs_code", "license_number", "exporter",
             "has_boe",
@@ -157,7 +156,6 @@ class AllotmentFilter(dj_filters.FilterSet):
                 | Q(contact_number__icontains=v)
                 | Q(bl_detail__icontains=v)
                 | Q(company__name__icontains=v)
-                | Q(related_company__name__icontains=v)
                 | Q(allotment_details__item__description__icontains=v)
                 | Q(allotment_details__item__hs_code__code__icontains=v)
                 | Q(allotment_details__item__license__license_number__icontains=v)
@@ -196,7 +194,6 @@ class AllotmentViewSet(viewsets.ModelViewSet):
         "contact_number",
         "bl_detail",
         "company__name",
-        "related_company__name",
         "allotment_details__item__description",
         "allotment_details__item__hs_code__code",
         "allotment_details__item__license__license_number",
@@ -223,7 +220,7 @@ class AllotmentViewSet(viewsets.ModelViewSet):
         """
         qs = (
             AllotmentModel.objects
-            .select_related("company", "port", "related_company")
+            .select_related("company", "port")
             .prefetch_related(
                 "allotment_details",
                 "allotment_details__item",
@@ -285,3 +282,28 @@ class AllotmentViewSet(viewsets.ModelViewSet):
                 "balanced_quantity": float(agg.get("total_balance") or 0),
             },
         })
+
+    @action(detail=True, methods=["post"], url_path="transfer-letter")
+    def transfer_letter(self, request, pk=None):
+        """
+        Expected payload:
+        {
+          "company": "...",
+          "company_address_line1": "...",
+          "company_address_line2": "...",
+          "tl_choice": "<template_id>",
+          "modified_items": [{ "id": .., "sr_number": "...", "cif_fc": 123.45 }, ...]
+        }
+        Return: { "url": "<download-url>" }
+        """
+        allotment = self.get_object()
+        data = request.data
+
+        # TODO: Hand off to your document generator using `allotment` + `data`
+        # url = generate_transfer_letter(allotment, data)
+        url = None  # set actual URL from your generator
+
+        if not url:
+            return Response({"detail": "Generator not implemented"}, status=status.HTTP_501_NOT_IMPLEMENTED)
+
+        return Response({"url": url})

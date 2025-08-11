@@ -16,7 +16,7 @@ const AllotmentViewPane = ({entry}) => {
             <Row className="mb-3 small">
                 <Col md={3}><strong>Required Qty:</strong> {fmt(entry?.required_quantity)}</Col>
                 <Col md={3}><strong>Unit Value/Unit:</strong> {fmt(entry?.unit_value_per_unit)}</Col>
-                <Col md={3}><strong>Required Value:</strong> {fmt(entry?.required_value)}</Col>
+                <Col md={3}><strong>Required Value:</strong> {fmt(entry?.required_cif_fc)}</Col>
             </Row>
 
             <div className="mb-2 small">

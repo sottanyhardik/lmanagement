@@ -20,9 +20,9 @@ def relative_url(value, field_name, urlencode=None):
 
 
 @register.simple_tag
-def calculate_required_value(quantity, unit_price):
+def calculate_required_cif_fc(quantity, unit_price):
     if quantity > 100:
-        value = round(quantity * unit_price,2)
+        value = round(quantity * unit_price, 2)
         return value
     else:
         return 0
@@ -33,4 +33,3 @@ def url_replace(context, **kwargs):
     query = context['request'].GET.copy()
     query.update(kwargs)
     return query.urlencode()
-

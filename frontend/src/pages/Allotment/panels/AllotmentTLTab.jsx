@@ -1,27 +1,28 @@
+// src/pages/Allotment/tabs/AllotmentTLTab.jsx
 import React from 'react';
 import TransferLetterForm from '../../BillOfEntry/TransferLetterForm';
 
 const AllotmentTLTab = ({entry}) => {
-    // Build a minimal BOE-like object expected by your TL form
-    const boeLike = {
-        company: entry?.company || null,
-        port: entry?.port || null,
-    };
-
+    // Hand entity as-is; TL form will read company/port/id from here
     const prefill = {
-        items: (entry?.allotment_details || []).map((d) => ({
-            sr_number: d.item
-                ? {value: d.item.id, label: d.item.display_name}
-                : {value: null, label: `${d.license_number} - ${d.serial_number}`},
-            qty: d.qty || 0,
-            cif_fc: d.cif_fc || 0,
-            cif_inr: d.cif_inr || 0,
+        items: (entry?.allotment_details || []).map((d, idx) => ({
+            id: d.id || idx,
+            // Use the nice display name if present, fall back to license + SR
+            sr_number:
+                d?.item?.display_name ||
+                `${d.license_number || ''} - S${d.serial_number || ''}`.trim(),
+            cif_fc: Number(d.cif_fc || 0),
         })),
     };
 
     return (
         <div className="border rounded p-3 bg-light">
-            <TransferLetterForm boe={boeLike} prefill={prefill}/>
+            <TransferLetterForm
+                context="allotment"
+                entity={entry}      // <-- the whole allotment
+                prefill={prefill}   // <-- rows for quick edit
+                autoDownload        // optional: auto open download if API returns url
+            />
         </div>
     );
 };

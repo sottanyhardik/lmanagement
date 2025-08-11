@@ -1,9 +1,17 @@
 from django.db.models import Q
 from rest_framework import filters
 from rest_framework import viewsets
+from rest_framework.generics import ListAPIView
+from rest_framework.pagination import PageNumberPagination
 
 from .models import LicenseImportItemsModel
 from .serializers import LicenseImportItemsSelectSerializer
+
+
+class SmallPagination(PageNumberPagination):
+    page_size = 25
+    page_size_query_param = "page_size"
+    max_page_size = 100
 
 
 class LicenseImportItemsViewSet(viewsets.ReadOnlyModelViewSet):
@@ -73,3 +81,67 @@ class LicenseDetailsViewSet(viewsets.ModelViewSet):
     # ✅ Optional: Enable ordering
     ordering_fields = ['license_date', 'license_expiry_date', 'modified_on']
     ordering = ['-modified_on']  # Default order
+
+
+class LicenseImportItemsSelectView(ListAPIView):
+    """
+    GET /api/license-import-items/select/?q=&license_number=&sion_norms=&description=&hs_code=
+        &notification_number=&expired=(true|false)&is_null=(true|false)
+    """
+    serializer_class = LicenseImportItemsSelectSerializer
+    pagination_class = SmallPagination
+
+    def get_queryset(self):
+        p = self.request.query_params
+        qs = (
+            LicenseImportItemsModel.objects
+            .select_related("license", "hs_code")
+            .all()
+        )
+
+        q = (p.get("q") or "").strip()
+        if q:
+            q_filter = (
+                    Q(license__license_number__icontains=q) |
+                    Q(description__icontains=q) |
+                    Q(hs_code__hs_code__icontains=q)
+            )
+            if q.isdigit():
+                q_filter = q_filter | Q(serial_number=int(q))
+            qs = qs.filter(q_filter)
+
+        lic_no = (p.get("license_number") or "").strip()
+        if lic_no:
+            qs = qs.filter(license__license_number__icontains=lic_no)
+
+        sion = (p.get("sion_norms") or "").strip()
+        if sion:
+            # through export items' norm class on the same license
+            qs = qs.filter(license__export_license__norm_class__norm_class__icontains=sion)
+
+        desc = (p.get("description") or "").strip()
+        if desc:
+            qs = qs.filter(description__icontains=desc)
+
+        hs = (p.get("hs_code") or "").strip()
+        if hs:
+            qs = qs.filter(hs_code__hs_code__icontains=hs)
+
+        notif = (p.get("notification_number") or "").strip()
+        if notif:
+            qs = qs.filter(license__notification_number__icontains=notif)
+
+        expired = p.get("expired")
+        if expired in ("true", "false"):
+            qs = qs.filter(license__is_expired=(expired == False))
+
+        is_null = p.get("is_null")
+        if is_null in ("true", "false"):
+            qs = qs.filter(license__is_null=(is_null == False))
+
+        # distinct() is needed because of the join via export_license for sion_norms
+        return qs.distinct().order_by(
+            "license__license_expiry_date",
+            "license__license_number",
+            "serial_number"
+        )
