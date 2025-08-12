@@ -386,7 +386,7 @@ class AllotmentViewSet(viewsets.ModelViewSet):
                 final_cif = lim_val
             else:
                 # even floor(q*price) doesn't fit -> reduce quantity to fit lim_val
-                q_fit_by_val = floor_int(lim_val / unit_price)
+                q_fit_by_val = ceil_int(lim_val / unit_price)
                 final_qty = max(Decimal("0"), min(final_qty, q_fit_by_val, rem_qty, avail_qty))
                 if final_qty <= 0:
                     return Response({"detail": "Insufficient remaining value to allot any quantity."},

@@ -64,25 +64,61 @@ const AllotmentList = () => {
 
     const toggle = (id) => setExpanded((prev) => ({...prev, [id]: !prev[id]}));
 
-    // Group: Company -> Port
+    // ---------- Group: Company -> Product (product_name) -> Port Code ----------
     const groups = useMemo(() => {
         const byCompany = {};
         (entries || []).forEach((a) => {
             const companyName = a.company?.name || '— No Company —';
-            const portName = a.port?.name || '— No Port —';
-            if (!byCompany[companyName]) byCompany[companyName] = {ports: {}, summary: {qty: 0, fc: 0, inr: 0}};
-            if (!byCompany[companyName].ports[portName]) byCompany[companyName].ports[portName] = [];
-            byCompany[companyName].ports[portName].push(a);
+            const productName = a.product_name || a.item_name || '— No Product —';
+            const portCode = a.port?.code || '— No Port —';
 
+            if (!byCompany[companyName]) {
+                byCompany[companyName] = {
+                    products: {}, // product -> { ports, summary }
+                    summary: {reqQty: 0, fc: 0, inr: 0},
+                };
+            }
+
+            if (!byCompany[companyName].products[productName]) {
+                byCompany[companyName].products[productName] = {
+                    ports: {}, // portCode -> { entries, summary }
+                    summary: {reqQty: 0, fc: 0, inr: 0},
+                };
+            }
+
+            if (!byCompany[companyName].products[productName].ports[portCode]) {
+                byCompany[companyName].products[productName].ports[portCode] = {
+                    entries: [],
+                    summary: {reqQty: 0, fc: 0, inr: 0},
+                };
+            }
+
+            // push entry
+            byCompany[companyName].products[productName].ports[portCode].entries.push(a);
+
+            // roll-ups
             const t = calcLineTotals(a.allotment_details || []);
-            byCompany[companyName].summary.qty += Number(a.required_quantity || 0);
+            const reqQty = Number(a.required_quantity || 0);
+
+            byCompany[companyName].summary.reqQty += reqQty;
             byCompany[companyName].summary.fc += t.fc;
             byCompany[companyName].summary.inr += t.inr;
+
+            byCompany[companyName].products[productName].summary.reqQty += reqQty;
+            byCompany[companyName].products[productName].summary.fc += t.fc;
+            byCompany[companyName].products[productName].summary.inr += t.inr;
+
+            byCompany[companyName].products[productName].ports[portCode].summary.reqQty += reqQty;
+            byCompany[companyName].products[productName].ports[portCode].summary.fc += t.fc;
+            byCompany[companyName].products[productName].ports[portCode].summary.inr += t.inr;
         });
         return byCompany;
     }, [entries]);
 
-    const sortedCompanies = useMemo(() => Object.keys(groups).sort((a, b) => a.localeCompare(b)), [groups]);
+    const sortedCompanies = useMemo(
+        () => Object.keys(groups).sort((a, b) => a.localeCompare(b)),
+        [groups]
+    );
 
     // Expand all allotment cards by default when entries change
     useEffect(() => {
@@ -158,8 +194,8 @@ const AllotmentList = () => {
 
             <Accordion alwaysOpen activeKey={openCompanies} onSelect={handleCompanyToggle}>
                 {sortedCompanies.map((company, cIdx) => {
-                    const {ports, summary} = groups[company];
-                    const sortedPorts = Object.keys(ports).sort((a, b) => a.localeCompare(b));
+                    const {products, summary} = groups[company];
+                    const sortedProducts = Object.keys(products).sort((a, b) => a.localeCompare(b));
 
                     return (
                         <Accordion.Item eventKey={`company-${cIdx}`} key={company}
@@ -169,7 +205,7 @@ const AllotmentList = () => {
                                     <div className="fw-bold fs-5 text-primary">🏢 {company}</div>
                                     <div className="ms-2 small text-muted">
                                         Total Required Qty:{' '}
-                                        <span className="badge bg-primary">{formatNumber(summary.qty)}</span> | CIF
+                                        <span className="badge bg-primary">{formatNumber(summary.reqQty)}</span> | CIF
                                         $:{' '}
                                         <span className="badge bg-info">{formatNumber(summary.fc)}</span> | INR ₹{' '}
                                         <span className="badge bg-success">{formatNumber(summary.inr)}</span>
@@ -178,100 +214,146 @@ const AllotmentList = () => {
                             </Accordion.Header>
 
                             <Accordion.Body className="bg-white">
-                                {sortedPorts.map((portName) => {
-                                    const list = ports[portName] || [];
+                                {sortedProducts.map((productName) => {
+                                    const {ports, summary: pSum} = products[productName];
+                                    const sortedPorts = Object.keys(ports).sort((a, b) => a.localeCompare(b));
+
                                     return (
-                                        <div key={`${company}-${portName}`} className="mb-4">
-                                            <div className="d-flex align-items-center mb-2">
-                                                <div className="fw-semibold">🛳 {portName}</div>
-                                                <div className="ms-2 text-muted small">
-                                                    ({list.length} allotment{list.length > 1 ? 's' : ''})
+                                        <div key={`${company}-${productName}`}
+                                             className="mb-4 p-3 border rounded bg-light-subtle">
+                                            <div className="d-flex align-items-center justify-content-between mb-2">
+                                                <div className="fw-semibold text-info">
+                                                    📦 Product:&nbsp;<span className="text-dark">{productName}</span>
+                                                </div>
+                                                <div className="small text-muted">
+                                                    Required Qty:{' '}
+                                                    <span
+                                                        className="badge bg-primary">{formatNumber(pSum.reqQty)}</span> |
+                                                    CIF $:{' '}
+                                                    <span className="badge bg-info">{formatNumber(pSum.fc)}</span> | INR
+                                                    ₹{' '}
+                                                    <span className="badge bg-success">{formatNumber(pSum.inr)}</span>
                                                 </div>
                                             </div>
 
-                                            {list.map((a) => (
-                                                <Card key={a.id} className="mb-3 shadow-sm border border-secondary">
-                                                    <Card.Header
-                                                        className="bg-white border-bottom"
-                                                        onClick={() => toggle(a.id)}
-                                                        style={{cursor: 'pointer'}}
-                                                    >
+                                            {sortedPorts.map((portCode) => {
+                                                const {entries: list, summary: portSum} = ports[portCode];
+
+                                                return (
+                                                    <div key={`${company}-${productName}-${portCode}`} className="mb-4">
                                                         <div
-                                                            className="d-flex flex-wrap align-items-center justify-content-between">
-                                                            <div
-                                                                className="d-flex flex-wrap align-items-center small text-nowrap">
-                                                                <div className="me-3">
-                                                                    <strong>Item:</strong> {a.item_name}
-                                                                </div>
-                                                                <div className="me-3">
-                                                                    <strong>Invoice:</strong> {a.invoice || '-'}
-                                                                </div>
-                                                                <div className="me-3">
-                                                                    <strong>ETA:</strong> {a.estimated_arrival_date || '-'}
-                                                                </div>
-                                                                <div className="me-3">
-                                                                    <strong>BL:</strong> {a.bl_detail || '-'}
-                                                                </div>
-                                                            </div>
-                                                            <div className="text-end">
+                                                            className="d-flex align-items-center justify-content-between mb-2">
+                                                            <div className="fw-semibold">🛳 Port: {portCode}</div>
+                                                            <div className="text-muted small">
+                                                                ({list.length} allotment{list.length > 1 ? 's' : ''}) &nbsp;•&nbsp; Required
+                                                                Qty:{' '}
                                                                 <Badge
-                                                                    bg={Number(a.balanced_quantity) > 0 ? 'warning' : 'success'}
-                                                                    className="me-2"
-                                                                >
-                                                                    Balance: {formatNumber(a.balanced_quantity)}
-                                                                </Badge>
-                                                                <Badge bg="info" className="me-2">
-                                                                    Allotted Qty: {formatNumber(a.alloted_quantity)}
-                                                                </Badge>
-                                                                <Badge bg="secondary">Allotted
-                                                                    $: {formatNumber(a.allotted_value)}</Badge>
+                                                                    bg="primary">{formatNumber(portSum.reqQty)}</Badge> &nbsp;•&nbsp; CIF
+                                                                $:{' '}
+                                                                <Badge
+                                                                    bg="info">{formatNumber(portSum.fc)}</Badge> &nbsp;•&nbsp; INR
+                                                                ₹{' '}
+                                                                <Badge bg="success">{formatNumber(portSum.inr)}</Badge>
                                                             </div>
                                                         </div>
-                                                    </Card.Header>
 
-                                                    <Collapse in={!!expanded[a.id]}>
-                                                        <Card.Body className="bg-white border-top-0">
-                                                            <Tabs
-                                                                activeKey={activeTab[a.id] || 'view'}
-                                                                onSelect={(k) => setActiveTab((prev) => ({
-                                                                    ...prev,
-                                                                    [a.id]: k
-                                                                }))}
-                                                                className="mb-3"
-                                                                justify
-                                                                mountOnEnter           // ⬅️ mount tab content only when opened
-                                                                unmountOnExit={false}  // ⬅️ keep it mounted after first open
-                                                            >
-                                                                <Tab eventKey="view" title="📄 View">
-                                                                    <Suspense fallback={<Fallback/>}>
-                                                                        <AllotmentViewPane entry={a}/>
-                                                                    </Suspense>
-                                                                </Tab>
+                                                        {list.map((a) => (
+                                                            <Card key={a.id}
+                                                                  className="mb-3 shadow-sm border border-secondary">
+                                                                <Card.Header
+                                                                    className="bg-white border-bottom"
+                                                                    onClick={() => toggle(a.id)}
+                                                                    style={{cursor: 'pointer'}}
+                                                                >
+                                                                    <div
+                                                                        className="d-flex flex-wrap align-items-center justify-content-between">
+                                                                        <div
+                                                                            className="d-flex flex-wrap align-items-center small text-nowrap">
+                                                                            <div className="me-3">
+                                                                                <strong>Item:</strong> {a.item_name || '-'}
+                                                                            </div>
+                                                                            <div className="me-3">
+                                                                                <strong>Invoice:</strong> {a.invoice || '-'}
+                                                                            </div>
+                                                                            <div className="me-3">
+                                                                                <strong>ETA:</strong> {a.estimated_arrival_date || '-'}
+                                                                            </div>
+                                                                            <div className="me-3">
+                                                                                <strong>BL:</strong> {a.bl_detail || '-'}
+                                                                            </div>
+                                                                        </div>
+                                                                        <div className="text-end">
+                                                                            <Badge
+                                                                                bg={Number(a.balanced_quantity) > 0 ? 'warning' : 'success'}
+                                                                                className="me-2"
+                                                                            >
+                                                                                Balance: {formatNumber(a.balanced_quantity)}
+                                                                            </Badge>
+                                                                            <Badge bg="info" className="me-2">
+                                                                                Allotted
+                                                                                Qty: {formatNumber(a.alloted_quantity)}
+                                                                            </Badge>
+                                                                            <Badge bg="secondary">
+                                                                                Allotted
+                                                                                $: {formatNumber(a.allotted_value)}
+                                                                            </Badge>
+                                                                        </div>
+                                                                    </div>
+                                                                </Card.Header>
 
-                                                                <Tab eventKey="edit" title="✏️ Edit Main">
-                                                                    <Suspense fallback={<Fallback/>}>
-                                                                        <AllotmentEditMainForm entry={a}
-                                                                                               onSaved={() => updateSingleEntry(a.id)}/>
-                                                                    </Suspense>
-                                                                </Tab>
+                                                                <Collapse in={!!expanded[a.id]}>
+                                                                    <Card.Body className="bg-white border-top-0">
+                                                                        <Tabs
+                                                                            activeKey={activeTab[a.id] || 'view'}
+                                                                            onSelect={(k) =>
+                                                                                setActiveTab((prev) => ({
+                                                                                    ...prev,
+                                                                                    [a.id]: k,
+                                                                                }))
+                                                                            }
+                                                                            className="mb-3"
+                                                                            justify
+                                                                            mountOnEnter
+                                                                            unmountOnExit={false}
+                                                                        >
+                                                                            <Tab eventKey="view" title="📄 View">
+                                                                                <Suspense fallback={<Fallback/>}>
+                                                                                    <AllotmentViewPane entry={a}/>
+                                                                                </Suspense>
+                                                                            </Tab>
 
-                                                                <Tab eventKey="make" title="🧩 Make Allotment">
-                                                                    <Suspense fallback={<Fallback/>}>
-                                                                        <AllotmentMakeForm entry={a}
-                                                                                           onSaved={() => updateSingleEntry(a.id)}/>
-                                                                    </Suspense>
-                                                                </Tab>
+                                                                            <Tab eventKey="edit" title="✏️ Edit Main">
+                                                                                <Suspense fallback={<Fallback/>}>
+                                                                                    <AllotmentEditMainForm
+                                                                                        entry={a}
+                                                                                        onSaved={() => updateSingleEntry(a.id)}
+                                                                                    />
+                                                                                </Suspense>
+                                                                            </Tab>
 
-                                                                <Tab eventKey="tl" title="📑 TL as BOE">
-                                                                    <Suspense fallback={<Fallback/>}>
-                                                                        <AllotmentTLTab entry={a}/>
-                                                                    </Suspense>
-                                                                </Tab>
-                                                            </Tabs>
-                                                        </Card.Body>
-                                                    </Collapse>
-                                                </Card>
-                                            ))}
+                                                                            <Tab eventKey="make"
+                                                                                 title="🧩 Make Allotment">
+                                                                                <Suspense fallback={<Fallback/>}>
+                                                                                    <AllotmentMakeForm
+                                                                                        entry={a}
+                                                                                        onSaved={() => updateSingleEntry(a.id)}
+                                                                                    />
+                                                                                </Suspense>
+                                                                            </Tab>
+
+                                                                            <Tab eventKey="tl" title="📑 Generate TL">
+                                                                                <Suspense fallback={<Fallback/>}>
+                                                                                    <AllotmentTLTab entry={a}/>
+                                                                                </Suspense>
+                                                                            </Tab>
+                                                                        </Tabs>
+                                                                    </Card.Body>
+                                                                </Collapse>
+                                                            </Card>
+                                                        ))}
+                                                    </div>
+                                                );
+                                            })}
                                         </div>
                                     );
                                 })}

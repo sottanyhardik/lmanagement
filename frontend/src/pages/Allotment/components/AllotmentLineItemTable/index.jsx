@@ -262,10 +262,7 @@ const AllotmentLineItemTable = ({
         val = round2(val);
 
         if (qty <= 0 || val <= 0) return toast.warn('Allotment after constraints is zero.');
-
-        const confirmMsg = `Allot ${qty} units (${fmt(val)} $) from:\n\n${resRow.display_name}\n\nProceed?`;
-        if (!window.confirm(confirmMsg)) return;
-
+        
         try {
             setPosting((p) => ({...p, [id]: true}));
             await axios.post(ADD_DETAIL_URL(allotmentId), {
