@@ -373,7 +373,7 @@ class AllotmentViewSet(viewsets.ModelViewSet):
             return Response({"detail": "No quantity can be allotted."}, status=status.HTTP_400_BAD_REQUEST)
 
         # value limit available to spend on this line
-        lim_val = min(rem_val, avail_val)
+        lim_val = min(rem_val, avail_val, cif_in)
 
         if unit_price > 0:
             needed_cif = ceil_int(final_qty * unit_price)  # preferred (round up)

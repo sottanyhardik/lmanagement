@@ -94,10 +94,11 @@ const GroupedAccordion = ({
                                                      style={{cursor: 'pointer', flex: 1}}>
                                                     <Row
                                                         className="gx-3 flex-nowrap overflow-auto align-items-center small text-nowrap">
-                                                        <Col className="flex-shrink-0"><strong className="text-primary">BOE
+                                                        <Col aria-colspan={1} className="flex-shrink-0"><strong
+                                                            className="text-primary">BOE
                                                             #{entry.bill_of_entry_number}</strong></Col>
-                                                        <Col
-                                                            className="flex-shrink-0">Date: {entry.bill_of_entry_date}</Col>
+                                                        <Col aria-colspan={1}
+                                                             className="flex-shrink-0">Date: {entry.bill_of_entry_date}</Col>
                                                         <Col
                                                             className="flex-shrink-0">Product: {entry.product_name}</Col>
                                                         <Col
@@ -106,10 +107,10 @@ const GroupedAccordion = ({
                                                             $: {formatNumber(entry.get_total_fc)}</Col>
                                                         <Col className="flex-shrink-0">Exc
                                                             Rt: {formatNumber(entry.exchange_rate)}</Col>
-                                                        <Col
-                                                            className="flex-shrink-0">Invoice: {entry.invoice_no || '-'}</Col>
                                                         <Col className="flex-shrink-0 text-end text-success">INR
                                                             ₹{formatNumber(entry.get_total_inr)}</Col>
+                                                        <Col
+                                                            className="flex-shrink-0">Invoice: {entry.invoice_no || '-'}</Col>
                                                     </Row>
                                                 </div>
                                             </Card.Header>

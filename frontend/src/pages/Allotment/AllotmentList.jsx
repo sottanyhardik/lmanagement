@@ -7,7 +7,7 @@ import useAllotmentListManager from '../../hooks/Allotment/useAllotmentListManag
 import './AllotmentList.css';
 
 // Lazy tabs & forms — chunks load only when first rendered
-const AllotmentCreateForm = lazy(() => import('./forms/AllotmentCreateForm'));
+const AllotmentCreateForm = lazy(() => import('./forms/./AllotmentWizard'));
 const AllotmentEditMainForm = lazy(() => import('./forms/AllotmentEditMainForm'));
 const AllotmentMakeForm = lazy(() => import('./forms/AllotmentMakeForm'));
 const AllotmentViewPane = lazy(() => import('./panels/AllotmentViewPane'));

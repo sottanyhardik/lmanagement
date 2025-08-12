@@ -129,7 +129,7 @@ const AllotmentLineItemTable = ({
 
             const byValueQty = Number.isFinite(availVal) && availVal > 0 ? roundQty(availVal / price) : Infinity;
 
-            const remainingValue = reqVal > 0 ? Math.max(0, reqVal - totals.value) : Infinity;
+            const remainingValue = reqVal > 0 ? Math.max(0, reqVal - totals.value + 10) : Infinity;
             const byRemainingValueQty =
                 Number.isFinite(remainingValue) && remainingValue > 0 ? roundQty(remainingValue / price) : Infinity;
 
@@ -227,7 +227,7 @@ const AllotmentLineItemTable = ({
 
         // Cap by value => recalc qty (floor)
         if (price > 0) {
-            const qtyFromVal = roundQty(val / price);
+            const qtyFromVal = round2(val / price);
             qty = qty > 0 ? Math.min(qty, qtyFromVal) : qtyFromVal;
         }
 

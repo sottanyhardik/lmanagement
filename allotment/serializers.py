@@ -219,7 +219,6 @@ class AllotmentSerializer(serializers.ModelSerializer):
         fields = (
             "id",
             "company", "company_id",
-            "type",
             "required_quantity",
             "unit_value_per_unit",
             "item_name",
