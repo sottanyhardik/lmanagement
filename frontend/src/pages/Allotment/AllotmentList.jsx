@@ -1,14 +1,24 @@
-import React, {useEffect, useMemo, useState} from 'react';
-import {Accordion, Badge, Card, Collapse, Container, Tab, Tabs,} from 'react-bootstrap';
+// src/pages/Allotment/AllotmentList.jsx
+import React, {lazy, Suspense, useEffect, useMemo, useState} from 'react';
+import {Accordion, Badge, Card, Collapse, Container, Tab, Tabs} from 'react-bootstrap';
 import ListControls from '../../components/ListControls';
 import AllotmentFilters from './AllotmentFilters';
 import useAllotmentListManager from '../../hooks/Allotment/useAllotmentListManager';
-import AllotmentCreateForm from './forms/AllotmentCreateForm';
-import AllotmentEditMainForm from './forms/AllotmentEditMainForm';
-import AllotmentMakeForm from './forms/AllotmentMakeForm';
-import AllotmentViewPane from './panels/AllotmentViewPane';
-import AllotmentTLTab from './panels/AllotmentTLTab';
 import './AllotmentList.css';
+
+// Lazy tabs & forms — chunks load only when first rendered
+const AllotmentCreateForm = lazy(() => import('./forms/AllotmentCreateForm'));
+const AllotmentEditMainForm = lazy(() => import('./forms/AllotmentEditMainForm'));
+const AllotmentMakeForm = lazy(() => import('./forms/AllotmentMakeForm'));
+const AllotmentViewPane = lazy(() => import('./panels/AllotmentViewPane'));
+const AllotmentTLTab = lazy(() => import('./panels/AllotmentTLTab'));
+
+const Fallback = () => (
+    <div className="py-3 text-center text-muted">
+        <span className="spinner-border spinner-border-sm me-2" role="status" aria-hidden="true"/>
+        Loading…
+    </div>
+);
 
 const formatNumber = (val) => {
     if (val === null || val === undefined) return '-';
@@ -47,9 +57,9 @@ const AllotmentList = () => {
         loadMoreRef,
     } = useAllotmentListManager();
 
-    const [expanded, setExpanded] = useState({});         // inner card collapses (per allotment id)
-    const [openCompanies, setOpenCompanies] = useState([]); // company accordion keys
-    const [activeTab, setActiveTab] = useState({});       // per allotment id
+    const [expanded, setExpanded] = useState({});           // per allotment id
+    const [openCompanies, setOpenCompanies] = useState([]); // accordion keys
+    const [activeTab, setActiveTab] = useState({});         // per allotment id
     const [newEntry, setNewEntry] = useState(null);
 
     const toggle = (id) => setExpanded((prev) => ({...prev, [id]: !prev[id]}));
@@ -72,13 +82,9 @@ const AllotmentList = () => {
         return byCompany;
     }, [entries]);
 
-    // Sorted companies (used for stable eventKey mapping)
-    const sortedCompanies = useMemo(
-        () => Object.keys(groups).sort((a, b) => a.localeCompare(b)),
-        [groups]
-    );
+    const sortedCompanies = useMemo(() => Object.keys(groups).sort((a, b) => a.localeCompare(b)), [groups]);
 
-    // Keep all allotment rows expanded by default whenever list changes
+    // Expand all allotment cards by default when entries change
     useEffect(() => {
         const allOpen = {};
         (entries || []).forEach((e) => {
@@ -87,11 +93,8 @@ const AllotmentList = () => {
         setExpanded(allOpen);
     }, [entries]);
 
-    // Compute company eventKeys from the sorted order and open all by default
-    const companyKeys = useMemo(
-        () => sortedCompanies.map((_, idx) => `company-${idx}`),
-        [sortedCompanies]
-    );
+    // Accordion event keys & open all companies by default
+    const companyKeys = useMemo(() => sortedCompanies.map((_, idx) => `company-${idx}`), [sortedCompanies]);
 
     useEffect(() => {
         setOpenCompanies(companyKeys);
@@ -99,9 +102,7 @@ const AllotmentList = () => {
 
     const handleCompanyToggle = (ek) => {
         if (ek == null) return;
-        setOpenCompanies((prev) =>
-            prev.includes(ek) ? prev.filter((k) => k !== ek) : [...prev, ek]
-        );
+        setOpenCompanies((prev) => (prev.includes(ek) ? prev.filter((k) => k !== ek) : [...prev, ek]));
     };
 
     return (
@@ -140,15 +141,17 @@ const AllotmentList = () => {
                 <Card className="mb-3 border-success">
                     <Card.Header className="bg-success text-white">New Allotment</Card.Header>
                     <Card.Body>
-                        <AllotmentCreateForm
-                            entry={newEntry}
-                            isNew
-                            onClose={() => setNewEntry(null)}
-                            onSaved={() => {
-                                setNewEntry(null);
-                                fetchData();
-                            }}
-                        />
+                        <Suspense fallback={<Fallback/>}>
+                            <AllotmentCreateForm
+                                entry={newEntry}
+                                isNew
+                                onClose={() => setNewEntry(null)}
+                                onSaved={() => {
+                                    setNewEntry(null);
+                                    fetchData();
+                                }}
+                            />
+                        </Suspense>
                     </Card.Body>
                 </Card>
             )}
@@ -165,11 +168,11 @@ const AllotmentList = () => {
                                 <div className="w-100">
                                     <div className="fw-bold fs-5 text-primary">🏢 {company}</div>
                                     <div className="ms-2 small text-muted">
-                                        Total Required Qty: <span
-                                        className="badge bg-primary">{formatNumber(summary.qty)}</span>
-                                        {' '}| CIF $: <span className="badge bg-info">{formatNumber(summary.fc)}</span>
-                                        {' '}| INR ₹ <span
-                                        className="badge bg-success">{formatNumber(summary.inr)}</span>
+                                        Total Required Qty:{' '}
+                                        <span className="badge bg-primary">{formatNumber(summary.qty)}</span> | CIF
+                                        $:{' '}
+                                        <span className="badge bg-info">{formatNumber(summary.fc)}</span> | INR ₹{' '}
+                                        <span className="badge bg-success">{formatNumber(summary.inr)}</span>
                                     </div>
                                 </div>
                             </Accordion.Header>
@@ -181,42 +184,47 @@ const AllotmentList = () => {
                                         <div key={`${company}-${portName}`} className="mb-4">
                                             <div className="d-flex align-items-center mb-2">
                                                 <div className="fw-semibold">🛳 {portName}</div>
-                                                <div
-                                                    className="ms-2 text-muted small">({list.length} allotment{list.length > 1 ? 's' : ''})
+                                                <div className="ms-2 text-muted small">
+                                                    ({list.length} allotment{list.length > 1 ? 's' : ''})
                                                 </div>
                                             </div>
 
                                             {list.map((a) => (
                                                 <Card key={a.id} className="mb-3 shadow-sm border border-secondary">
-                                                    <Card.Header className="bg-white border-bottom"
-                                                                 onClick={() => toggle(a.id)}
-                                                                 style={{cursor: 'pointer'}}>
+                                                    <Card.Header
+                                                        className="bg-white border-bottom"
+                                                        onClick={() => toggle(a.id)}
+                                                        style={{cursor: 'pointer'}}
+                                                    >
                                                         <div
                                                             className="d-flex flex-wrap align-items-center justify-content-between">
                                                             <div
                                                                 className="d-flex flex-wrap align-items-center small text-nowrap">
                                                                 <div className="me-3">
-                                                                    <strong>Item:</strong> {a.item_name}</div>
+                                                                    <strong>Item:</strong> {a.item_name}
+                                                                </div>
                                                                 <div className="me-3">
-                                                                    <strong>Invoice:</strong> {a.invoice || '-'}</div>
+                                                                    <strong>Invoice:</strong> {a.invoice || '-'}
+                                                                </div>
                                                                 <div className="me-3">
                                                                     <strong>ETA:</strong> {a.estimated_arrival_date || '-'}
                                                                 </div>
                                                                 <div className="me-3">
-                                                                    <strong>BL:</strong> {a.bl_detail || '-'}</div>
+                                                                    <strong>BL:</strong> {a.bl_detail || '-'}
+                                                                </div>
                                                             </div>
                                                             <div className="text-end">
                                                                 <Badge
                                                                     bg={Number(a.balanced_quantity) > 0 ? 'warning' : 'success'}
-                                                                    className="me-2">
+                                                                    className="me-2"
+                                                                >
                                                                     Balance: {formatNumber(a.balanced_quantity)}
                                                                 </Badge>
                                                                 <Badge bg="info" className="me-2">
                                                                     Allotted Qty: {formatNumber(a.alloted_quantity)}
                                                                 </Badge>
-                                                                <Badge bg="secondary">
-                                                                    Allotted $: {formatNumber(a.allotted_value)}
-                                                                </Badge>
+                                                                <Badge bg="secondary">Allotted
+                                                                    $: {formatNumber(a.allotted_value)}</Badge>
                                                             </div>
                                                         </div>
                                                     </Card.Header>
@@ -231,23 +239,33 @@ const AllotmentList = () => {
                                                                 }))}
                                                                 className="mb-3"
                                                                 justify
+                                                                mountOnEnter           // ⬅️ mount tab content only when opened
+                                                                unmountOnExit={false}  // ⬅️ keep it mounted after first open
                                                             >
                                                                 <Tab eventKey="view" title="📄 View">
-                                                                    <AllotmentViewPane entry={a}/>
+                                                                    <Suspense fallback={<Fallback/>}>
+                                                                        <AllotmentViewPane entry={a}/>
+                                                                    </Suspense>
                                                                 </Tab>
 
                                                                 <Tab eventKey="edit" title="✏️ Edit Main">
-                                                                    <AllotmentEditMainForm entry={a}
-                                                                                           onSaved={() => updateSingleEntry(a.id)}/>
+                                                                    <Suspense fallback={<Fallback/>}>
+                                                                        <AllotmentEditMainForm entry={a}
+                                                                                               onSaved={() => updateSingleEntry(a.id)}/>
+                                                                    </Suspense>
                                                                 </Tab>
 
                                                                 <Tab eventKey="make" title="🧩 Make Allotment">
-                                                                    <AllotmentMakeForm entry={a}
-                                                                                       onSaved={() => updateSingleEntry(a.id)}/>
+                                                                    <Suspense fallback={<Fallback/>}>
+                                                                        <AllotmentMakeForm entry={a}
+                                                                                           onSaved={() => updateSingleEntry(a.id)}/>
+                                                                    </Suspense>
                                                                 </Tab>
 
                                                                 <Tab eventKey="tl" title="📑 TL as BOE">
-                                                                    <AllotmentTLTab entry={a}/>
+                                                                    <Suspense fallback={<Fallback/>}>
+                                                                        <AllotmentTLTab entry={a}/>
+                                                                    </Suspense>
                                                                 </Tab>
                                                             </Tabs>
                                                         </Card.Body>

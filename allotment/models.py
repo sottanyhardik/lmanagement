@@ -167,4 +167,4 @@ def update_stock(sender, instance, **kwargs):
 def delete_stock(sender, instance, *args, **kwargs):
     item = instance.item
     from bill_of_entry.tasks import update_balance_values_task
-    update_balance_values_task.delay(item.id)
+    update_balance_values_task(item.id)

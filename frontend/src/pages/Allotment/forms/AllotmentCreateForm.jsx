@@ -4,7 +4,7 @@ import AsyncCompanySelect from '../../../components/AsyncCompanySelect.jsx';
 import AsyncPortSelect from '../../../components/AsyncPortSelect.jsx';
 import axios from '../../../api/axiosInstance.js';
 import {toast} from 'react-toastify';
-import AllotmentLineItemTable from '../parts/AllotmentLineItemTable';
+import AllotmentLineItemTable from '../components/AllotmentLineItemTable';
 
 const AllotmentCreateForm = ({entry, isNew = false, onClose, onSaved}) => {
     const normalizeEntry = useCallback((e) => {

@@ -2,7 +2,7 @@ import React from 'react';
 import AsyncSelect from 'react-select/async';
 import axios from '../api/axiosInstance.js';
 
-const AsyncHeadNormSelect = ({value, onChange}) => {
+const AsyncNormSelect = ({value, onChange}) => {
     const loadOptions = async (inputValue) => {
         const res = await axios.get(`api/sion-classes/?search=${inputValue}`);
         return res.data.results.map((head) => ({
@@ -29,4 +29,4 @@ const AsyncHeadNormSelect = ({value, onChange}) => {
     );
 };
 
-export default AsyncHeadNormSelect;
+export default AsyncNormSelect;

@@ -10,6 +10,7 @@ class LicenseImportItemsSelectSerializer(serializers.ModelSerializer):
     display_name = serializers.SerializerMethodField()
     hs_code = serializers.CharField(source="hs_code.hs_code", read_only=True)
     license_number = serializers.CharField(source="license.license_number", read_only=True)
+    notification_number = serializers.CharField(source="license.notification_number", read_only=True)
 
     class Meta:
         model = LicenseImportItemsModel
@@ -22,6 +23,7 @@ class LicenseImportItemsSelectSerializer(serializers.ModelSerializer):
             "available_value",
             "hs_code",
             "license_number",
+            "notification_number",
         )
 
     def get_display_name(self, obj):
