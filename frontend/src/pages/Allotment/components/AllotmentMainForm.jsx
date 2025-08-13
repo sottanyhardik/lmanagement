@@ -2,8 +2,8 @@ import React, {useCallback, useMemo, useState} from "react";
 import {Button, Col, Form, Row, Spinner} from "react-bootstrap";
 import axios from "../../../api/axiosInstance";
 import {toast} from "react-toastify";
-import AsyncCompanySelect from "../../../components/AsyncCompanySelect.jsx";
-import AsyncPortSelect from "../../../components/AsyncPortSelect.jsx";
+import AsyncCompanySelect from "../../../components/AsyncSelect/AsyncCompanySelect.jsx";
+import AsyncPortSelect from "../../../components/AsyncSelect/AsyncPortSelect.jsx";
 
 const toNum = (v) => {
     const n = typeof v === "number" ? v : parseFloat(v);

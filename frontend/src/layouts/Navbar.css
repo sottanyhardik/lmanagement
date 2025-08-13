@@ -1,6 +1,14 @@
-/* Navbar Theme Overrides (based on index.css variables) */
+/* Theme fallbacks */
+:root {
+    --primary-color: #0d6efd;
+    --primary-text: #212529;
+    --text-light: #f8f9fa;
+    --bg-dark: #0b1220;
+    --dropdown-bg: #ffffff;
+    --on-primary: #ffffff; /* text color on primary bg */
+}
 
-/* Navbar background */
+/* Navbar shell */
 .navbar-custom {
     background-color: var(--primary-color) !important;
 }
@@ -12,18 +20,18 @@
 }
 
 .dashboard-logo-text {
-    font-weight: bold;
+    font-weight: 700;
     font-size: 1.1rem;
     line-height: 1.2;
     color: var(--bg-dark);
 }
 
-/* User section */
+/* Account name */
 .user-name {
     color: var(--text-light);
 }
 
-/* Logout button */
+/* Logout button (if used elsewhere) */
 .logout-btn {
     border-color: var(--text-light);
     color: var(--text-light);
@@ -34,16 +42,49 @@
     color: var(--primary-color) !important;
 }
 
-/* Base dropdown menu */
+/* Dropdown base */
 .dropdown-menu {
     background-color: var(--dropdown-bg);
     border: none;
     border-radius: 8px;
     min-width: 180px;
-    box-shadow: 0 8px 16px rgba(0, 0, 0, 0.15);
+    box-shadow: 0 8px 16px rgba(0, 0, 0, .15);
+    z-index: 1056; /* above navbar */
 }
 
-/* Nested submenu support */
+/* Items */
+.dropdown-item {
+    color: var(--primary-color);
+    font-weight: 500;
+    display: flex;
+    align-items: center;
+    gap: .6rem;
+    padding: .5rem 1rem;
+    background: transparent;
+}
+
+/* Hover/Focus */
+.dropdown-item:hover,
+.dropdown-item:focus {
+    background-color: rgba(13, 110, 253, .1); /* subtle */
+    color: var(--primary-color);
+    outline: none;
+}
+
+/* Active (Bootstrap override) */
+.dropdown-item.active,
+.dropdown-item:active {
+    background-color: var(--primary-color) !important;
+    color: var(--on-primary) !important;
+    font-weight: 600;
+}
+
+/* Hide Bootstrap caret on toggles; we draw our own for submenu */
+.dropdown-toggle::after {
+    display: none !important;
+}
+
+/* Submenu (desktop hover, mobile click) */
 .dropdown-submenu {
     position: relative;
 }
@@ -53,80 +94,48 @@
     position: absolute;
     left: 100%;
     top: 0;
-    margin-top: 0;
-    background-color: var(--dropdown-bg);
+    margin-left: .25rem;
 }
 
 .dropdown-submenu:hover > .dropdown-menu {
     display: block;
 }
 
-.dropdown-submenu > .dropdown-item {
-    display: flex;
-    justify-content: space-between;
-    align-items: center;
-}
-
-.dropdown-submenu > .dropdown-item::after {
+.dropdown-submenu > .dropdown-item.dropdown-toggle::after {
     content: '▸';
+    margin-left: auto;
     color: var(--primary-color);
-    font-weight: bold;
+    font-weight: 700;
 }
 
-/* Dropdown item base */
-.dropdown-item {
-    color: var(--primary-color);
-    font-weight: 500;
-    display: flex;
-    align-items: center;
-    gap: 0.6rem;
-    padding: 0.5rem 1rem;
-    background-color: transparent;
-}
-
-/* Hover & focus */
-.dropdown-item:hover,
-.dropdown-item:focus {
-    background-color: rgba(225, 97, 35, 0.1);
-    outline: 1px solid var(--primary-color);
-    color: var(--text-light) !important;
-}
-
-/* Fix bootstrap blue active state */
-
-/* Icons in menu */
+/* Icon sizing */
 .dropdown-item svg {
     font-size: 1rem;
     flex-shrink: 0;
 }
 
-.dropdown-item:hover,
-.dropdown-item:focus {
-    background-color: var(--primary-color);
-    color: var(--primary-color) !important;
-}
-
-/* Hide dropdown toggle arrow */
-.dropdown-toggle::after {
-    display: none !important;
-}
-
-/* Mobile tweaks */
+/* Mobile */
 @media (max-width: 768px) {
     .navbar .nav-link span {
         display: none;
+    }
+
+    .dropdown-submenu > .dropdown-menu {
+        position: static;
+        margin-left: 0;
+        display: block; /* let BS handle show/hide via JS toggle */
     }
 
     .user-dropdown {
         position: static !important;
         transform: none !important;
         box-shadow: none;
-        background: var(--bg-dark);
+        background: var(--dropdown-bg);
         width: 100%;
     }
 }
 
-/* List item resets */
+/* Remove list markers if any reset fights us */
 .navbar .nav-item,
 .navbar .dropdown,
 .navbar .dropdown-menu li {
@@ -138,12 +147,4 @@
 .navbar .nav-item::before,
 .navbar .dropdown li::before {
     content: none !important;
-}
-
-.dropdown-item.active,
-.dropdown-item:active {
-    background-color: var(--primary-color) !important;
-    color: var(--primary-text) !important;
-    font-weight: bold;
-    text-underline-offset: 0.2rem;
 }

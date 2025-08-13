@@ -1,4 +1,5 @@
-import {useCallback, useEffect, useState} from 'react';
+// src/hooks/License/useLicenseListManager.js
+import {useCallback, useEffect, useMemo, useRef, useState} from 'react';
 import {useInView} from 'react-intersection-observer';
 import axios from '../../api/axiosInstance';
 import {toast} from 'react-toastify';
@@ -24,7 +25,21 @@ export const sortOptions = [
     {label: 'Expiry Date ⬆️', value: 'license_expiry_date:asc'},
 ];
 
-const useLicenseListManager = (apiUrl = '/api/licenses/') => {
+const ensureSlash = (s) => (s.endsWith('/') ? s : `${s}/`);
+const nextPageFromUrl = (u) => {
+    if (!u) return null;
+    try {
+        const url = u.startsWith('http') ? new URL(u) : new URL(u, window.location.origin);
+        const p = url.searchParams.get('page');
+        return p ? parseInt(p, 10) : null;
+    } catch {
+        return null;
+    }
+};
+
+const useLicenseListManager = (apiUrl = 'licenses/') => {
+    const base = useMemo(() => ensureSlash(apiUrl || 'licenses/'), [apiUrl]);
+
     const [entries, setEntries] = useState([]);
     const [expanded, setExpanded] = useState({});
     const [loading, setLoading] = useState(false);
@@ -39,6 +54,7 @@ const useLicenseListManager = (apiUrl = '/api/licenses/') => {
     const [triggeredByFilter, setTriggeredByFilter] = useState(false);
     const [filters, setFilters] = useState(DEFAULT_FILTERS);
     const [selectedIds, setSelectedIds] = useState([]);
+    const [nextUrl, setNextUrl] = useState(null);
 
     const {ref: loadMoreRef, inView} = useInView();
 
@@ -53,87 +69,111 @@ const useLicenseListManager = (apiUrl = '/api/licenses/') => {
         setSortOrder,
     });
 
-    const fetchData = useCallback(async () => {
-        if (loading) return;
-        setLoading(true);
-        try {
-            const params = {
-                page,
-                search: searchQuery,
-                ordering: sortField && sortOrder ? `${sortOrder === 'desc' ? '-' : ''}${sortField}` : '',
-                ...(filters.exporter_objs.length > 0 && {
-                    exporter__in: filters.exporter_objs.map(c => c.id).join(','),
-                }),
-                ...(filters.port_objs.length > 0 && {
-                    port__in: filters.port_objs.map(p => p.id).join(','),
-                }),
-                ...(filters.from_date && {from_date: filters.from_date}),
-                ...(filters.to_date && {to_date: filters.to_date}),
-                ...(filters.expired_only && {expired_only: true}),
-            };
+    // request race guards
+    const abortRef = useRef(null);
+    const seqRef = useRef(0);
 
-            const res = await axios.get(apiUrl, {params});
-            const newEntries = res.data.results;
-            const hasNextPage = res.data.next !== null;
-
-            setEntries(prev => {
-                if (page === 1) return newEntries;
-                const combined = [...prev, ...newEntries];
-                const uniqueEntries = Array.from(new Map(combined.map(e => [e.id, e])).values());
-                return uniqueEntries;
-            });
-            setHasMore(hasNextPage);
-        } catch (err) {
-            if (err?.response?.status === 404) {
-                setHasMore(false);                 // stop infinite scroll
-                if (page !== 1) setPage(1);         // reset to page 1 safely
-                // Optional UX: inform user when first page also 404s
-                if (page === 1) {
-                    setEntries([]);                 // clear list if needed
-                    toast.info('No data found for the current filters.');
-                }
-            } else {
-                console.error(err);
-                toast.error('Failed to fetch License data');
-            }
-        } finally {
-            setLoading(false);
-        }
+    const buildParams = useCallback(() => {
+        const params = {
+            page,
+            search: searchQuery || undefined,
+            ordering: sortField && sortOrder ? `${sortOrder === 'desc' ? '-' : ''}${sortField}` : '',
+            ...(filters.exporter_objs.length > 0 && {
+                exporter__in: filters.exporter_objs.map((c) => c.id).join(','),
+            }),
+            ...(filters.port_objs.length > 0 && {
+                port__in: filters.port_objs.map((p) => p.id).join(','),
+            }),
+            ...(filters.from_date && {from_date: filters.from_date}),
+            ...(filters.to_date && {to_date: filters.to_date}),
+            ...(filters.expired_only && {expired_only: true}),
+        };
+        return params;
     }, [page, searchQuery, sortField, sortOrder, filters]);
 
+    const fetchData = useCallback(
+        async (append = false, pageOverride = null) => {
+            if (loading && append) return; // avoid double fetch while scrolling
+
+            abortRef.current?.abort();
+            const seq = ++seqRef.current;
+            const ctrl = new AbortController();
+            abortRef.current = ctrl;
+
+            setLoading(true);
+            try {
+                const res = await axios.get(base, {
+                    params: pageOverride ? {...buildParams(), page: pageOverride} : buildParams(),
+                    signal: ctrl.signal,
+                });
+
+                if (seq !== seqRef.current) return; // stale response
+
+                const data = res.data || {};
+                const results = Array.isArray(data.results) ? data.results : [];
+                setEntries((prev) => {
+                    if (!append || pageOverride === 1) return results;
+                    const combined = [...prev, ...results];
+                    return Array.from(new Map(combined.map((e) => [e.id, e])).values());
+                });
+                setHasMore(Boolean(data.next));
+                setNextUrl(data.next || null);
+            } catch (err) {
+                if (err?.name === 'CanceledError' || err?.code === 'ERR_CANCELED') return;
+                if (err?.response?.status === 404) {
+                    setHasMore(false);
+                    if (page !== 1) setPage(1);
+                    if (page === 1) {
+                        setEntries([]);
+                        toast.info('No data found for the current filters.');
+                    }
+                } else {
+                    console.error(err);
+                    toast.error('Failed to fetch License data');
+                }
+            } finally {
+                if (seq === seqRef.current) setLoading(false);
+            }
+        },
+        [base, buildParams, loading, page]
+    );
+
+    // reset when query/sort/filters change
     useEffect(() => {
         setEntries([]);
         setPage(1);
         setHasMore(true);
+        setNextUrl(null);
         setTriggeredByFilter(true);
-        setRefreshKey(prev => prev + 1);
+        setRefreshKey((k) => k + 1);
+        return () => abortRef.current?.abort();
     }, [searchQuery, sortField, sortOrder, filters]);
 
-    useEffect(() => {
-        fetchData();
-    }, [page]);
-
+    // fetch first page after reset
     useEffect(() => {
         if (triggeredByFilter) {
-            fetchData().then(() => setTriggeredByFilter(false));
+            fetchData(false, 1).then(() => setTriggeredByFilter(false));
         }
-    }, [refreshKey]);
+    }, [refreshKey, triggeredByFilter, fetchData]);
 
+    // fetch when page increments (append mode)
     useEffect(() => {
-        const delay = 200;
-        let timeout;
-        if (inView && hasMore && !loading && !triggeredByFilter) {
-            timeout = setTimeout(() => {
-                setPage(prev => prev + 1);
-            }, delay);
-        }
-        return () => clearTimeout(timeout);
-    }, [inView, hasMore, loading, triggeredByFilter]);
+        if (page > 1) fetchData(true, page);
+    }, [page, fetchData]);
+
+    // infinite scroll
+    useEffect(() => {
+        if (!inView || !hasMore || loading || triggeredByFilter) return;
+        const np = nextPageFromUrl(nextUrl) ?? page + 1;
+        if (Number.isFinite(np)) setPage(np);
+    }, [inView, hasMore, loading, triggeredByFilter, nextUrl, page]);
 
     const updateSingleEntry = async (id) => {
+        const targetId = typeof id === 'object' ? id?.id : id;
+        if (!targetId) return;
         try {
-            const {data} = await axios.get(`${apiUrl}${id}/`);
-            setEntries(prev => prev.map(e => e.id === id ? data : e));
+            const {data} = await axios.get(`${base}${targetId}/`);
+            setEntries((prev) => prev.map((e) => (e.id === targetId ? data : e)));
         } catch (err) {
             toast.error('Failed to fetch license entry');
             console.error(err);
@@ -141,16 +181,12 @@ const useLicenseListManager = (apiUrl = '/api/licenses/') => {
     };
 
     const toggleSelect = (id) => {
-        setSelectedIds(prev =>
-            prev.includes(id) ? prev.filter(i => i !== id) : [...prev, id]
-        );
+        setSelectedIds((prev) => (prev.includes(id) ? prev.filter((i) => i !== id) : [...prev, id]));
     };
 
     const toggleSelectAll = (ids) => {
-        const allSelected = ids.every(id => selectedIds.includes(id));
-        setSelectedIds(prev =>
-            allSelected ? prev.filter(id => !ids.includes(id)) : [...new Set([...prev, ...ids])]
-        );
+        const allSel = ids.every((id) => selectedIds.includes(id));
+        setSelectedIds((prev) => (allSel ? prev.filter((id) => !ids.includes(id)) : [...new Set([...prev, ...ids])]));
     };
 
     const clearSelection = () => setSelectedIds([]);
@@ -159,34 +195,36 @@ const useLicenseListManager = (apiUrl = '/api/licenses/') => {
         setSearchQuery('');
         setSortField(DEFAULT_SORT_FIELD);
         setSortOrder(DEFAULT_SORT_ORDER);
-        setFilters(DEFAULT_FILTERS);
+        setFilters({...DEFAULT_FILTERS, exporter_objs: [], port_objs: []}); // fresh arrays
         setPage(1);
         setEntries([]);
         setHasMore(true);
+        setNextUrl(null);
         clearSelection();
     };
 
     const buildExportParams = () => {
         const params = new URLSearchParams({
-            search: searchQuery,
+            search: searchQuery || '',
             ordering: sortField && sortOrder ? `${sortOrder === 'desc' ? '-' : ''}${sortField}` : '',
-            ...(filters.exporter_objs.length > 0 && {
-                exporter__in: filters.exporter_objs.map(c => c.id).join(','),
-            }),
-            ...(filters.port_objs.length > 0 && {
-                port__in: filters.port_objs.map(p => p.id).join(','),
-            }),
-            ...(filters.from_date && {from_date: filters.from_date}),
-            ...(filters.to_date && {to_date: filters.to_date}),
-            ...(filters.expired_only && {expired_only: 'true'}),
         });
+
+        if (filters.exporter_objs.length) {
+            params.set('exporter__in', filters.exporter_objs.map((c) => c.id).join(','));
+        }
+        if (filters.port_objs.length) {
+            params.set('port__in', filters.port_objs.map((p) => p.id).join(','));
+        }
+        if (filters.from_date) params.set('from_date', filters.from_date);
+        if (filters.to_date) params.set('to_date', filters.to_date);
+        if (filters.expired_only) params.set('expired_only', 'true');
 
         return params.toString();
     };
 
     const handleExportXLSX = async () => {
         try {
-            const res = await axios.get(`${apiUrl}export-excel/?${buildExportParams()}`, {
+            const res = await axios.get(`${base}export-excel/?${buildExportParams()}`, {
                 responseType: 'blob',
             });
             const blob = new Blob([res.data], {
@@ -209,7 +247,7 @@ const useLicenseListManager = (apiUrl = '/api/licenses/') => {
     const handleExportPDF = async () => {
         try {
             toast.info('Downloading PDF...');
-            const res = await axios.get(`${apiUrl}export/pdf/?${buildExportParams()}`, {
+            const res = await axios.get(`${base}export/pdf/?${buildExportParams()}`, {
                 responseType: 'blob',
             });
             const blob = new Blob([res.data], {type: 'application/pdf'});

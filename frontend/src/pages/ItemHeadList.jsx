@@ -1,25 +1,43 @@
+// src/pages/ItemHeadList.jsx
 import React from 'react';
 import GenericList from '../layouts/GenericList';
 
 const validateItemHead = (item) => {
     const errors = {};
-    if (!item.name?.trim()) errors.name = 'Name is required';
-    if (item.unit_rate < 0) errors.unit_rate = 'Unit rate cannot be negative';
+    const name = item.name?.trim();
+    const unitRate = Number(item.unit_rate);
+
+    if (!name) errors.name = 'Name is required';
+    if (!Number.isFinite(unitRate) || unitRate < 0) {
+        errors.unit_rate = 'Unit rate must be a non-negative number';
+    }
     return errors;
 };
 
 const fields = [
     {name: 'name', label: 'Name'},
+    {name: 'unit_rate', label: 'Unit Rate'},
     {name: 'is_restricted', label: 'Restricted?'},
     {name: 'dict_key', label: 'Dict Key'},
 ];
 
 const renderInput = {
+    unit_rate: (val, onChange) => (
+        <input
+            type="number"
+            className="form-control form-control-sm"
+            value={val ?? ''}
+            min={0}
+            step="0.01"
+            onChange={(e) => onChange(e.target.value)}
+            placeholder="0.00"
+        />
+    ),
     is_restricted: (val, onChange) => (
         <input
             type="checkbox"
             className="form-check-input"
-            checked={val}
+            checked={!!val}
             onChange={(e) => onChange(e.target.checked)}
         />
     ),
@@ -36,16 +54,16 @@ const initialItem = {
     dict_key: '',
 };
 
-const ItemHeadList = () => (
-    <GenericList
-        resource="api/item-heads"
-        title="📋 Item Heads"
-        fields={fields}
-        validateItem={validateItemHead}
-        initialItem={initialItem}
-        renderInput={renderInput}
-        renderField={renderField}
-    />
-);
-
-export default ItemHeadList;
+export default function ItemHeadList() {
+    return (
+        <GenericList
+            resource="item-heads"           // ✅ no /api prefix
+            title="📋 Item Heads"
+            fields={fields}
+            validateItem={validateItemHead}
+            initialItem={initialItem}
+            renderInput={renderInput}
+            renderField={renderField}
+        />
+    );
+}

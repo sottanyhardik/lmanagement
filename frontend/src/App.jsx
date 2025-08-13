@@ -1,13 +1,13 @@
 import React, {useContext} from 'react';
 import {Navigate, Route, Routes} from 'react-router-dom';
+
 import MainLayout from './layouts/MainLayout';
 import LoginForm from './pages/Login/LoginForm';
 import ForgotPassword from './pages/Login/ForgotPassword';
 import ResetPassword from './pages/Login/ResetPassword';
 import Dashboard from './pages/Dashboard/Dashboard';
-import PrivateRoute from './routes/PrivateRoute';
 import Logout from './pages/Login/Logout.jsx';
-import EditUser from './pages/User/EditUser';
+import UserList from './pages/User/UserList.jsx';
 import ProfilePage from './pages/User/ProfilePage';
 import CompanyList from './pages/CompanyList';
 import PortList from './pages/PortList';
@@ -15,147 +15,80 @@ import ItemNameList from './pages/ItemNameList';
 import ItemHeadList from './pages/ItemHeadList';
 import HSCodeList from './pages/HSCodeList';
 import SionNormList from './pages/Sion/SionNormList';
-import BillOfEntryList from './pages/BillOfEntry/BillOfEntryList'
+import BillOfEntryList from './pages/BillOfEntry/BillOfEntryList';
 import LicenseList from './pages/License/LicenseList';
 import IcegateCaptchaForm from './pages/IcegateCaptchaForm.jsx';
 import LedgerUpload from './pages/LedgerUpload.jsx';
-import AuthContext from '../src/context/AuthContext';
+import AllotmentList from './pages/Allotment/AllotmentList';
+
+import PrivateRoute from './routes/PrivateRoute';
+import AuthContext from './context/AuthContext';
+
 import {ToastContainer} from 'react-toastify';
 import 'react-toastify/dist/ReactToastify.css';
-import AllotmentList from "./pages/Allotment/AllotmentList";
-
-
-// import UserList from './components/User/UserList';
 
 function App() {
-    const {user} = useContext(AuthContext);
+    const {isAuthenticated} = useContext(AuthContext);
 
     return (
         <>
             <Routes>
-                <Route path="/" element={
-                    user ? <Navigate to="/dashboard" replace/> : <Navigate to="/login" replace/>
-                }/>
+                {/* Root redirect based on auth */}
+                <Route
+                    path="/"
+                    element={
+                        isAuthenticated
+                            ? <Navigate to="/dashboard" replace/>
+                            : <Navigate to="/login" replace/>
+                    }
+                />
+
+                {/* Public auth routes */}
                 <Route path="/login" element={<LoginForm/>}/>
                 <Route path="/forgot-password" element={<ForgotPassword/>}/>
                 <Route path="/reset/:uid/:token" element={<ResetPassword/>}/>
-                <Route element={<MainLayout/>}>
-                    <Route path="/logout" element={<Logout/>}/>
-                    <Route
-                        path="/dashboard"
-                        element={
-                            <PrivateRoute>
-                                <Dashboard/>
-                            </PrivateRoute>
-                        }
-                    />
-                    <Route
-                        path="/profile/edit"
-                        element={
-                            <PrivateRoute>
-                                <EditUser/>
-                            </PrivateRoute>
-                        }
-                    />
-                    <Route
-                        path="/profile"
-                        element={
-                            <PrivateRoute>
-                                <ProfilePage/>
-                            </PrivateRoute>
-                        }
-                    />
-                    <Route
-                        path="/master/company"
-                        element={
-                            <PrivateRoute>
-                                <CompanyList/>
-                            </PrivateRoute>
-                        }
-                    />
-                    <Route
-                        path="/master/port"
-                        element={
-                            <PrivateRoute>
-                                <PortList/>
-                            </PrivateRoute>
-                        }
-                    />
-                    <Route
-                        path="/master/item-heads"
-                        element={
-                            <PrivateRoute>
-                                <ItemHeadList/>
-                            </PrivateRoute>
-                        }
-                    />
-                    <Route
-                        path="/master/hs-codes"
-                        element={
-                            <PrivateRoute>
-                                <HSCodeList/>
-                            </PrivateRoute>
-                        }
-                    />
-                    <Route
-                        path="/master/item-names"
-                        element={
-                            <PrivateRoute>
-                                <ItemNameList/>
-                            </PrivateRoute>
-                        }
-                    />
-                    <Route
-                        path="/master/sion"
-                        element={
-                            <PrivateRoute>
-                                <SionNormList/>
-                            </PrivateRoute>
-                        }
-                    />
-                    <Route
-                        path="/addtional/fetch-boe"
-                        element={
-                            <PrivateRoute>
-                                <IcegateCaptchaForm/>
-                            </PrivateRoute>
-                        }
-                    />
-                    <Route
-                        path="/addtional/ledger"
-                        element={
-                            <PrivateRoute>
-                                <LedgerUpload/>
-                            </PrivateRoute>
-                        }
-                    />
-                    <Route
-                        path="/bill-of-entry"
-                        element={
-                            <PrivateRoute>
-                                <BillOfEntryList/>
-                            </PrivateRoute>
-                        }
-                    />
-                    <Route
-                        path="/licenses/dfia"
-                        element={
-                            <PrivateRoute>
-                                <LicenseList/>
-                            </PrivateRoute>
-                        }
-                    />
-                    <Route
-                        path="/allotment"
-                        element={
-                            <PrivateRoute>
-                                <AllotmentList/>
-                            </PrivateRoute>
-                        }
-                    />
 
+                {/* Protected area: single PrivateRoute wraps MainLayout + all child routes */}
+                <Route
+                    element={
+                        <PrivateRoute>
+                            <MainLayout/>
+                        </PrivateRoute>
+                    }
+                >
+                    <Route path="/logout" element={<Logout/>}/>
+
+                    <Route path="/dashboard" element={<Dashboard/>}/>
+                    <Route path="/users" element={<UserList/>}/>
+                    <Route path="/profile" element={<ProfilePage/>}/>
+
+                    <Route path="/master/company" element={<CompanyList/>}/>
+                    <Route path="/master/port" element={<PortList/>}/>
+                    <Route path="/master/item-heads" element={<ItemHeadList/>}/>
+                    <Route path="/master/hs-codes" element={<HSCodeList/>}/>
+                    <Route path="/master/item-names" element={<ItemNameList/>}/>
+                    <Route path="/master/sion" element={<SionNormList/>}/>
+
+                    <Route path="/additional/fetch-boe" element={<IcegateCaptchaForm/>}/>
+                    <Route path="/additional/ledger" element={<LedgerUpload/>}/>
+
+                    <Route path="/bill-of-entry" element={<BillOfEntryList/>}/>
+                    <Route path="/licenses/dfia" element={<LicenseList/>}/>
+                    <Route path="/allotment" element={<AllotmentList/>}/>
                 </Route>
+
+                {/* Catch-all */}
+                <Route
+                    path="*"
+                    element={
+                        <Navigate
+                            to={isAuthenticated ? '/dashboard' : '/login'}
+                            replace
+                        />
+                    }
+                />
             </Routes>
+
             <ToastContainer position="top-right" autoClose={3000}/>
         </>
     );

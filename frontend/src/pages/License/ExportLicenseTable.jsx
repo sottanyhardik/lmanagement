@@ -2,7 +2,7 @@
 import React, {useEffect, useState} from 'react';
 import PropTypes from 'prop-types';
 import {Button, Form, InputGroup, Table} from 'react-bootstrap';
-import AsyncNormSelect from '../../components/AsyncNormSelect';
+import AsyncNormSelect from '../../components/AsyncSelect/AsyncNormSelect.jsx';
 
 /**
  * ExportLicenseTable

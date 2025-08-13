@@ -4,7 +4,7 @@ import {Button, Card, Col, Collapse, Container, Row, Spinner} from 'react-bootst
 import {toast} from 'react-toastify';
 import NormForm from './NormForm';
 import {parseFormErrors} from '../../utils/parseFormErrors';
-import AsyncHeadNormSelect from '../../components/AsyncHeadNormSelect.jsx';
+import AsyncHeadNormSelect from '../../components/AsyncSelect/AsyncHeadNormSelect.jsx';
 import ListControls from '../../components/ListControls';
 
 

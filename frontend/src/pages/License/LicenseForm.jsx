@@ -1,9 +1,9 @@
 // LicenseForm.jsx
 import React, {useEffect, useState} from 'react';
 import {Button, Form, Table} from 'react-bootstrap';
-import AsyncCompanySelect from '../../components/AsyncCompanySelect';
-import AsyncPortSelect from '../../components/AsyncPortSelect';
-import AsyncChoiceSelect from '../../components/AsyncChoiceSelect';
+import AsyncCompanySelect from '../../components/AsyncSelect/AsyncCompanySelect.jsx';
+import AsyncPortSelect from '../../components/AsyncSelect/AsyncPortSelect.jsx';
+import AsyncChoiceSelect from '../../components/AsyncSelect/AsyncChoiceSelect.jsx';
 import {useLicenseChoices} from '../../hooks/useChoiceLoader';
 import ExportLicenseTable from './ExportLicenseTable';
 import ImportLicenseTable from './ImportLicenseTable';

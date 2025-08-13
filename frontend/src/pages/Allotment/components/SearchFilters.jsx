@@ -1,6 +1,6 @@
 import React from "react";
 import {Button, Col, Form, Row, Spinner} from "react-bootstrap";
-import AsyncNormSelect from "../../../components/AsyncNormSelect";
+import AsyncNormSelect from "../../../components/AsyncSelect/AsyncNormSelect.jsx";
 
 const SearchFilters = ({
                            srFilters,

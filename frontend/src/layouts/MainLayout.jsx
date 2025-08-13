@@ -1,20 +1,20 @@
-import {Outlet, useLocation} from 'react-router-dom';
-import Navbar from '../layouts/Navbar';
+// src/layouts/MainLayout.jsx
+import {Outlet} from 'react-router-dom';
+import Navbar from './Navbar';
 
-const MainLayout = () => {
-    const location = useLocation();
-
-    const hideNavbarPaths = ['/login', '/forgot-password', '/reset'];
-    const shouldHideNavbar = hideNavbarPaths.some(path => location.pathname.startsWith(path));
-
+export default function MainLayout() {
     return (
         <div>
-            {!shouldHideNavbar && <Navbar/>}
-            <main className="main-content">
+            {/* Accessibility: tab to skip straight to content */}
+            <a href="#main" className="skip-link">Skip to content</a>
+
+            {/* Your Navbar should have Bootstrap's `fixed-top` if you want it pinned */}
+            <Navbar/>
+
+            {/* Top padding so content isn’t hidden behind a fixed navbar */}
+            <main id="main" className="main-content container-fluid">
                 <Outlet/>
             </main>
         </div>
     );
-};
-
-export default MainLayout;
+}

@@ -1,20 +1,77 @@
-export const groupLicenses = (entries = []) => {
-    const grouped = {};
+// src/utils/groupLicenses.js
 
-    for (const entry of entries) {
-        const exporter = entry.exporter?.name || 'Unknown Exporter';
-        const port = entry.port?.name || 'Unknown Port';
+/**
+ * Group licenses by Exporter → Port.
+ * Returns an array tree that's easy to render.
+ *
+ * @param {Array<any>} entries
+ * @param {Object} options
+ * @param {(e:any)=>string} [options.getExporter]  pick exporter label
+ * @param {(e:any)=>string} [options.getPort]      pick port label
+ * @param {(a,b)=>number}   [options.sortExporters] optional comparator
+ * @param {(a,b)=>number}   [options.sortPorts]     optional comparator
+ * @returns {Array<{exporter:string, count:number, ports:Array<{port:string, entries:any[]}>}>}
+ */
+export function groupLicenses(
+    entries = [],
+    {
+        getExporter = (e) => e?.exporter?.name ?? 'Unknown Exporter',
+        getPort = (e) => e?.port?.name ?? e?.port?.code ?? 'Unknown Port',
+        sortExporters = null,
+        sortPorts = null,
+    } = {}
+) {
+    const expMap = new Map(); // exporter -> { exporter, portsMap, count }
 
-        if (!grouped[exporter]) {
-            grouped[exporter] = {ports: {}};
+    for (const e of entries) {
+        const exporter = String(getExporter(e));
+        const port = String(getPort(e));
+
+        let expBucket = expMap.get(exporter);
+        if (!expBucket) {
+            expBucket = {exporter, portsMap: new Map(), count: 0};
+            expMap.set(exporter, expBucket);
         }
 
-        if (!grouped[exporter].ports[port]) {
-            grouped[exporter].ports[port] = [];
+        let portBucket = expBucket.portsMap.get(port);
+        if (!portBucket) {
+            portBucket = {port, entries: []};
+            expBucket.portsMap.set(port, portBucket);
         }
 
-        grouped[exporter].ports[port].push(entry);
+        portBucket.entries.push(e);
+        expBucket.count++;
     }
 
-    return grouped;
-};
+    // materialize + optional sorting
+    let result = Array.from(expMap.values()).map((exp) => {
+        let ports = Array.from(exp.portsMap.values());
+        if (typeof sortPorts === 'function') ports.sort(sortPorts);
+        return {exporter: exp.exporter, count: exp.count, ports};
+    });
+
+    if (typeof sortExporters === 'function') result.sort(sortExporters);
+    return result;
+}
+
+/**
+ * Back-compat: convert the array tree to your original object shape.
+ * {
+ *   [exporter]: {
+ *     ports: {
+ *       [port]: [entry, ...]
+ *     }
+ *   }
+ * }
+ */
+export function groupLicensesAsObject(entries = [], opts) {
+    const tree = groupLicenses(entries, opts);
+    const out = {};
+    for (const g of tree) {
+        out[g.exporter] = {ports: {}};
+        for (const p of g.ports) {
+            out[g.exporter].ports[p.port] = p.entries;
+        }
+    }
+    return out;
+}

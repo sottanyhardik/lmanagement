@@ -1,26 +1,27 @@
+// src/pages/IcegateCaptchaForm.jsx
 import React, {useEffect, useState} from 'react';
 import axios from '../api/axiosInstance';
-import ListControls from "../components/ListControls.jsx";
-import {Card, CardBody, CardHeader, Container} from 'react-bootstrap';
-import {toast} from "react-toastify";
+import {toast} from 'react-toastify';
+import {Card, Container} from 'react-bootstrap';
+import ListControls from '../components/ListControls';
 
 const IcegateCaptchaForm = () => {
     const [captchaData, setCaptchaData] = useState(null);
     const [userCaptcha, setUserCaptcha] = useState('');
     const [loading, setLoading] = useState(true);
-    const [error, setError] = useState('');
     const [submitting, setSubmitting] = useState(false);
+    const [error, setError] = useState('');
 
     const fetchCaptcha = async () => {
+        setLoading(true);
+        setError('');
         try {
-            setLoading(true);
-            const res = await axios.get('/api/iecgate/fetch');
-            console.log(res.data);
-            setCaptchaData(res.data);
+            const {data} = await axios.get('iecgate/fetch/'); // ✅ no /api prefix
+            setCaptchaData(data);
             setUserCaptcha('');
-            setError('');
         } catch (err) {
             setError('❌ Failed to fetch CAPTCHA');
+            toast.error('Failed to fetch CAPTCHA');
         } finally {
             setLoading(false);
         }
@@ -33,8 +34,11 @@ const IcegateCaptchaForm = () => {
     const handleSubmit = async (e) => {
         e.preventDefault();
         setSubmitting(true);
+
         if (!captchaData?.csrftoken || !captchaData?.cookies) {
             setError('❌ Missing session data');
+            toast.error('Missing session data. Please reload the CAPTCHA.');
+            setSubmitting(false);
             return;
         }
 
@@ -45,26 +49,24 @@ const IcegateCaptchaForm = () => {
                 cookies: captchaData.cookies,
             };
 
-            const res = await axios.post('/api/iecgate/fetch', payload);
+            const {data} = await axios.post('iecgate/fetch/', payload); // ✅ same endpoint
 
-            if (res.data?.status === 'triggered') {
-                fetchCaptcha();
-                toast.success(`✅ Fetch triggered for ${res.data.count} entries`);
+            if (data?.status === 'triggered') {
+                toast.success(`✅ Fetch triggered for ${data.count} entr${data.count === 1 ? 'y' : 'ies'}`);
+                await fetchCaptcha(); // get a fresh captcha/session
             } else {
-                toast.info(`ℹ️ Response received but not confirmed.`);
+                toast.info('ℹ️ Submitted, waiting on server confirmation.');
             }
         } catch (err) {
-            toast.info(`❌ Failed to submit CAPTCHA - ${err}`);
+            toast.error('❌ Failed to submit CAPTCHA');
+        } finally {
+            setSubmitting(false);
         }
-        setSubmitting(false);
     };
 
     return (
         <Container className="mt-4">
-            <ListControls
-                title="📋 ICEGATE CAPTCHA"
-                onlyHeader={false}
-            />
+            <ListControls title="📋 ICEGATE CAPTCHA" onlyHeader={false}/>
 
             {loading ? (
                 <p>Loading CAPTCHA...</p>
@@ -73,24 +75,31 @@ const IcegateCaptchaForm = () => {
             ) : (
                 <Card>
                     <form onSubmit={handleSubmit}>
-                        <CardHeader>
+                        <Card.Header>
                             <div className="mb-3 text-center">
                                 <img
-                                    src={captchaData.captcha}
+                                    src={captchaData?.captcha}
                                     alt="ICEGATE CAPTCHA"
                                     className="img-fluid border img-thumbnail"
                                 />
                             </div>
-                        </CardHeader>
-                        <CardBody>
+                        </Card.Header>
+
+                        <Card.Body>
                             <div className="mb-2">
-                                <label className="form-label">Enter CAPTCHA</label>
+                                <label className="form-label" htmlFor="captcha-input">
+                                    Enter CAPTCHA
+                                </label>
                                 <input
+                                    id="captcha-input"
                                     type="text"
                                     className="form-control"
                                     value={userCaptcha}
                                     onChange={(e) => setUserCaptcha(e.target.value)}
                                     required
+                                    autoComplete="off"
+                                    autoCorrect="off"
+                                    spellCheck="false"
                                 />
                             </div>
 
@@ -99,14 +108,20 @@ const IcegateCaptchaForm = () => {
                                     type="button"
                                     className="btn btn-secondary"
                                     onClick={fetchCaptcha}
+                                    disabled={loading || submitting}
                                 >
                                     🔄 Reload
                                 </button>
-                                <button type="submit" className="btn btn-primary" disabled={submitting}>
-                                    {submitting ? '⏳ Submitting...' : '✅ Submit'}
+
+                                <button
+                                    type="submit"
+                                    className="btn btn-primary"
+                                    disabled={submitting || !userCaptcha.trim()}
+                                >
+                                    {submitting ? '⏳ Submitting…' : '✅ Submit'}
                                 </button>
                             </div>
-                        </CardBody>
+                        </Card.Body>
                     </form>
                 </Card>
             )}

@@ -1,16 +1,25 @@
+// vite.config.js
 import {defineConfig} from 'vite'
 import react from '@vitejs/plugin-react'
 
-// Make built asset URLs start with /static/
 export default defineConfig({
     plugins: [react()],
-    base: '/static/',
+    base: '',
+    server: {
+        proxy: {
+            '/api': {
+                target: 'http://localhost:8000',
+                changeOrigin: true,
+            },
+        },
+        
+    },
     build: {
-        outDir: 'dist',       // already your default
-        assetsDir: 'assets',  // default; keep it explicit
+        outDir: 'dist',
+        assetsDir: 'assets',
         manifest: true,
         rollupOptions: {
-            input: '/src/main.jsx',  // <-- critical for django-vite
+            input: '/src/main.jsx',
         },
-    }
+    },
 })

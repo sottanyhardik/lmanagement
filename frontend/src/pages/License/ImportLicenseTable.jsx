@@ -1,7 +1,7 @@
 import React from 'react';
 import {Button, Form, Table} from 'react-bootstrap';
-import AsyncHSCodeSelect from '../../components/AsyncHSCodeSelect';
-import AsyncItemSelect from '../../components/AsyncItemSelect';
+import AsyncHSCodeSelect from '../../components/AsyncSelect/AsyncHSCodeSelect.jsx';
+import AsyncItemSelect from '../../components/AsyncSelect/AsyncItemSelect.jsx';
 
 const ImportLicenseTable = ({importItems = [], onChange, onAdd}) => {
     const handleItemChange = (index, field, value) => {

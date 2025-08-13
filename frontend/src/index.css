@@ -240,3 +240,34 @@ td {
 .react-select__control {
     align-items: flex-end !important;
 }
+
+
+/* Skip link: visible only when focused */
+.skip-link {
+    position: absolute;
+    left: -9999px;
+    top: 0;
+    z-index: 10000;
+    background: #0d6efd;
+    color: #fff;
+    padding: 8px 12px;
+    border-radius: 6px;
+}
+
+.skip-link:focus {
+    left: 12px;
+    top: 12px;
+}
+
+/* If your Navbar uses .fixed-top (~56px high), pad the main content */
+.main-content {
+    padding-top: 64px; /* 56–64px depending on your navbar height */
+    padding-bottom: 16px;
+}
+
+/* Optional: tweak for larger screens if your navbar is taller */
+@media (min-width: 992px) {
+    .main-content {
+        padding-top: 72px;
+    }
+}

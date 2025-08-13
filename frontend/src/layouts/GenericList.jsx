@@ -1,250 +1,269 @@
-import React, {useEffect, useRef, useState} from 'react';
+// src/layouts/GenericList.jsx
+import React, {useCallback, useEffect, useMemo, useRef, useState} from 'react';
 import axios from '../api/axiosInstance';
 import {toast} from 'react-toastify';
 import {Container} from 'react-bootstrap';
-import 'bootstrap/dist/js/bootstrap.bundle.min.js';
 import ListControls from '../components/ListControls';
 import GenericTable from '../components/GenericTable';
 import PaginationControls from '../components/PaginationControls';
 import AddItemModal from '../components/AddItemModal';
 
-
-const PAGE_SIZE = 10;
+const DEFAULT_PAGE_SIZE = 10;
 
 const GenericList = ({
-                         resource = 'companies',
+                         resource = 'companies',          // e.g. "companies" → axios baseURL handles "/api/"
                          title = 'Company List',
                          fields = [],
-                         filters = [],
                          validateItem = () => ({}),
                          initialItem = {},
                          renderField = {},
                          renderInput = {},
+                         pageSize = DEFAULT_PAGE_SIZE,
                      }) => {
     const [items, setItems] = useState([]);
     const [editedItem, setEditedItem] = useState({});
     const [editIndex, setEditIndex] = useState(null);
     const [errors, setErrors] = useState({});
     const [search, setSearch] = useState('');
-    const [sortOrder, setSortOrder] = useState(''); // 'asc' or 'desc'
-    const [sortField, setSortField] = useState('');
+    const [sortOrder, setSortOrder] = useState(''); // 'asc' | 'desc' | ''
+    const [sortField, setSortField] = useState(''); // '' means no ordering
     const [page, setPage] = useState(1);
     const [totalCount, setTotalCount] = useState(0);
     const [selectedIds, setSelectedIds] = useState([]);
     const [loading, setLoading] = useState(true);
+
     const [newItem, setNewItem] = useState(initialItem);
     const [addErrors, setAddErrors] = useState({});
     const [showAddModal, setShowAddModal] = useState(false);
     const [adding, setAdding] = useState(false);
-    const inputRef = useRef();
 
-    const totalPages = Math.ceil(totalCount / PAGE_SIZE);
+    const inputRef = useRef(null);
+    const abortRef = useRef(null);
 
-    const fetchItems = async () => {
+    const totalPages = useMemo(
+        () => Math.max(1, Math.ceil((totalCount || 0) / pageSize)),
+        [totalCount, pageSize]
+    );
+
+    // -- fetch list (abortable) -------------------------------------------------
+    const fetchItems = useCallback(async () => {
+        if (abortRef.current) abortRef.current.abort();
+        const controller = new AbortController();
+        abortRef.current = controller;
+
         setLoading(true);
         try {
-            const res = await axios.get(`/${resource}/`, {
-                params: {
-                    page,
-                    page_size: PAGE_SIZE,
-                    search,
-                    ordering: sortOrder === 'desc' ? `-${sortField}` : sortField,
-                },
+            const params = {
+                page,
+                page_size: pageSize,
+                search: search || undefined,
+                ordering: sortField
+                    ? `${sortOrder === 'desc' ? '-' : ''}${sortField}`
+                    : undefined,
+            };
+
+            const {data} = await axios.get(`${resource}/`, {
+                params,
+                signal: controller.signal,
             });
-            const data = res.data;
-            setItems(data.results || data);
-            setTotalCount(data.count || data.length || 0);
-            setSelectedIds([]);
+
+            setItems(data.results ?? data ?? []);
+            setTotalCount(data.count ?? (Array.isArray(data) ? data.length : 0));
+            setSelectedIds([]); // clear selection on new data
         } catch (err) {
+            if (err.name === 'CanceledError' || err.code === 'ERR_CANCELED') return;
             console.error('Fetch error:', err);
+            toast.error('Failed to load data');
         } finally {
             setLoading(false);
         }
-    };
+    }, [resource, page, pageSize, search, sortField, sortOrder]);
+
+    // document title
     useEffect(() => {
-        if (title) {
-            document.title = title.toUpperCase();
-        }
+        if (title) document.title = String(title).toUpperCase();
     }, [title]);
 
+    // trigger loads
     useEffect(() => {
         fetchItems();
-    }, [page, search, sortField, sortOrder]);
+        return () => abortRef.current?.abort();
+    }, [fetchItems]);
 
-    const validate = () => {
+    // -- inline edit ------------------------------------------------------------
+    const validate = useCallback(() => {
         const newErrors = validateItem(editedItem);
         setErrors(newErrors);
         return Object.keys(newErrors).length === 0;
-    };
+    }, [editedItem, validateItem]);
 
-    const handleEditClick = (index) => {
-        setEditIndex(index);
-        setEditedItem({...items[index]});
-        setErrors({});
-        setTimeout(() => inputRef.current?.focus(), 0);
-    };
+    const handleEditClick = useCallback(
+        (index) => {
+            setEditIndex(index);
+            setEditedItem({...items[index]});
+            setErrors({});
+            setTimeout(() => inputRef.current?.focus(), 0);
+        },
+        [items]
+    );
 
-    const handleChange = (e) => {
+    const handleChange = useCallback((e) => {
         const {name, value} = e.target;
         setEditedItem((prev) => ({...prev, [name]: value}));
-    };
+    }, []);
 
-    const handleCancel = () => {
+    const handleCancel = useCallback(() => {
         setEditIndex(null);
         setEditedItem({});
         setErrors({});
-    };
+    }, []);
 
-    const handleSave = async () => {
+    const handleSave = useCallback(async () => {
         if (!validate()) return;
         try {
-            const response = await axios.put(`/${resource}/${editedItem.id}/`, editedItem);
+            const {data} = await axios.put(`${resource}/${editedItem.id}/`, editedItem);
             const updated = [...items];
-            updated[editIndex] = editedItem;
+            updated[editIndex] = data ?? editedItem;
             setItems(updated);
             setEditIndex(null);
             setEditedItem({});
             setErrors({});
-            if (response.status === 200) {
-                toast.success('✅ Saved successfully');
-            } else {
-                toast.error('❌ Failed to save');
-            }
+            toast.success('✅ Saved successfully');
         } catch (err) {
-            if (err.response?.data) {
-                const apiErrors = err.response.data;
+            const apiErrors = err?.response?.data;
+            if (apiErrors && typeof apiErrors === 'object') {
                 setErrors(apiErrors);
-
-                const nonFieldErrors = Object.entries(apiErrors)
+                const nonField = Object.entries(apiErrors)
                     .filter(([key]) => !fields.some((f) => f.name === key))
-                    .map(([_, val]) => (Array.isArray(val) ? val.join(', ') : val))
-                    .join('');
-
-                if (nonFieldErrors) {
-                    toast.error(`❌ ${nonFieldErrors}`);
-                }
+                    .map(([, val]) => (Array.isArray(val) ? val.join(', ') : String(val)))
+                    .filter(Boolean)
+                    .join('; ');
+                if (nonField) toast.error(`❌ ${nonField}`);
             } else {
                 toast.error('❌ Failed to save');
             }
         }
-    };
+    }, [validate, resource, editedItem, items, editIndex, fields]);
 
-    const toggleSort = (field) => {
-        setPage(1);
-        if (sortField === field) {
-            if (sortOrder === 'asc') {
-                setSortOrder('desc'); // Asc → Desc
-            } else if (sortOrder === 'desc') {
-                setSortField('');
-                setSortOrder('');     // Desc → None
+    // -- sorting ---------------------------------------------------------------
+    const toggleSort = useCallback(
+        (field) => {
+            setPage(1);
+            if (sortField === field) {
+                if (sortOrder === 'asc') setSortOrder('desc');      // asc → desc
+                else if (sortOrder === 'desc') {
+                    setSortField('');
+                    setSortOrder('');               // desc → none
+                } else setSortOrder('asc');                         // none → asc
             } else {
-                setSortOrder('asc');  // None → Asc
+                setSortField(field);
+                setSortOrder('asc');                                // new field → asc
             }
-        } else {
-            setSortField(field);
-            setSortOrder('asc');      // New field → Asc
-        }
-    };
+        },
+        [sortField, sortOrder]
+    );
 
-    const toggleSelect = (id) => {
+    // -- selection -------------------------------------------------------------
+    const toggleSelect = useCallback((id) => {
         setSelectedIds((prev) =>
             prev.includes(id) ? prev.filter((x) => x !== id) : [...prev, id]
         );
-    };
+    }, []);
 
-    const toggleSelectAll = () => {
+    const toggleSelectAll = useCallback(() => {
         const visibleIds = items.map((c) => c.id);
-        const allSelected = visibleIds.every((id) => selectedIds.includes(id));
+        const allSelected = visibleIds.length > 0 && visibleIds.every((id) => selectedIds.includes(id));
         setSelectedIds(allSelected ? [] : visibleIds);
-    };
+    }, [items, selectedIds]);
 
-    const deleteSelected = async () => {
+    // -- bulk delete -----------------------------------------------------------
+    const deleteSelected = useCallback(async () => {
         if (selectedIds.length === 0) {
             toast.warn('⚠️ No items selected to delete');
             return;
         }
-        if (!window.confirm(`Delete ${selectedIds.length} selected items?`)) return;
+        if (!window.confirm(`Delete ${selectedIds.length} selected item(s)?`)) return;
+
         try {
             const results = await Promise.all(
                 selectedIds.map(async (id) => {
                     try {
-                        await axios.delete(`/${resource}/${id}/`);
+                        await axios.delete(`${resource}/${id}/`);
                         return {id, success: true};
                     } catch (err) {
                         return {
                             id,
                             success: false,
-                            error: err.response?.data?.detail || `Failed to delete item ${id}`,
+                            error: err?.response?.data?.detail || `Failed to delete item ${id}`,
                         };
                     }
                 })
             );
             const failed = results.filter((r) => !r.success);
-            if (failed.length > 0) {
+            if (failed.length) {
                 toast.error(
-                    `❌ Failed to delete ${failed.length} of ${selectedIds.length} items: ` +
+                    `❌ Failed to delete ${failed.length} of ${selectedIds.length}: ` +
                     failed.map((f) => f.error).join(', ')
                 );
             } else {
                 toast.success('🗑️ Deleted selected items');
             }
-            fetchItems();
-        } catch (err) {
+            fetchItems(); // refresh page
+        } catch {
             toast.error('❌ Bulk delete failed');
         }
-    };
+    }, [selectedIds, resource, fetchItems]);
 
-    const validateNew = () => {
-        const errors = validateItem(newItem);
-        setAddErrors(errors);
-        return Object.keys(errors).length === 0;
-    };
+    // -- add new ---------------------------------------------------------------
+    const validateNew = useCallback(() => {
+        const v = validateItem(newItem);
+        setAddErrors(v);
+        return Object.keys(v).length === 0;
+    }, [newItem, validateItem]);
 
-    const handleAdd = async () => {
+    const handleAdd = useCallback(async () => {
         if (!validateNew()) return;
-
-        setAdding(true); // Start loading
-
+        setAdding(true);
         try {
-            const response = await axios.post(`/${resource}/`, newItem);
-
-            if (response.status !== 201) {
-                toast.error(`❌ Unexpected response (${response.status})`);
+            const {status} = await axios.post(`${resource}/`, newItem);
+            if (status !== 201) {
+                toast.error(`❌ Unexpected response (${status})`);
                 return;
             }
-
             toast.success('✅ Added successfully');
             setNewItem(initialItem);
             setAddErrors({});
             setShowAddModal(false);
+            // Reset to first page to see new record (optional)
+            setPage(1);
             fetchItems();
-
         } catch (err) {
-            if (err.response?.data) {
-                const apiErrors = err.response.data;
+            const apiErrors = err?.response?.data;
+            if (apiErrors && typeof apiErrors === 'object') {
                 setAddErrors(apiErrors);
-
-                const nonFieldErrors = Object.entries(apiErrors)
+                const nonField = Object.entries(apiErrors)
                     .filter(([key]) => !fields.some((f) => f.name === key))
-                    .map(([_, val]) => Array.isArray(val) ? val.join(', ') : val)
+                    .map(([, val]) => (Array.isArray(val) ? val.join(', ') : String(val)))
+                    .filter(Boolean)
                     .join('; ');
-
-                toast.error(nonFieldErrors || '❌ Please fix validation errors.');
+                toast.error(nonField || '❌ Please fix validation errors.');
             } else {
-                toast.error(`❌ ${err.message || 'Failed to add item'}`);
+                toast.error(`❌ ${err?.message || 'Failed to add item'}`);
             }
         } finally {
-            setAdding(false); // Done loading
+            setAdding(false);
         }
-    };
-
+    }, [validateNew, resource, newItem, initialItem, fields, fetchItems]);
 
     return (
         <Container className="mt-4">
             <ListControls
-                title={title.toUpperCase()}
+                title={String(title).toUpperCase()}
                 search={search}
-                setSearch={setSearch}
+                setSearch={(v) => {
+                    setPage(1);
+                    setSearch(v);
+                }}
                 sortField={sortField}
                 sortOrder={sortOrder}
                 setSortField={setSortField}
@@ -279,7 +298,6 @@ const GenericList = ({
                 setEditedItem={setEditedItem}
             />
 
-
             <PaginationControls
                 page={page}
                 totalPages={totalPages}
@@ -297,7 +315,8 @@ const GenericList = ({
                 renderInput={renderInput}
                 handleAdd={handleAdd}
                 loading={adding}
-            /> </Container>
+            />
+        </Container>
     );
 };
 

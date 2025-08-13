@@ -1,6 +1,6 @@
 import React, {useCallback, useEffect, useMemo, useState} from 'react';
 import {Button, Col, Form, Modal, Row, Spinner, Table} from 'react-bootstrap';
-import AsyncNormSelect from '../../../../components/AsyncNormSelect';
+import AsyncNormSelect from '../../../../components/AsyncSelect/AsyncNormSelect.jsx';
 import axios from '../../../../api/axiosInstance';
 import {toast} from 'react-toastify';
 import '../../AllotmentList.css';
@@ -262,7 +262,7 @@ const AllotmentLineItemTable = ({
         val = round2(val);
 
         if (qty <= 0 || val <= 0) return toast.warn('Allotment after constraints is zero.');
-        
+
         try {
             setPosting((p) => ({...p, [id]: true}));
             await axios.post(ADD_DETAIL_URL(allotmentId), {

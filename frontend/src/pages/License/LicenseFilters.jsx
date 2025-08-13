@@ -1,7 +1,7 @@
 // pages/License/LicenseFilters.jsx
 import React from 'react';
-import AsyncCompanySelect from '../../components/AsyncCompanySelect';
-import AsyncPortSelect from '../../components/AsyncPortSelect';
+import AsyncCompanySelect from '../../components/AsyncSelect/AsyncCompanySelect.jsx';
+import AsyncPortSelect from '../../components/AsyncSelect/AsyncPortSelect.jsx';
 import {Form} from 'react-bootstrap';
 
 const LicenseFilters = ({filters, setFilters}) => (
