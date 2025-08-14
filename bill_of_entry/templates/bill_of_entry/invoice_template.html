@@ -145,12 +145,13 @@
             <th><strong>HSN</strong></th>
             {% if invoice.billing_mode == 'kg' %}
                 <th><strong>Qty (KG)</strong></th>
+                <th><strong>Rate in KGS</strong></th>
             {% else %}
                 <th><strong>CIF $</strong></th>
                 <th><strong>Ex. Rate</strong></th>
                 <th><strong>CIF INR</strong></th>
+                <th><strong>Rate (%)</strong></th>
             {% endif %}
-            <th><strong>Rate</strong></th>
             <th><strong>Amount</strong></th>
         </tr>
         </thead>

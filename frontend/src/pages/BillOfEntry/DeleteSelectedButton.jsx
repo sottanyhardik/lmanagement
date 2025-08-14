@@ -8,7 +8,7 @@ const DeleteSelectedButton = ({selectedIds, onDeleted}) => {
         if (!window.confirm(`Are you sure you want to delete ${selectedIds.length} entries?`)) return;
 
         try {
-            await axios.post('/api/bill-of-entries/bulk-delete/', {ids: selectedIds});
+            await axios.post('bill-of-entries/bulk-delete/', {ids: selectedIds});
             toast.success('Selected entries deleted');
             onDeleted();
         } catch (err) {

@@ -1,8 +1,8 @@
 import React, {useCallback, useEffect, useMemo, useRef, useState} from 'react';
 import {Button, Col, Form, Row} from 'react-bootstrap';
-import AsyncCompanySelect from '../../components/AsyncSelect/AsyncCompanySelect.jsx';
-import AsyncPortSelect from '../../components/AsyncSelect/AsyncPortSelect.jsx';
-import AsyncAllotmentSelect from '../../components/AsyncSelect/AsyncAllotmentSelect.jsx';
+import AsyncCompanySelect from '../../components/AsyncSelect/AsyncCompanySelect';
+import AsyncPortSelect from '../../components/AsyncSelect/AsyncPortSelect';
+import AsyncAllotmentSelect from '../../components/AsyncSelect/AsyncAllotmentSelect';
 import axios from '../../api/axiosInstance';
 import {toast} from 'react-toastify';
 import LineItemTable from './LineItemTable';
@@ -248,10 +248,10 @@ const BillOfEntryForm = ({entry, isNew = false, onClose, onSaved}) => {
             };
             console.log(payload);
             if (isNew) {
-                await axios.post('/api/bill-of-entries/', payload);
+                await axios.post('bill-of-entries/', payload);
                 toast.success('Bill of Entry Created');
             } else {
-                await axios.patch(`/api/bill-of-entries/${data.id}/`, payload);
+                await axios.patch(`bill-of-entries/${data.id}/`, payload);
                 toast.success('Bill of Entry Updated');
             }
             onSaved?.();

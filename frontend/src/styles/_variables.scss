@@ -1,0 +1,21 @@
+// Define main color variables
+$primary: #e16123;
+$primary-hover: #cc541f;
+$primary-text: #ffffff;
+
+$body-bg: #f7f7f7;
+$body-color: #242424;
+
+$card-bg: #f7f7f7;
+$dropdown-bg: #333333;
+$dropdown-hover: #444444;
+
+$navbar-dark-color: #ffffff;
+$navbar-dark-hover-color: #ffffff;
+
+// Override Bootstrap variables
+$theme-colors: (
+  "primary": $primary,
+  "dark": $body-color,
+  "light": $primary-text
+);

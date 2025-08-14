@@ -14,7 +14,7 @@ const MakeTLAsBOE = () => {
         let mounted = true;
         (async () => {
             try {
-                const {data} = await axios.get(`/api/allotments/${id}/`);
+                const {data} = await axios.get(`allotments/${id}/`);
                 if (!mounted) return;
                 setEntry(data);
 

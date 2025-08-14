@@ -1,0 +1,51 @@
+import {Route, Routes} from 'react-router-dom';
+import MainLayout from './layouts/MainLayout';
+import LoginForm from './components/Login/LoginForm';
+import ForgotPassword from './components/Login/ForgotPassword';
+import ResetPassword from './components/Login/ResetPassword';
+import Dashboard from './components/Dashboard/Dashboard';
+import PrivateRoute from './routes/PrivateRoute';
+import Logout from './components/User/Logout';
+import EditUser from './components/User/EditUser';
+
+// import UserList from './components/User/UserList';
+
+function App() {
+    return (
+        <Routes>
+            <Route path="/login" element={<LoginForm/>}/>
+            <Route path="/forgot-password" element={<ForgotPassword/>}/>
+            <Route path="/reset/:uid/:token" element={<ResetPassword/>}/>
+
+            <Route element={<MainLayout/>}>
+                <Route path="/logout" element={<Logout/>}/>
+                <Route
+                    path="/dashboard"
+                    element={
+                        <PrivateRoute>
+                            <Dashboard/>
+                        </PrivateRoute>
+                    }
+                />
+                <Route
+                    path="/profile/edit"
+                    element={
+                        <PrivateRoute>
+                            <EditUser/>
+                        </PrivateRoute>
+                    }
+                />
+                {/*<Route*/}
+                {/*    path="/users"*/}
+                {/*    element={*/}
+                {/*        <PrivateRoute>*/}
+                {/*            <UserList/>*/}
+                {/*        </PrivateRoute>*/}
+                {/*    }*/}
+                {/*/>*/}
+            </Route>
+        </Routes>
+    );
+}
+
+export default App;

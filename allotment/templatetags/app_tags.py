@@ -1,6 +1,6 @@
 from django import template
 
-from license.models import AllotmentItems
+from allotment.models import AllotmentItems
 
 register = template.Library()
 

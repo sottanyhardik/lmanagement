@@ -8,11 +8,12 @@ from rest_framework import filters, viewsets
 from rest_framework.generics import ListAPIView
 from rest_framework.pagination import PageNumberPagination
 
-from license.models import LicenseDetailsModel
-from license.serializers import LicenseDetailsSerializer
-from .models import LicenseImportItemsModel
-from .serializers import LicenseImportItemsSelectSerializer
+from .filters import LicenseDetailsFilterSet
+from .models import LicenseDetailsModel, LicenseImportItemsModel
+from .serializers import LicenseDetailsSerializer, LicenseImportItemsSelectSerializer
 
+
+# ---------------- Pagination ----------------
 
 class SmallPagination(PageNumberPagination):
     page_size = 25
@@ -20,43 +21,54 @@ class SmallPagination(PageNumberPagination):
     max_page_size = 100
 
 
+# ---------------- License Details ----------------
+
 class LicenseDetailsViewSet(viewsets.ModelViewSet):
+    """
+    Default: show NON-EXPIRED (active) unless the client explicitly asks otherwise.
+
+    Supports FilterSet:
+      - status=active|expired|all
+      - exporter__in=1,2,3
+      - port__in=5,9
+      - from_date=YYYY-MM-DD
+      - to_date=YYYY-MM-DD
+      - license_number=...
+      - is_individual=true|false
+      - is_null=true|false
+    """
     queryset = (
         LicenseDetailsModel.objects
-        .all()
+        .select_related('exporter', 'port')
         .prefetch_related('export_license', 'import_license')
+        .all()
         .distinct()
     )
     serializer_class = LicenseDetailsSerializer
-
     filter_backends = [DjangoFilterBackend, filters.SearchFilter, filters.OrderingFilter]
-
-    filterset_fields = [
-        'scheme_code',
-        'notification_number',
-        'license_number',
-        'license_date',
-        'license_expiry_date',
-        'exporter',
-        'port',
-        'purchase_status',
-        'is_active',
-        'is_expired',
-        'is_incomplete',
-    ]
+    filterset_class = LicenseDetailsFilterSet
 
     search_fields = [
-        'license_number',
-        'file_number',
-        'notification_number',
-        'scheme_code',
-        'exporter__name',
-        'port__name',
+        'license_number', 'file_number', 'notification_number', 'scheme_code',
+        'exporter__name', 'port__name',
     ]
-
     ordering_fields = ['license_date', 'license_expiry_date', 'modified_on']
     ordering = ['-modified_on']
 
+    def get_queryset(self):
+        qs = super().get_queryset()
+        params = self.request.query_params
+
+        # If the client explicitly sets status (or direct is_expired),
+        # we do NOT enforce the default.
+        if 'status' in params or 'is_expired' in params:
+            return qs
+
+        # Default to active (non-expired)
+        return qs.filter(is_expired=False)
+
+
+# ---------------- Helpers for select endpoint ----------------
 
 def _get_bool(param_val):
     """
@@ -87,6 +99,8 @@ def _get_num(param_val, num_type=float):
         return None
 
 
+# ---------------- Import Items: searchable select ----------------
+
 class LicenseImportItemsSelectView(ListAPIView):
     """
     GET /api/license-import-items/select/
@@ -97,7 +111,7 @@ class LicenseImportItemsSelectView(ListAPIView):
       &description=
       &hs_code=
       &notification_number=
-      &expired=(true|false)     (uses 1-month window relative to today)
+      &expired=(true|false)     (window: < +1 month from today)
       &is_expired=(true|false)  (direct field on license)
       &is_null=(true|false)
       &min_balance_cif=<number>
@@ -117,20 +131,19 @@ class LicenseImportItemsSelectView(ListAPIView):
         today = date.today()
         one_month_from_now = today + relativedelta(months=1)
 
-        # --- Expiry filters ---
-        # 1) window-based: expired=true => expiry < +1mo, expired=false => expiry >= +1mo
+        # --- Expiry window ---
         expired_window = _get_bool(p.get("expired"))
         if expired_window is True:
             qs = qs.filter(license__license_expiry_date__lt=one_month_from_now)
         elif expired_window is False:
             qs = qs.filter(license__license_expiry_date__gte=one_month_from_now)
 
-        # 2) direct field override if provided
+        # --- Direct flag override (takes precedence if provided) ---
         is_expired_flag = _get_bool(p.get("is_expired"))
         if is_expired_flag is not None:
             qs = qs.filter(license__is_expired=is_expired_flag)
 
-        # --- Availability/value floors (apply only when provided) ---
+        # --- Floors ---
         min_balance_cif = _get_num(p.get("min_balance_cif"), float)
         if min_balance_cif is not None:
             qs = qs.filter(available_value__gte=min_balance_cif)
@@ -139,7 +152,7 @@ class LicenseImportItemsSelectView(ListAPIView):
         if min_balance_qty is not None:
             qs = qs.filter(available_quantity__gte=min_balance_qty)
 
-        # --- SION Norm (by id preferred, fallback to text) ---
+        # --- SION norm ---
         sion_id = (p.get("sion_norm_id") or "").strip()
         if sion_id.isdigit():
             qs = qs.filter(license__export_license__norm_class__id=int(sion_id))
@@ -148,7 +161,7 @@ class LicenseImportItemsSelectView(ListAPIView):
             if sion_txt:
                 qs = qs.filter(license__export_license__norm_class__norm_class__icontains=sion_txt)
 
-        # --- Free text search ---
+        # --- Free text ---
         q = (p.get("q") or "").strip()
         if q:
             q_filter = (
@@ -160,7 +173,7 @@ class LicenseImportItemsSelectView(ListAPIView):
                 q_filter |= Q(serial_number=int(q))
             qs = qs.filter(q_filter)
 
-        # --- Specific field filters ---
+        # --- Specific fields ---
         lic_no = (p.get("license_number") or "").strip()
         if lic_no:
             qs = qs.filter(license__license_number__icontains=lic_no)
@@ -177,12 +190,11 @@ class LicenseImportItemsSelectView(ListAPIView):
         if notif:
             qs = qs.filter(license__notification_number__icontains=notif)
 
-        # license.is_null
         is_null_flag = _get_bool(p.get("is_null"))
         if is_null_flag is not None:
             qs = qs.filter(license__is_null=is_null_flag)
 
-        # distinct() needed for the join via export_license (SION)
+        # distinct for joins through export_license
         return qs.distinct().order_by(
             "license__license_expiry_date",
             "license__license_number",
@@ -191,6 +203,9 @@ class LicenseImportItemsSelectView(ListAPIView):
 
 
 class LicenseImportItemsViewSet(viewsets.ReadOnlyModelViewSet):
+    """
+    Lightweight endpoint to search by a composed 'display_name' field the FE uses.
+    """
     queryset = (
         LicenseImportItemsModel.objects
         .select_related('license')
@@ -204,6 +219,7 @@ class LicenseImportItemsViewSet(viewsets.ReadOnlyModelViewSet):
     def get_queryset(self):
         queryset = super().get_queryset()
         search = self.request.query_params.get('display_name')
+
         if search and ' - ' in search:
             license_part, sr_part = search.split(' - ', 1)
             queryset = queryset.filter(
@@ -215,4 +231,5 @@ class LicenseImportItemsViewSet(viewsets.ReadOnlyModelViewSet):
                 Q(license__license_number__istartswith=search) |
                 Q(license__license_number__iendswith=search)
             )
+
         return queryset.distinct()

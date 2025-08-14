@@ -1,5 +1,5 @@
 import {fireEvent, render, screen} from '@testing-library/react';
-import ForgotPassword from '../ForgotPassword.jsx';
+import ForgotPassword from '../ForgotPassword';
 import {ToastContainer} from 'react-toastify';
 
 test('renders forgot password form and submits', async () => {

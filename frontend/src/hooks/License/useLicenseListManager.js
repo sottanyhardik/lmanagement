@@ -11,19 +11,12 @@ const DEFAULT_SORT_ORDER = 'desc';
 const DEFAULT_FILTERS = {
     exporter_objs: [],
     port_objs: [],
+    license_number: '',
     from_date: '',
     to_date: '',
-    expired_only: false,
+    balance_cmp: 'gte',   // 'gte' | 'lte'
+    balance_val: '',      // string/number
 };
-
-export const sortOptions = [
-    {label: 'License No ⬇️', value: 'license_number:desc'},
-    {label: 'License No ⬆️', value: 'license_number:asc'},
-    {label: 'License Date ⬇️', value: 'license_date:desc'},
-    {label: 'License Date ⬆️', value: 'license_date:asc'},
-    {label: 'Expiry Date ⬇️', value: 'license_expiry_date:desc'},
-    {label: 'Expiry Date ⬆️', value: 'license_expiry_date:asc'},
-];
 
 const ensureSlash = (s) => (s.endsWith('/') ? s : `${s}/`);
 const nextPageFromUrl = (u) => {
@@ -37,6 +30,16 @@ const nextPageFromUrl = (u) => {
     }
 };
 
+// tiny debounce
+const useDebounced = (value, ms = 300) => {
+    const [v, setV] = useState(value);
+    useEffect(() => {
+        const t = setTimeout(() => setV(value), ms);
+        return () => clearTimeout(t);
+    }, [value, ms]);
+    return v;
+};
+
 const useLicenseListManager = (apiUrl = 'licenses/') => {
     const base = useMemo(() => ensureSlash(apiUrl || 'licenses/'), [apiUrl]);
 
@@ -47,17 +50,19 @@ const useLicenseListManager = (apiUrl = 'licenses/') => {
     const [sortField, setSortField] = useState(DEFAULT_SORT_FIELD);
     const [sortOrder, setSortOrder] = useState(DEFAULT_SORT_ORDER);
     const [searchQuery, setSearchQuery] = useState('');
+    const debouncedSearch = useDebounced(searchQuery, 300);
+
     const [allExpanded, setAllExpanded] = useState(true);
     const [hasMore, setHasMore] = useState(true);
     const [newEntry, setNewEntry] = useState(null);
-    const [refreshKey, setRefreshKey] = useState(0);
-    const [triggeredByFilter, setTriggeredByFilter] = useState(false);
     const [filters, setFilters] = useState(DEFAULT_FILTERS);
     const [selectedIds, setSelectedIds] = useState([]);
     const [nextUrl, setNextUrl] = useState(null);
+    const [firstPageLoaded, setFirstPageLoaded] = useState(false);
 
-    const {ref: loadMoreRef, inView} = useInView();
+    const {ref: loadMoreRef, inView} = useInView({rootMargin: '400px 0px', threshold: 0});
 
+    // URL ↔ state sync (keeps bookmarkable)
     useUrlSync({
         page,
         setPage,
@@ -69,32 +74,45 @@ const useLicenseListManager = (apiUrl = 'licenses/') => {
         setSortOrder,
     });
 
-    // request race guards
+    // request guards
     const abortRef = useRef(null);
     const seqRef = useRef(0);
 
     const buildParams = useCallback(() => {
         const params = {
             page,
-            search: searchQuery || undefined,
+            search: debouncedSearch || undefined,
             ordering: sortField && sortOrder ? `${sortOrder === 'desc' ? '-' : ''}${sortField}` : '',
+            // backend supports ids as ?,? or separate — send comma-joined
             ...(filters.exporter_objs.length > 0 && {
                 exporter__in: filters.exporter_objs.map((c) => c.id).join(','),
             }),
             ...(filters.port_objs.length > 0 && {
                 port__in: filters.port_objs.map((p) => p.id).join(','),
             }),
+            ...(filters.license_number && {license_number: filters.license_number}),
             ...(filters.from_date && {from_date: filters.from_date}),
             ...(filters.to_date && {to_date: filters.to_date}),
-            ...(filters.expired_only && {expired_only: true}),
         };
+
+        // Optional: numeric balance filter (safe to send; ignored if server doesn’t support)
+        if (filters.balance_val !== '' && filters.balance_val != null) {
+            const val = String(filters.balance_val).trim();
+            if (val !== '') {
+                params.balance_cmp = filters.balance_cmp || 'gte';
+                params.balance_val = val;
+            }
+        }
+
+        // Default behavior: server already returns non-expired by default
+        // (see your ViewSet.get_queryset). If you add a UI switch later,
+        // add `is_expired` here accordingly.
+
         return params;
-    }, [page, searchQuery, sortField, sortOrder, filters]);
+    }, [page, debouncedSearch, sortField, sortOrder, filters]);
 
-    const fetchData = useCallback(
-        async (append = false, pageOverride = null) => {
-            if (loading && append) return; // avoid double fetch while scrolling
-
+    const fetchPage = useCallback(
+        async (pageToGet, append) => {
             abortRef.current?.abort();
             const seq = ++seqRef.current;
             const ctrl = new AbortController();
@@ -103,30 +121,28 @@ const useLicenseListManager = (apiUrl = 'licenses/') => {
             setLoading(true);
             try {
                 const res = await axios.get(base, {
-                    params: pageOverride ? {...buildParams(), page: pageOverride} : buildParams(),
+                    params: {...buildParams(), page: pageToGet},
                     signal: ctrl.signal,
                 });
-
-                if (seq !== seqRef.current) return; // stale response
+                if (seq !== seqRef.current) return; // stale
 
                 const data = res.data || {};
                 const results = Array.isArray(data.results) ? data.results : [];
                 setEntries((prev) => {
-                    if (!append || pageOverride === 1) return results;
+                    if (!append || pageToGet === 1) return results;
+                    // de-dupe by id
                     const combined = [...prev, ...results];
                     return Array.from(new Map(combined.map((e) => [e.id, e])).values());
                 });
                 setHasMore(Boolean(data.next));
                 setNextUrl(data.next || null);
+                if (pageToGet === 1) setFirstPageLoaded(true);
             } catch (err) {
                 if (err?.name === 'CanceledError' || err?.code === 'ERR_CANCELED') return;
                 if (err?.response?.status === 404) {
+                    setEntries([]);
                     setHasMore(false);
-                    if (page !== 1) setPage(1);
-                    if (page === 1) {
-                        setEntries([]);
-                        toast.info('No data found for the current filters.');
-                    }
+                    setNextUrl(null);
                 } else {
                     console.error(err);
                     toast.error('Failed to fetch License data');
@@ -135,38 +151,44 @@ const useLicenseListManager = (apiUrl = 'licenses/') => {
                 if (seq === seqRef.current) setLoading(false);
             }
         },
-        [base, buildParams, loading, page]
+        [base, buildParams]
     );
 
-    // reset when query/sort/filters change
+    // Reset → fetch first page when search/sort/filters change (after debounce)
     useEffect(() => {
         setEntries([]);
         setPage(1);
         setHasMore(true);
         setNextUrl(null);
-        setTriggeredByFilter(true);
-        setRefreshKey((k) => k + 1);
+        setFirstPageLoaded(false);
+        fetchPage(1, false);
         return () => abortRef.current?.abort();
-    }, [searchQuery, sortField, sortOrder, filters]);
+        // eslint-disable-next-line react-hooks/exhaustive-deps
+    }, [debouncedSearch, sortField, sortOrder, JSON.stringify({
+        exporter: filters.exporter_objs.map((x) => x.id),
+        port: filters.port_objs.map((x) => x.id),
+        license_number: filters.license_number,
+        from_date: filters.from_date,
+        to_date: filters.to_date,
+        balance_cmp: filters.balance_cmp,
+        balance_val: filters.balance_val,
+    })]);
 
-    // fetch first page after reset
+    // Append next pages
     useEffect(() => {
-        if (triggeredByFilter) {
-            fetchData(false, 1).then(() => setTriggeredByFilter(false));
-        }
-    }, [refreshKey, triggeredByFilter, fetchData]);
+        if (page > 1) fetchPage(page, true);
+    }, [page, fetchPage]);
 
-    // fetch when page increments (append mode)
+    // Infinite scroll sentinel:
     useEffect(() => {
-        if (page > 1) fetchData(true, page);
-    }, [page, fetchData]);
+        // Only react to the sentinel after page 1 is in, to avoid double calls on mount.
+        if (!firstPageLoaded) return;
+        if (!hasMore || loading) return;
+        if (!inView) return;
 
-    // infinite scroll
-    useEffect(() => {
-        if (!inView || !hasMore || loading || triggeredByFilter) return;
         const np = nextPageFromUrl(nextUrl) ?? page + 1;
         if (Number.isFinite(np)) setPage(np);
-    }, [inView, hasMore, loading, triggeredByFilter, nextUrl, page]);
+    }, [inView, hasMore, loading, nextUrl, page, firstPageLoaded]);
 
     const updateSingleEntry = async (id) => {
         const targetId = typeof id === 'object' ? id?.id : id;
@@ -175,14 +197,13 @@ const useLicenseListManager = (apiUrl = 'licenses/') => {
             const {data} = await axios.get(`${base}${targetId}/`);
             setEntries((prev) => prev.map((e) => (e.id === targetId ? data : e)));
         } catch (err) {
-            toast.error('Failed to fetch license entry');
             console.error(err);
+            toast.error('Failed to refresh entry');
         }
     };
 
-    const toggleSelect = (id) => {
+    const toggleSelect = (id) =>
         setSelectedIds((prev) => (prev.includes(id) ? prev.filter((i) => i !== id) : [...prev, id]));
-    };
 
     const toggleSelectAll = (ids) => {
         const allSel = ids.every((id) => selectedIds.includes(id));
@@ -195,7 +216,7 @@ const useLicenseListManager = (apiUrl = 'licenses/') => {
         setSearchQuery('');
         setSortField(DEFAULT_SORT_FIELD);
         setSortOrder(DEFAULT_SORT_ORDER);
-        setFilters({...DEFAULT_FILTERS, exporter_objs: [], port_objs: []}); // fresh arrays
+        setFilters({...DEFAULT_FILTERS, exporter_objs: [], port_objs: []});
         setPage(1);
         setEntries([]);
         setHasMore(true);
@@ -205,7 +226,7 @@ const useLicenseListManager = (apiUrl = 'licenses/') => {
 
     const buildExportParams = () => {
         const params = new URLSearchParams({
-            search: searchQuery || '',
+            search: debouncedSearch || '',
             ordering: sortField && sortOrder ? `${sortOrder === 'desc' ? '-' : ''}${sortField}` : '',
         });
 
@@ -215,9 +236,13 @@ const useLicenseListManager = (apiUrl = 'licenses/') => {
         if (filters.port_objs.length) {
             params.set('port__in', filters.port_objs.map((p) => p.id).join(','));
         }
+        if (filters.license_number) params.set('license_number', filters.license_number);
         if (filters.from_date) params.set('from_date', filters.from_date);
         if (filters.to_date) params.set('to_date', filters.to_date);
-        if (filters.expired_only) params.set('expired_only', 'true');
+        if (filters.balance_val !== '' && filters.balance_val != null) {
+            params.set('balance_cmp', filters.balance_cmp || 'gte');
+            params.set('balance_val', String(filters.balance_val));
+        }
 
         return params.toString();
     };
@@ -246,7 +271,6 @@ const useLicenseListManager = (apiUrl = 'licenses/') => {
 
     const handleExportPDF = async () => {
         try {
-            toast.info('Downloading PDF...');
             const res = await axios.get(`${base}export/pdf/?${buildExportParams()}`, {
                 responseType: 'blob',
             });
@@ -257,8 +281,8 @@ const useLicenseListManager = (apiUrl = 'licenses/') => {
             link.download = `Licenses_${new Date().toISOString().slice(0, 19).replace(/[:T]/g, '-')}.pdf`;
             document.body.appendChild(link);
             link.click();
-            document.body.removeChild(link);
-            setTimeout(() => window.URL.revokeObjectURL(url), 1000);
+            link.remove();
+            setTimeout(() => window.URL.revokeObjectURL(url), 500);
         } catch (err) {
             console.error('Export PDF failed:', err);
             toast.error('Failed to Export PDF');
@@ -281,7 +305,6 @@ const useLicenseListManager = (apiUrl = 'licenses/') => {
         clearSelection,
         sortField,
         sortOrder,
-        sortOptions,
         setSortField,
         setSortOrder,
         searchQuery,
@@ -294,7 +317,7 @@ const useLicenseListManager = (apiUrl = 'licenses/') => {
         handleReset,
         handleExportXLSX,
         handleExportPDF,
-        fetchData,
+        fetchData: (append = false, p = 1) => fetchPage(p, append),
     };
 };
 

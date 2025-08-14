@@ -1,45 +1,83 @@
+// src/pages/BillOfEntry/BillOfEntryList.jsx
 import React from 'react';
 import {Card, Container} from 'react-bootstrap';
 
-import BillOfEntryForm from './BillOfEntryForm';
 import ListControls from '../../components/ListControls';
 import DeleteSelectedButton from './DeleteSelectedButton';
-import GroupedAccordion from './GroupedAccordion';
 import BoeFilters from './BoeFilters';
+import BillOfEntryForm from './BillOfEntryForm';
+import GroupedAccordion from './GroupedAccordion';
+
 import {groupEntries} from '../../utils/groupEntries';
 import useBillOfEntryListManager from '../../hooks/BillOfEntry/useBillOfEntryListManager';
 
 const BillOfEntryList = () => {
     const {
+        // data/state
         entries,
+        loading,
+        hasMore,
         expanded,
         setExpanded,
-        loading,
-        newEntry,
         allExpanded,
-        selectedIds,
-        sortField,
-        sortOrder,
-        searchQuery,
-        filters,
-        loadMoreRef,
-        sortOptions,
-        setSortField,
-        setSortOrder,
-        setSearchQuery,
-        setPage,
+        setAllExpanded,
+        newEntry,
         setNewEntry,
+
+        // selection
+        selectedIds,
         toggleSelect,
         toggleSelectAll,
         clearSelection,
+
+        // sorting/search/filtering
+        sortField,
+        sortOrder,
+        sortOptions,
+        setSortField,
+        setSortOrder,
+        searchQuery,
+        setSearchQuery,
+        filters,
         setFilters,
+        setPage,
+
+        // io
+        loadMoreRef,
+        updateSingleEntry,
+        fetchData,
         handleReset,
         handleExportXLSX,
         handleExportPDF,
-        updateSingleEntry,
-        fetchData,
-        setAllExpanded,
-    } = useBillOfEntryListManager();
+    } = useBillOfEntryListManager(); // hook baseURL already includes /api via axiosInstance
+
+    const onAddNewClick = () =>
+        setNewEntry({
+            bill_of_entry_number: '',
+            bill_of_entry_date: '',
+            port: null,
+            exchange_rate: '',
+            company: null,
+            invoice_no: '',
+            product_name: '',
+            item_details: [
+                {
+                    sr_number: '',
+                    transaction_type: 'D', // Debit by default
+                    qty: '',
+                    cif_fc: '',
+                    cif_inr: '',
+                },
+            ],
+        });
+
+    const onSavedRow = (id) => {
+        if (!id) return;
+        updateSingleEntry(id);
+        setExpanded((prev) => ({...prev, [id]: true}));
+    };
+
+    const groups = groupEntries(entries);
 
     return (
         <Container className="mt-4">
@@ -56,35 +94,16 @@ const BillOfEntryList = () => {
                 handleReset={handleReset}
                 handleExportCSV={loading ? undefined : handleExportXLSX}
                 handleExportPDF={loading ? undefined : handleExportPDF}
-                dataExport={true}
-                Filters={React.Children.toArray(<BoeFilters filters={filters} setFilters={setFilters}/>)}
-                onAddNewClick={() =>
-                    setNewEntry({
-                        bill_of_entry_number: '',
-                        bill_of_entry_date: '',
-                        port: null,
-                        exchange_rate: '',
-                        company: null,
-                        invoice_no: '',
-                        product_name: '',
-                        item_details: [
-                            {
-                                sr_number: '',
-                                transaction_type: 'D',
-                                qty: '',
-                                cif_fc: '',
-                                cif_inr: '',
-                            },
-                        ],
-                    })
-                }
+                dataExport
+                Filters={<BoeFilters filters={filters} setFilters={setFilters}/>}
+                onAddNewClick={onAddNewClick}
             />
 
             <DeleteSelectedButton
                 selectedIds={selectedIds}
                 onDeleted={() => {
                     clearSelection();
-                    fetchData();
+                    fetchData(false, 1);
                 }}
             />
 
@@ -107,7 +126,7 @@ const BillOfEntryList = () => {
                             onClose={() => setNewEntry(null)}
                             onSaved={() => {
                                 setNewEntry(null);
-                                fetchData();
+                                fetchData(false, 1);
                             }}
                         />
                     </Card.Body>
@@ -115,20 +134,28 @@ const BillOfEntryList = () => {
             )}
 
             <GroupedAccordion
-                groups={groupEntries(entries)}
+                groups={groups}
                 allExpanded={allExpanded}
                 expanded={expanded}
                 toggle={(id) => setExpanded((prev) => ({...prev, [id]: !prev[id]}))}
                 selectedIds={selectedIds}
                 toggleSelect={toggleSelect}
                 toggleSelectAll={toggleSelectAll}
-                onSaved={updateSingleEntry}
+                onSaved={onSavedRow}
             />
 
-            <div ref={loadMoreRef} className="text-center my-4" style={{minHeight: '40px'}}>
-                {loading && <div className="spinner-border text-primary" role="status"/>}
-                {!loading && !entries.length && <span className="text-muted">No entries found</span>}
-            </div>
+            {/* Loading + infinite-scroll sentinel */}
+            {loading && (
+                <div className="text-center my-3">
+                    <div className="spinner-border text-primary" role="status"/>
+                </div>
+            )}
+            {!loading && hasMore && (
+                <div ref={loadMoreRef} className="text-center my-4" style={{minHeight: 24}}/>
+            )}
+            {!loading && !entries.length && (
+                <div className="text-center text-muted my-4">No entries found.</div>
+            )}
         </Container>
     );
 };

@@ -1,103 +1,194 @@
-import React, {useEffect, useState} from 'react';
+// src/pages/BillOfEntry/TransferLetterForm.jsx
+import React, {useEffect, useMemo, useState} from 'react';
 import {Button, Col, Form, Row, Spinner, Table} from 'react-bootstrap';
 import axios from '../../api/axiosInstance';
 import {toast} from 'react-toastify';
 import {fetchTransferLetterTemplates} from '../../Cache/templateCache';
 
-const TransferLetterForm = ({boe, autoDownload = false}) => {
+/**
+ * Props:
+ * - boe: BOE object (must include company + item_details)
+ * - autoDownload: boolean (open the generated file automatically)
+ * - generatePath: (boe) => string   // allows API flexibility
+ * - onGenerated: (payload, response) => void
+ */
+const TransferLetterForm = ({
+                                boe,
+                                autoDownload = false,
+                                generatePath = (b) => `bill-of-entries/${b?.id}/generate-transfer-letter/`,
+                                onGenerated,
+                            }) => {
     const [templates, setTemplates] = useState([]);
-    const [loading, setLoading] = useState(true);
+    const [tplLoading, setTplLoading] = useState(true);
     const [generating, setGenerating] = useState(false);
-    const [formData, setFormData] = useState({
+
+    const [form, setForm] = useState({
         company: '',
         company_address_line1: '',
         company_address_line2: '',
-        tl_choice: ''
+        tl_choice: '',
     });
 
-    const [editableItems, setEditableItems] = useState([]);
+    const [rows, setRows] = useState([]);
 
-    useEffect(() => {
-        const fetchTemplates = async () => {
-            try {
-                const data = await fetchTransferLetterTemplates();
-                setTemplates(Array.isArray(data) ? data : []);
-            } catch (err) {
-                toast.error('Failed to load TL templates');
-            } finally {
-                setLoading(false);
-            }
-        };
+    // ---------- helpers ----------
+    const setField = (k, v) => setForm((s) => ({...s, [k]: v}));
 
-        fetchTemplates();
-    }, []);
-
-    useEffect(() => {
-        if (boe && boe.company) {
-            setFormData({
-                company: boe.company.name || '',
-                company_address_line1: boe.company.address_line_1 || '',
-                company_address_line2: boe.company.address_line_2 || '',
-                tl_choice: ''
-            });
-
-            setEditableItems(
-                boe.item_details?.map((item, index) => ({
-                    id: item.id || index,
-                    sr_number: item.sr_number?.display_name || `SR ${index + 1}`,
-                    cif_fc: item.cif_fc
-                })) || []
-            );
-        }
-    }, [boe]);
-
-    const handleChange = (field, value) => {
-        setFormData(prev => ({...prev, [field]: value}));
+    const toNumber = (v) => {
+        const n = typeof v === 'string' ? v.replace(/,/g, '') : v;
+        const x = Number(n);
+        return Number.isFinite(x) ? x : 0;
     };
 
-    const handleCifChange = (index, value) => {
-        setEditableItems(prev =>
-            prev.map((item, idx) =>
-                idx === index ? {...item, cif_fc: value} : item
-            )
+    const downloadFromResponse = (res, fallback = 'transfer_letter.docx') => {
+        // prefer JSON with {url}
+        if (res?.data?.url) {
+            const a = document.createElement('a');
+            a.href = res.data.url;
+            a.target = '_blank';
+            a.rel = 'noopener';
+            a.click();
+            return true;
+        }
+        // or blob content
+        const ct = res?.headers?.['content-type'] || '';
+        if (ct && (ct.includes('application') || ct.includes('octet-stream'))) {
+            const blob = new Blob([res.data], {type: ct});
+            const url = window.URL.createObjectURL(blob);
+            const a = document.createElement('a');
+            a.href = url;
+            a.download = fallback;
+            document.body.appendChild(a);
+            a.click();
+            a.remove();
+            window.URL.revokeObjectURL(url);
+            return true;
+        }
+        return false;
+    };
+
+    // ---------- load templates once ----------
+    useEffect(() => {
+        let alive = true;
+        (async () => {
+            try {
+                const data = await fetchTransferLetterTemplates();
+                if (!alive) return;
+                const list = Array.isArray(data) ? data : [];
+                setTemplates(list);
+                // preselect sole template
+                if (list.length === 1) {
+                    setField('tl_choice', String(list[0].id));
+                }
+            } catch (e) {
+                toast.error('Failed to load transfer letter templates');
+            } finally {
+                if (alive) setTplLoading(false);
+            }
+        })();
+        return () => {
+            alive = false;
+        };
+    }, []);
+
+    // ---------- populate from BOE ----------
+    useEffect(() => {
+        if (!boe) return;
+
+        setForm((s) => ({
+            ...s,
+            company: boe?.company?.name || '',
+            company_address_line1: boe?.company?.address_line_1 || '',
+            company_address_line2: boe?.company?.address_line_2 || '',
+            // keep tl_choice as-is (user might have selected already)
+        }));
+
+        const mapped =
+            boe?.item_details?.map((item, idx) => ({
+                id: item.id ?? idx,
+                sr_number:
+                    item?.sr_number?.display_name ??
+                    item?.serial_number ??
+                    item?.sr_number ??
+                    `SR ${idx + 1}`,
+                cif_fc: toNumber(item?.cif_fc),
+            })) ?? [];
+
+        setRows(mapped);
+    }, [boe]);
+
+    const tplOptions = useMemo(
+        () =>
+            templates.map((t) => ({
+                value: String(t.id),
+                label: t.name ?? `Template #${t.id}`,
+            })),
+        [templates]
+    );
+
+    const handleRowCif = (i, val) => {
+        setRows((prev) =>
+            prev.map((r, idx) => (idx === i ? {...r, cif_fc: toNumber(val)} : r))
         );
     };
 
     const handleGenerate = async () => {
-        if (!formData.tl_choice) {
-            toast.warning('Please select a TL template');
+        if (!boe?.id) {
+            toast.error('Missing Bill of Entry context.');
+            return;
+        }
+        if (!form.tl_choice) {
+            toast.warning('Please select a transfer letter template.');
             return;
         }
 
+        const payload = {
+            company: form.company?.trim() || '',
+            company_address_line1: form.company_address_line1?.trim() || '',
+            company_address_line2: form.company_address_line2?.trim() || '',
+            tl_choice: form.tl_choice,
+            modified_items: rows.map((r) => ({
+                id: r.id,
+                cif_fc: toNumber(r.cif_fc),
+            })),
+        };
+
         setGenerating(true);
         try {
-            const payload = {
-                ...formData,
-                modified_items: editableItems
-            };
+            // Try JSON first; if your API returns a file, we’ll retry as blob.
+            const url = generatePath(boe);
+            let res;
+            try {
+                res = await axios.post(url, payload);
+            } catch (e) {
+                // fallback: maybe API returns a file
+                res = await axios.post(url, payload, {responseType: 'blob'});
+            }
 
-            const res = await axios.post(`/boe/${boe.id}/generate`, payload);
-            toast.success('Transfer Letter Generated');
+            toast.success('Transfer Letter generated.');
+            onGenerated?.(payload, res);
 
-            if (autoDownload && res.data?.url) {
-                const link = document.createElement('a');
-                link.href = res.data.url;
-                link.download = '';
-                link.target = '_blank';
-                link.click();
+            if (autoDownload) {
+                const ok = downloadFromResponse(res);
+                if (!ok) toast.info('Generated. Download link not provided by server.');
             }
         } catch (err) {
-            console.error('Failed to generate TL:', err);
-            toast.error('Failed to generate TL');
+            console.error(err);
+            const msg =
+                err?.response?.data?.detail ||
+                err?.response?.data?.error ||
+                'Failed to generate Transfer Letter';
+            toast.error(msg);
         } finally {
             setGenerating(false);
         }
     };
 
-    if (loading) {
+    // ---------- render ----------
+    if (tplLoading) {
         return (
             <div className="text-muted">
-                <Spinner size="sm"/> Loading templates...
+                <Spinner size="sm" className="me-2"/> Loading templates…
             </div>
         );
     }
@@ -108,74 +199,85 @@ const TransferLetterForm = ({boe, autoDownload = false}) => {
                 <Col md={4}>
                     <Form.Label>Company</Form.Label>
                     <Form.Control
-                        value={formData.company}
-                        onChange={e => handleChange('company', e.target.value)}
+                        value={form.company}
+                        onChange={(e) => setField('company', e.target.value)}
                     />
                 </Col>
                 <Col md={4}>
                     <Form.Label>Address Line 1</Form.Label>
                     <Form.Control
-                        value={formData.company_address_line1}
-                        onChange={e => handleChange('company_address_line1', e.target.value)}
+                        value={form.company_address_line1}
+                        onChange={(e) => setField('company_address_line1', e.target.value)}
                     />
                 </Col>
                 <Col md={4}>
                     <Form.Label>Address Line 2</Form.Label>
                     <Form.Control
-                        value={formData.company_address_line2}
-                        onChange={e => handleChange('company_address_line2', e.target.value)}
+                        value={form.company_address_line2}
+                        onChange={(e) => setField('company_address_line2', e.target.value)}
                     />
                 </Col>
             </Row>
 
             <Row className="mb-3">
                 <Col md={6}>
-                    <Form.Label>Select Template</Form.Label>
+                    <Form.Label>Template</Form.Label>
                     <Form.Select
-                        value={formData.tl_choice}
-                        onChange={e => handleChange('tl_choice', e.target.value)}
+                        value={form.tl_choice}
+                        onChange={(e) => setField('tl_choice', e.target.value)}
                     >
-                        <option value="">-- Select Transfer Letter Template --</option>
-                        {templates.map(template => (
-                            <option key={template.id} value={template.id}>
-                                {template.name}
+                        <option value="">— Select Transfer Letter Template —</option>
+                        {tplOptions.map((o) => (
+                            <option key={o.value} value={o.value}>
+                                {o.label}
                             </option>
                         ))}
                     </Form.Select>
                 </Col>
             </Row>
 
-            <h6 className="mt-3 mb-2">Edit CIF FC Values</h6>
-            <Table bordered size="sm" className="mb-3">
+            <h6 className="mt-3 mb-2">Edit CIF (FC) per SR</h6>
+            <Table bordered size="sm" responsive className="mb-3">
                 <thead className="table-light">
                 <tr>
-                    <th>#</th>
+                    <th style={{width: 60}}>#</th>
                     <th>SR Number</th>
-                    <th className="text-end">CIF FC (editable)</th>
+                    <th className="text-end" style={{width: 200}}>
+                        CIF FC (editable)
+                    </th>
                 </tr>
                 </thead>
                 <tbody>
-                {editableItems.map((item, idx) => (
-                    <tr key={item.id}>
-                        <td>{idx + 1}</td>
-                        <td>{item.sr_number}</td>
+                {rows.map((r, i) => (
+                    <tr key={r.id}>
+                        <td>{i + 1}</td>
+                        <td>{r.sr_number}</td>
                         <td className="text-end">
                             <Form.Control
                                 type="number"
                                 min="0"
-                                value={item.cif_fc}
-                                onChange={e => handleCifChange(idx, e.target.value)}
+                                step="0.01"
+                                inputMode="decimal"
+                                value={Number.isFinite(r.cif_fc) ? r.cif_fc : ''}
+                                onChange={(e) => handleRowCif(i, e.target.value)}
                                 style={{textAlign: 'right'}}
                             />
                         </td>
                     </tr>
                 ))}
+                {!rows.length && (
+                    <tr>
+                        <td colSpan={3} className="text-center text-muted">
+                            No items to include.
+                        </td>
+                    </tr>
+                )}
                 </tbody>
             </Table>
 
             <div className="text-end">
-                <Button variant="primary" onClick={handleGenerate} disabled={generating}>
-                    {generating ? 'Generating...' : 'Generate Transfer Letter'}
+                <Button onClick={handleGenerate} disabled={generating || !boe}>
+                    {generating ? 'Generating…' : 'Generate Transfer Letter'}
                 </Button>
             </div>
         </Form>

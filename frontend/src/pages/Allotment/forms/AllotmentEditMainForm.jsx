@@ -1,7 +1,7 @@
 import React, {useCallback, useMemo, useState} from 'react';
 import {Button, Col, Form, Row} from 'react-bootstrap';
-import AsyncCompanySelect from '../../../components/AsyncSelect/AsyncCompanySelect.jsx';
-import AsyncPortSelect from '../../../components/AsyncSelect/AsyncPortSelect.jsx';
+import AsyncCompanySelect from '../../../components/AsyncSelect/AsyncCompanySelect';
+import AsyncPortSelect from '../../../components/AsyncSelect/AsyncPortSelect';
 import axios from '../../../api/axiosInstance';
 import {toast} from 'react-toastify';
 
@@ -135,7 +135,7 @@ const AllotmentEditMainForm = ({entry, onSaved}) => {
                 ? computedUnit
                 : Number(data.unit_value_per_unit) || 0;
 
-            await axios.patch(`/api/allotments/${data.id}/`, {
+            await axios.patch(`allotments/${data.id}/`, {
                 company_id: data.company?.id,
                 port_id: data.port?.id || null,
                 item_name: data.item_name,

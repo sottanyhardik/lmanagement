@@ -267,7 +267,7 @@ export const AuthProvider = ({children}) => {
                 const msg =
                     error?.response?.data?.detail ||
                     error?.response?.data?.error ||
-                    (status === 401 ? 'Invalid username or password' : 'Login failed');
+                    (status === 401 ? 'Invalid username or password' : 'Auth failed');
                 toast.error(`❌ ${msg}`);
                 throw error;
             } finally {

@@ -10,11 +10,11 @@ router.register(r'license-import-items', LicenseImportItemsViewSet, basename='li
 router.register(r'licenses', LicenseDetailsViewSet)
 
 urlpatterns = [
-    path("api/license-import-items/select/", LicenseImportItemsSelectView.as_view(),
+    path("license-import-items/select/", LicenseImportItemsSelectView.as_view(),
          name="license-import-items-select"),
-    path('api/licenses/export/pdf/', LicenseImportItemsUltraWidePDF.as_view(), name='license-details-pdf'),
-    path('api/licenses/export/excel/', LicenseImportItemsXLSX.as_view(), name="licenses-export-xlsx"),
-    path('api/', include(router.urls)),
+    path('licenses/export/pdf/', LicenseImportItemsUltraWidePDF.as_view(), name='license-details-pdf'),
+    path('licenses/export/excel/', LicenseImportItemsXLSX.as_view(), name="licenses-export-xlsx"),
+    path('', include(router.urls)),
 
     # path('license/report/biscuits/', login_required(views.PDFSummaryLicenseDetailView.as_view()),
     #      name='license_report_biscuits_new'),

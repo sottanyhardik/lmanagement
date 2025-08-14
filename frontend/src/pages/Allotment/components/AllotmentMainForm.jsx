@@ -171,11 +171,11 @@ export default function AllotmentMainForm({
             };
 
             if (isCreate) {
-                const {data: created} = await axios.post("/api/allotments/", payload);
+                const {data: created} = await axios.post("allotments/", payload);
                 toast.success("Allotment created");
                 onCreated?.(created);
             } else {
-                await axios.patch(`/api/allotments/${data.id}/`, payload);
+                await axios.patch(`allotments/${data.id}/`, payload);
                 toast.success("Allotment updated");
                 onSaved?.();
             }

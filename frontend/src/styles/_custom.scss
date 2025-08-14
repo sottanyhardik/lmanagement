@@ -1,0 +1,137 @@
+:root {
+  --primary-color: #e16123;
+  --primary-hover: #c9521d;
+  --primary-text: #ffffff;
+  --bg-color: #f7f7f7;
+  --text-color: #212529;
+}
+
+// Global body
+body {
+  font-family: 'Segoe UI', sans-serif;
+  background-color: var(--bg-color);
+  color: var(--text-color);
+  margin: 0;
+}
+
+// Links
+a, .text-primary {
+  color: $primary !important;
+  text-decoration: none;
+
+  &:hover {
+    color: $primary-hover;
+    text-decoration: underline;
+  }
+}
+
+// Buttons
+button,
+.btn {
+  background-color: $primary;
+  color: $primary-text !important;
+  border: none;
+  border-radius: 6px;
+  padding: 0.6em 1.2em;
+  font-size: 1em;
+  cursor: pointer;
+  transition: background-color 0.3s ease;
+
+  &:hover {
+    background-color: $primary-hover;
+  }
+
+  &:disabled {
+    opacity: 0.6;
+    cursor: not-allowed;
+  }
+}
+
+.btn-primary {
+  background-color: $primary;
+  border-color: $primary;
+  color: $primary-text;
+
+  &:hover, &:focus, &:active {
+    background-color: $primary-hover;
+    border-color: $primary-hover;
+    color: $primary-text;
+  }
+}
+
+.btn-outline-primary {
+  color: $primary;
+  border-color: $primary;
+
+  &:hover, &:focus, &:active {
+    background-color: $primary;
+    color: $primary-text;
+  }
+}
+
+// Forms
+input.form-control,
+textarea.form-control,
+select.form-select {
+  border: none;
+  border-bottom: 1px solid #ccc;
+  border-radius: 0;
+  background: transparent;
+  box-shadow: none;
+  padding: 2px 0;
+
+  &:focus {
+    border-bottom: 1px solid #000;
+    outline: none;
+  }
+}
+
+// Cards
+.card {
+  border-radius: 0.75rem;
+  background-color: $card-bg;
+  box-shadow: 0 4px 16px rgba(0, 0, 0, 0.1);
+  transition: all 0.3s ease-in-out;
+}
+
+// Navbar
+.navbar {
+  background-color: $primary;
+  color: $primary-text !important;
+  font-weight: 500;
+}
+
+.navbar .nav-link {
+  background-color: $primary;
+  color: $primary-text !important;
+  font-weight: 500;
+  margin-left: 1rem;
+
+  &:hover, &:focus, &.active {
+    color: $primary-text !important;
+    outline: 1px solid $primary-text;
+    border-radius: 4px;
+    font-weight: bold;
+  }
+}
+
+// Dropdowns
+.dropdown-item {
+  &:focus, &.active {
+    color: $primary-text !important;
+    outline: 1px solid $primary-text;
+    border-radius: 4px;
+    font-weight: bold;
+  }
+}
+
+// Layout Padding
+.pt-navbar {
+  padding-top: 72px;
+}
+
+@media (min-width: 768px) {
+  .pt-navbar {
+    padding-top: 80px;
+  }
+}

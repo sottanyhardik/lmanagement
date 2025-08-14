@@ -9,7 +9,7 @@ import {fetchTransferLetterTemplates} from '../../Cache/templateCache';
  * Props:
  *  - allotment: object (expects .company, .allotment_details)
  *  - autoDownload?: boolean = false
- *  - generatePath?: string (override API path). Default: `/api/allotments/{id}/generate-tl/`
+ *  - generatePath?: string (override API path). Default: `allotments/{id}/generate-tl/`
  */
 const TransferLetterFromAllotment = ({allotment, autoDownload = false, generatePath}) => {
     const [templates, setTemplates] = useState([]);
@@ -95,7 +95,7 @@ const TransferLetterFromAllotment = ({allotment, autoDownload = false, generateP
 
             const url =
                 generatePath ||
-                `/api/allotments/${encodeURIComponent(allotment.id)}/generate-tl/`;
+                `allotments/${encodeURIComponent(allotment.id)}/generate-tl/`;
 
             const res = await axios.post(url, payload);
             toast.success('Transfer Letter Generated');

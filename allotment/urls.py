@@ -11,7 +11,7 @@ router.register(r'option-allotments', AllotmentOptionViewSet, basename='allotmen
 router.register(r"allotments", AllotmentViewSet, basename="allotments")
 
 urlpatterns = [
-    path('api/', include(router.urls)),
+    path('', include(router.urls)),
     # ex: /polls/
     path('add/', login_required(views.AllotmentCreateView.as_view()), name='allotment-add'),
     # path('card/<int:pk>/', login_required(views.CardView.as_view()), name='allotment-card'),

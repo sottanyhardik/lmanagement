@@ -1,28 +1,36 @@
-// pages/License/LicenseList.jsx
+// src/pages/License/LicenseList.jsx
 import React from 'react';
 import {Card, Container} from 'react-bootstrap';
-import LicenseForm from './LicenseForm';
+
 import ListControls from '../../components/ListControls';
 import DeleteSelectedButton from './DeleteSelectedButton';
 import LicenseFilters from './LicenseFilters';
-import useListManager from '../../hooks/License/useLicenseListManager';
-import axios from '../../api/axiosInstance';
+import LicenseForm from './LicenseForm';
 import GroupedAccordionLicense from './GroupedAccordionLicense';
-import {groupLicenses} from '../../utils/License/groupLicenses';
+
+import useListManager from '../../hooks/License/useLicenseListManager';
+import {groupLicensesAsObject} from '../../utils/License/groupLicenses';
 
 const LicenseList = () => {
     const {
+        // data/state
         entries,
+        expanded,
+        setExpanded,
+        loading,
+        hasMore,
         newEntry,
         setNewEntry,
+        allExpanded,
+        setAllExpanded,
+
+        // selection
         selectedIds,
         toggleSelect,
         toggleSelectAll,
-        updateSingleEntry,
-        expanded,
-        setExpanded,
-        allExpanded,
-        setAllExpanded,
+        clearSelection,
+
+        // sorting/search/filtering
         sortField,
         sortOrder,
         setSortField,
@@ -32,30 +40,34 @@ const LicenseList = () => {
         filters,
         setFilters,
         setPage,
-        clearSelection,
+
+        // fetching / export / update
         loadMoreRef,
-        fetchData,
+        updateSingleEntry,
         handleReset,
-    } = useListManager('/api/licenses/');
+        handleExportXLSX,
+        handleExportPDF,
+        fetchData,
+    } = useListManager('licenses/');
 
-    const handleExport = async () => {
-        try {
-            const res = await axios.get('/api/licenses/export/', {responseType: 'blob'});
-            const url = window.URL.createObjectURL(new Blob([res.data]));
-            const link = document.createElement('a');
-            link.href = url;
-            link.setAttribute('download', 'licenses_export.xlsx');
-            document.body.appendChild(link);
-            link.click();
-        } catch (err) {
-            console.error('Export failed', err);
-        }
+    const onAddNewClick = () =>
+        setNewEntry({
+            license_number: '',
+            license_date: '',
+            license_expiry_date: '',
+            exporter: null,
+            port: null,
+            import_license: [],
+            export_license: [],
+        });
+
+    const onSavedEntry = (id /*, updatedEntry */) => {
+        // fetch the fresh row and expand it
+        updateSingleEntry(id);
+        setExpanded((prev) => ({...prev, [id]: true}));
     };
 
-    const updateEntryInList = (id, updatedEntry) => {
-        updateSingleEntry(id, updatedEntry); // update state
-        setExpanded(prev => ({...prev, [id]: true})); // expand the updated entry
-    };
+    const grouped = groupLicensesAsObject(entries);
 
     return (
         <Container className="mt-4">
@@ -71,27 +83,22 @@ const LicenseList = () => {
                     {label: 'License No', value: 'license_number'},
                     {label: 'Date', value: 'license_date'},
                     {label: 'Expiry', value: 'license_expiry_date'},
+                    {label: 'Recently Modified', value: 'modified_on'},
                 ]}
-                Filters={React.Children.toArray(<LicenseFilters filters={filters} setFilters={setFilters}/>)}
+                Filters={<LicenseFilters filters={filters} setFilters={setFilters}/>}
                 handleReset={handleReset}
                 setPage={setPage}
-                handleExportCSV={handleExport}
-                onAddNewClick={() => setNewEntry({
-                    license_number: '',
-                    license_date: '',
-                    license_expiry_date: '',
-                    exporter: null,
-                    port: null,
-                    import_license: [],
-                    export_license: []
-                })}
+                // Export actions
+                handleExportCSV={handleExportXLSX}
+                handleExportPDF={handleExportPDF}
+                onAddNewClick={onAddNewClick}
             />
 
             <DeleteSelectedButton
                 selectedIds={selectedIds}
                 onDeleted={() => {
                     clearSelection();
-                    fetchData();
+                    fetchData(false, 1);
                 }}
             />
 
@@ -105,7 +112,7 @@ const LicenseList = () => {
                             onClose={() => setNewEntry(null)}
                             onSaved={() => {
                                 setNewEntry(null);
-                                fetchData();
+                                fetchData(false, 1);
                             }}
                         />
                     </Card.Body>
@@ -113,19 +120,27 @@ const LicenseList = () => {
             )}
 
             <GroupedAccordionLicense
-                groups={groupLicenses(entries)}
+                groups={grouped}
                 allExpanded={allExpanded}
                 expanded={expanded}
                 toggle={(id) => setExpanded((prev) => ({...prev, [id]: !prev[id]}))}
                 selectedIds={selectedIds}
                 toggleSelect={toggleSelect}
                 toggleSelectAll={toggleSelectAll}
-                onSaved={updateEntryInList}
+                onSaved={onSavedEntry}
             />
 
-            <div ref={loadMoreRef} className="text-center my-4" style={{minHeight: '40px'}}>
-                <div className="spinner-border text-primary" role="status"/>
-            </div>
+            {/* Loading indicator */}
+            {loading && (
+                <div className="text-center my-3">
+                    <div className="spinner-border text-primary" role="status"/>
+                </div>
+            )}
+
+            {/* Infinite-scroll sentinel (only when useful) */}
+            {!loading && hasMore && (
+                <div ref={loadMoreRef} className="text-center my-4" style={{minHeight: 24}}/>
+            )}
         </Container>
     );
 };

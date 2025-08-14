@@ -21,7 +21,7 @@ router.register(r'invoice-entities', InvoiceEntityReadOnlyViewSet, basename='inv
 urlpatterns = [
     path('choices/', ChoicesAPIView.as_view(), name='choices'),
     path('', include(router.urls)),
-    path('iecgate/fetch', FetchBOEData.as_view(), name='fetch-boe-details'),
+    path('iecgate/fetch/', FetchBOEData.as_view(), name='fetch-boe-details'),
     path('ledger/upload/', UploadLedgerAPIView.as_view(), name='upload-ledger-api'),
 
     # ex: /polls/

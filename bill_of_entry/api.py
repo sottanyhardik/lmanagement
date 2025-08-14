@@ -4,7 +4,6 @@ from rest_framework import filters, viewsets
 from rest_framework import permissions
 from rest_framework import status
 from rest_framework.generics import get_object_or_404
-from rest_framework.permissions import IsAuthenticated
 from rest_framework.response import Response
 from rest_framework.views import APIView
 
@@ -17,7 +16,7 @@ class BillOfEntryViewSet(viewsets.ModelViewSet):
     queryset = BillOfEntryModel.objects.all().select_related('company', 'port').prefetch_related(
         'item_details').order_by('company__name').distinct()
     serializer_class = BillOfEntrySerializer
-    permission_classes = [IsAuthenticated]
+    # permission_classes = [IsAuthenticated]
     filter_backends = [DjangoFilterBackend, filters.SearchFilter, filters.OrderingFilter]
     filterset_class = BillOfEntryFilter
     search_fields = ['bill_of_entry_number', 'invoice_no', 'product_name',
@@ -85,7 +84,7 @@ class InvoicePDFView(PDFTemplateView):
             'to_company': to,
             'items': [
                 {
-                    'licenseNo': str(item.license_no).zfill(10),
+                    'licenseNo': str(item.license_no.replace('LIC ', '').split("• SR")[0]).zfill(10),
                     'hsnCode': item.hsn_code,
                     'qty': str(float(item.qty or 0)),
                     'cifUsd': str(float(item.cif_fc or 0)),

@@ -1,6 +1,6 @@
 import React from 'react';
 import {Button, Col, Form, Row} from 'react-bootstrap';
-import AsyncSrNumberSelect from '../../components/AsyncSelect/AsyncSrNumberSelect.jsx';
+import AsyncSrNumberSelect from '../../components/AsyncSelect/AsyncSrNumberSelect';
 
 const LineItemTable = ({
                            items,

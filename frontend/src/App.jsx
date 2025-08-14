@@ -2,12 +2,12 @@ import React, {useContext} from 'react';
 import {Navigate, Route, Routes} from 'react-router-dom';
 
 import MainLayout from './layouts/MainLayout';
-import LoginForm from './pages/Login/LoginForm';
-import ForgotPassword from './pages/Login/ForgotPassword';
-import ResetPassword from './pages/Login/ResetPassword';
+import LoginForm from './pages/Auth/LoginForm';
+import ForgotPassword from './pages/Auth/ForgotPassword';
+import ResetPassword from './pages/Auth/ResetPassword';
 import Dashboard from './pages/Dashboard/Dashboard';
-import Logout from './pages/Login/Logout.jsx';
-import UserList from './pages/User/UserList.jsx';
+import Logout from './pages/Auth/Logout';
+import UserList from './pages/User/UserList';
 import ProfilePage from './pages/User/ProfilePage';
 import CompanyList from './pages/CompanyList';
 import PortList from './pages/PortList';
@@ -17,8 +17,8 @@ import HSCodeList from './pages/HSCodeList';
 import SionNormList from './pages/Sion/SionNormList';
 import BillOfEntryList from './pages/BillOfEntry/BillOfEntryList';
 import LicenseList from './pages/License/LicenseList';
-import IcegateCaptchaForm from './pages/IcegateCaptchaForm.jsx';
-import LedgerUpload from './pages/LedgerUpload.jsx';
+import IcegateCaptchaForm from './pages/IcegateCaptchaForm';
+import LedgerUpload from './pages/LedgerUpload';
 import AllotmentList from './pages/Allotment/AllotmentList';
 
 import PrivateRoute from './routes/PrivateRoute';

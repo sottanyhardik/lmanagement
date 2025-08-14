@@ -1,7 +1,7 @@
 // src/pages/Allotment/AllotmentFilters.jsx
 import React from 'react';
-import AsyncCompanySelect from '../../components/AsyncSelect/AsyncCompanySelect.jsx';
-import AsyncPortSelect from '../../components/AsyncSelect/AsyncPortSelect.jsx';
+import AsyncCompanySelect from '../../components/AsyncSelect/AsyncCompanySelect';
+import AsyncPortSelect from '../../components/AsyncSelect/AsyncPortSelect';
 import YesNoRadio from '../../components/YesNoRadio';
 import {Form} from 'react-bootstrap';
 

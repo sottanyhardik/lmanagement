@@ -1,9 +1,9 @@
 // LicenseForm.jsx
 import React, {useEffect, useState} from 'react';
 import {Button, Form, Table} from 'react-bootstrap';
-import AsyncCompanySelect from '../../components/AsyncSelect/AsyncCompanySelect.jsx';
-import AsyncPortSelect from '../../components/AsyncSelect/AsyncPortSelect.jsx';
-import AsyncChoiceSelect from '../../components/AsyncSelect/AsyncChoiceSelect.jsx';
+import AsyncCompanySelect from '../../components/AsyncSelect/AsyncCompanySelect';
+import AsyncPortSelect from '../../components/AsyncSelect/AsyncPortSelect';
+import AsyncChoiceSelect from '../../components/AsyncSelect/AsyncChoiceSelect';
 import {useLicenseChoices} from '../../hooks/useChoiceLoader';
 import ExportLicenseTable from './ExportLicenseTable';
 import ImportLicenseTable from './ImportLicenseTable';
@@ -114,7 +114,7 @@ const LicenseForm = ({entry, isNew = false, onClose, onSaved}) => {
         }
 
         try {
-            const {data: sion} = await axios.get(`/api/sion-classes/${normId}/`);
+            const {data: sion} = await axios.get(`sion-classes/${normId}/`);
             const importNorms = Array.isArray(sion?.import_norm) ? sion.import_norm : [];
             if (importNorms.length === 0) {
                 toast.info('No SION import norms found for the selected class.');
@@ -172,10 +172,10 @@ const LicenseForm = ({entry, isNew = false, onClose, onSaved}) => {
         try {
             let response;
             if (isNew) {
-                response = await axios.post('/api/licenses/', payload);
+                response = await axios.post('licenses/', payload);
                 toast.success('License Created');
             } else {
-                response = await axios.patch(`/api/licenses/${data.id}/`, payload);
+                response = await axios.patch(`licenses/${data.id}/`, payload);
                 toast.success('License Updated');
             }
             onSaved?.(response.data.id, response.data);

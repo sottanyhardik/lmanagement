@@ -1,14 +1,14 @@
-// src/pages/Login.jsx
+// src/pages/Auth.jsx
 import React, {useContext, useEffect} from 'react';
 import {Navigate} from 'react-router-dom';
 import AuthContext from '../context/AuthContext';
-import LoginForm from './Login/LoginForm';
+import LoginForm from './Auth/LoginForm';
 
 const Login = () => {
     const {user} = useContext(AuthContext);
 
     useEffect(() => {
-        document.title = 'Login • License Manager';
+        document.title = 'Auth • License Manager';
     }, []);
 
     if (user) return <Navigate to="/dashboard" replace/>;

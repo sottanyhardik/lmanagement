@@ -8,8 +8,8 @@
  * @param {Object} options
  * @param {(e:any)=>string} [options.getExporter]  pick exporter label
  * @param {(e:any)=>string} [options.getPort]      pick port label
- * @param {(a,b)=>number}   [options.sortExporters] optional comparator
- * @param {(a,b)=>number}   [options.sortPorts]     optional comparator
+ * @param {(a,b)=>number}   [options.sortExporters] optional comparator for exporter groups
+ * @param {(a,b)=>number}   [options.sortPorts]     optional comparator for ports within a group
  * @returns {Array<{exporter:string, count:number, ports:Array<{port:string, entries:any[]}>}>}
  */
 export function groupLicenses(
@@ -21,11 +21,18 @@ export function groupLicenses(
         sortPorts = null,
     } = {}
 ) {
+    if (!Array.isArray(entries) || entries.length === 0) return [];
+
+    const norm = (s) => {
+        const t = (s ?? '').toString().trim();
+        return t || '—';
+    };
+
     const expMap = new Map(); // exporter -> { exporter, portsMap, count }
 
     for (const e of entries) {
-        const exporter = String(getExporter(e));
-        const port = String(getPort(e));
+        const exporter = norm(getExporter(e));
+        const port = norm(getPort(e));
 
         let expBucket = expMap.get(exporter);
         if (!expBucket) {
@@ -43,7 +50,7 @@ export function groupLicenses(
         expBucket.count++;
     }
 
-    // materialize + optional sorting
+    // Materialize + optional sorting
     let result = Array.from(expMap.values()).map((exp) => {
         let ports = Array.from(exp.portsMap.values());
         if (typeof sortPorts === 'function') ports.sort(sortPorts);

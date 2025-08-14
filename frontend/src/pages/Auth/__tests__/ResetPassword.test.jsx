@@ -1,5 +1,5 @@
 import {render, screen} from '@testing-library/react';
-import ResetPassword from '../ResetPassword.jsx';
+import ResetPassword from '../ResetPassword';
 import {MemoryRouter, Route, Routes} from 'react-router-dom';
 
 test('renders reset password form', () => {

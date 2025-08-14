@@ -1,5 +1,5 @@
 import React from 'react';
-import GenericAsyncSelect from '../common/GenericAsyncSelect.jsx';
+import GenericAsyncSelect from '../common/GenericAsyncSelect';
 
 const toOption = (item) => item ? ({
     value: item.id,

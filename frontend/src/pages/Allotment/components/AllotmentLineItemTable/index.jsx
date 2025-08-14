@@ -1,14 +1,14 @@
 import React, {useCallback, useEffect, useMemo, useState} from 'react';
 import {Button, Col, Form, Modal, Row, Spinner, Table} from 'react-bootstrap';
-import AsyncNormSelect from '../../../../components/AsyncSelect/AsyncNormSelect.jsx';
+import AsyncNormSelect from '../../../../components/AsyncSelect/AsyncNormSelect';
 import axios from '../../../../api/axiosInstance';
 import {toast} from 'react-toastify';
 import '../../AllotmentList.css';
 
-const LICENSE_SEARCH_URL = '/api/license-import-items/select/';
-const ADD_DETAIL_URL = (id) => `/api/allotments/${id}/details/`;
+const LICENSE_SEARCH_URL = 'license-import-items/select/';
+const ADD_DETAIL_URL = (id) => `allotments/${id}/details/`;
 const FALLBACK_DELETE_DETAIL_URL = (allotmentId, detailId) =>
-    `/api/allotments/${allotmentId}/details/${detailId}/`;
+    `allotments/${allotmentId}/details/${detailId}/`;
 
 const fmt = (n) => {
     const v = Number(n ?? 0);

@@ -10,11 +10,11 @@ router.register(r'invoices', InvoiceViewSet, basename='invoice')
 
 urlpatterns = [
     # urls.py
-    path("api/bill-of-entries/Export-excel/", views.ExportBOEExcelView.as_view(), name="export_boe_excel"),
-    path('api/bill-of-entries/Export/pdf', views.BillOfEntryExportView.as_view(), name='bill-of-entry-Export'),
-    path('api/bill-of-entries/bulk-delete/', BillOfEntryBulkDeleteView.as_view(), name='bill-of-entry-bulk-delete'),
-    path('api/invoices/<int:pk>/pdf/', InvoicePDFView.as_view(), name='invoice-pdf'),
-    path('api/', include(router.urls)),
+    path("bill-of-entries/Export-excel/", views.ExportBOEExcelView.as_view(), name="export_boe_excel"),
+    path('bill-of-entries/Export/pdf', views.BillOfEntryExportView.as_view(), name='bill-of-entry-Export'),
+    path('bill-of-entries/bulk-delete/', BillOfEntryBulkDeleteView.as_view(), name='bill-of-entry-bulk-delete'),
+    path('invoices/<int:pk>/pdf/', InvoicePDFView.as_view(), name='invoice-pdf'),
+    path('', include(router.urls)),
 
     # path('', login_required(views.BillOfEntryView.as_view()), name='bill-of-entry-list'),
     # path('ajax/', login_required(views.BillOfEntryAjaxListView.as_view()), name='bill-of-entry-ajax-list'),

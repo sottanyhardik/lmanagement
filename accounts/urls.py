@@ -12,6 +12,7 @@ from .views import (
     SetUserPasswordView,
     GetCurrentUserView,
     UserDetailView,
+    ChangePasswordView,  # ← add
 )
 
 app_name = "accounts"
@@ -31,7 +32,6 @@ urlpatterns = [
     path('users/me/', GetCurrentUserView.as_view(), name='current_user'),
     path('users/<int:pk>/', UserDetailView.as_view(), name='user_detail'),
     path('users/<int:pk>/set-password/', SetUserPasswordView.as_view(), name='user_set_password'),
-
-    # (Optional) legacy alias; prefer users/me/
-    path('profile/', ProfileView.as_view(), name='profile'),
+    path('profile/', ProfileView.as_view(), name='profile'),  # simple profile GET/PUT (kept)
+    path('users/me/change-password/', ChangePasswordView.as_view(), name='change_password'),  # ← NEW
 ]

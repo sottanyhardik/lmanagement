@@ -6,9 +6,12 @@ from django.shortcuts import get_object_or_404
 from django.template.loader import render_to_string
 from django.utils.encoding import force_bytes, force_str
 from django.utils.http import urlsafe_base64_encode, urlsafe_base64_decode
-from rest_framework import generics, status
+from rest_framework import generics
+from rest_framework import status
 from rest_framework.generics import ListAPIView, RetrieveAPIView, RetrieveUpdateAPIView
-from rest_framework.permissions import AllowAny, IsAdminUser, IsAuthenticated
+from rest_framework.permissions import AllowAny, IsAdminUser
+# accounts/views.py (add this)
+from rest_framework.permissions import IsAuthenticated
 from rest_framework.response import Response
 from rest_framework.views import APIView
 from rest_framework_simplejwt.serializers import TokenObtainPairSerializer
@@ -210,3 +213,30 @@ class SetUserPasswordView(APIView):
         user.set_password(new_password)
         user.save()
         return Response({'detail': 'Password updated'})
+
+
+class ChangePasswordView(APIView):
+    """
+    Authenticated user can change their own password by providing old + new.
+    """
+    permission_classes = [IsAuthenticated]
+
+    def post(self, request, *args, **kwargs):
+        old_password = (request.data.get('old_password') or '').strip()
+        new_password = (request.data.get('new_password') or '').strip()
+
+        errors = {}
+        if not old_password:
+            errors['old_password'] = ['This field is required.']
+        if not new_password:
+            errors['new_password'] = ['This field is required.']
+        if errors:
+            return Response(errors, status=status.HTTP_400_BAD_REQUEST)
+
+        user = request.user
+        if not user.check_password(old_password):
+            return Response({'old_password': ['Incorrect password.']}, status=status.HTTP_400_BAD_REQUEST)
+
+        user.set_password(new_password)
+        user.save()
+        return Response({'detail': 'Password changed successfully.'}, status=status.HTTP_200_OK)

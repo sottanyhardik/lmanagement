@@ -1,6 +1,7 @@
 import React, {useContext} from 'react';
 import {NavLink} from 'react-router-dom';
 import AuthContext from '../context/AuthContext';
+
 import {
     FaBoxes,
     FaBuilding,
@@ -16,10 +17,9 @@ import {
     FaUserCircle,
     FaWarehouse
 } from 'react-icons/fa';
-import './Navbar.css';
 
 export default function Navbar() {
-    const {logoutUser: logout, user} = useContext(AuthContext);
+    const {logoutUser, user} = useContext(AuthContext);
 
     const displayName =
         user?.fullName ||
@@ -31,7 +31,9 @@ export default function Navbar() {
             <div className="container-fluid">
                 <NavLink className="navbar-brand d-flex align-items-center" to="/dashboard">
                     <img src="/Logo.png" alt="Logo" className="dashboard-logo-img me-2"/>
-                    <div className="dashboard-logo-text">License<br/>Manager</div>
+                    <div className="dashboard-logo-text">
+                        License<br/>Manager
+                    </div>
                 </NavLink>
 
                 <button
@@ -47,143 +49,10 @@ export default function Navbar() {
                 </button>
 
                 <div className="collapse navbar-collapse" id="navbarNav">
-                    {/* LEFT NAV */}
                     <ul className="navbar-nav me-auto mb-2 mb-lg-0">
-
-                        {/* License */}
-                        <li className="nav-item dropdown">
-                            <a className="nav-link dropdown-toggle" href="#" role="button" data-bs-toggle="dropdown"
-                               aria-expanded="false">
-                                <FaKey className="me-2"/> License
-                            </a>
-                            <ul className="dropdown-menu">
-                                <li>
-                                    <NavLink className="dropdown-item" to="/licenses/dfia">
-                                        <FaFileAlt className="me-2"/> DFIA
-                                    </NavLink>
-                                </li>
-                                <li>
-                                    <NavLink className="dropdown-item" to="/licenses/rodtep">
-                                        <FaFileAlt className="me-2"/> RODTEP
-                                    </NavLink>
-                                </li>
-                            </ul>
-                        </li>
-
-                        <li className="nav-item">
-                            <NavLink className="nav-link" to="/allotment">
-                                <FaListAlt className="me-2"/> Allotment
-                            </NavLink>
-                        </li>
-
-                        <li className="nav-item">
-                            <NavLink className="nav-link" to="/bill-of-entry">
-                                <FaFileAlt className="me-2"/> Bill of Entry
-                            </NavLink>
-                        </li>
-
-                        {/* Master */}
-                        <li className="nav-item dropdown">
-                            <a className="nav-link dropdown-toggle" href="#" role="button" data-bs-toggle="dropdown"
-                               aria-expanded="false">
-                                <FaCogs className="me-2"/> Master
-                            </a>
-                            <ul className="dropdown-menu">
-                                <li>
-                                    <NavLink className="dropdown-item" to="/master/company">
-                                        <FaBuilding className="me-2"/> Company
-                                    </NavLink>
-                                </li>
-                                <li>
-                                    <NavLink className="dropdown-item" to="/master/port">
-                                        <FaWarehouse className="me-2"/> Port
-                                    </NavLink>
-                                </li>
-                                <li>
-                                    <NavLink className="dropdown-item" to="/master/hs-codes">
-                                        <FaBuilding className="me-2"/> HS Code
-                                    </NavLink>
-                                </li>
-                                <li>
-                                    <NavLink className="dropdown-item" to="/master/item-heads">
-                                        <FaBuilding className="me-2"/> Item Head
-                                    </NavLink>
-                                </li>
-                                <li>
-                                    <NavLink className="dropdown-item" to="/master/item-names">
-                                        <FaBuilding className="me-2"/> Item Name
-                                    </NavLink>
-                                </li>
-                                <li>
-                                    <NavLink className="dropdown-item" to="/master/sion">
-                                        <FaListAlt className="me-2"/> Sion Norms
-                                    </NavLink>
-                                </li>
-                            </ul>
-                        </li>
-
-                        {/* Additional */}
-                        <li className="nav-item dropdown">
-                            <a className="nav-link dropdown-toggle" href="#" role="button" data-bs-toggle="dropdown"
-                               aria-expanded="false">
-                                <FaBoxes className="me-2"/> Additional
-                            </a>
-                            <ul className="dropdown-menu">
-                                <li>
-                                    <NavLink className="dropdown-item" to="/additional/ledger">
-                                        <FaFileUpload className="me-2"/> Upload Ledger
-                                    </NavLink>
-                                </li>
-                                <li>
-                                    <NavLink className="dropdown-item" to="/additional/fetch-boe">
-                                        <FaDownload className="me-2"/> Fetch BOE
-                                    </NavLink>
-                                </li>
-                            </ul>
-                        </li>
-
-                        {/* Reports (with nested submenu) */}
-                        <li className="nav-item dropdown">
-                            <a className="nav-link dropdown-toggle" href="#" role="button" data-bs-toggle="dropdown"
-                               aria-expanded="false">
-                                <FaChartPie className="me-2"/> Reports
-                            </a>
-                            <ul className="dropdown-menu" data-bs-auto-close="outside">
-                                <li>
-                                    <NavLink className="dropdown-item" to="/reports/item-search">
-                                        <FaSearch className="me-2"/> Item Search
-                                    </NavLink>
-                                </li>
-
-                                {/* Submenu */}
-                                <li className="dropdown-submenu">
-                                    <a className="dropdown-item dropdown-toggle" href="#" data-bs-toggle="dropdown"
-                                       aria-expanded="false">
-                                        Biscuit DFIA
-                                    </a>
-                                    <ul className="dropdown-menu">
-                                        <li>
-                                            <NavLink className="dropdown-item" to="/reports/biscuit/parle">
-                                                <FaFileAlt className="me-2"/> PARLE
-                                            </NavLink>
-                                        </li>
-                                        <li>
-                                            <NavLink className="dropdown-item" to="/reports/biscuit/global">
-                                                <FaFileAlt className="me-2"/> GLOBAL
-                                            </NavLink>
-                                        </li>
-                                        <li>
-                                            <NavLink className="dropdown-item" to="/reports/biscuit/conversion">
-                                                <FaFileAlt className="me-2"/> CONVERSION
-                                            </NavLink>
-                                        </li>
-                                    </ul>
-                                </li>
-                            </ul>
-                        </li>
+                        {renderNavItems()}
                     </ul>
 
-                    {/* RIGHT (Account) */}
                     <ul className="navbar-nav ms-auto">
                         <li className="nav-item dropdown">
                             <a
@@ -206,22 +75,132 @@ export default function Navbar() {
                                 {user?.is_superuser && (
                                     <li>
                                         <NavLink className="dropdown-item" to="/users">
-                                            <FaListAlt className="me-2"/> List Users
+                                            <FaListAlt className="me-2"/>List Users
                                         </NavLink>
                                     </li>
                                 )}
 
                                 <li>
                                     <NavLink className="dropdown-item" to="/logout">
-                                        <FaSignOutAlt className="me-2"/> Logout
+                                        <FaSignOutAlt className="me-2"/>Logout
                                     </NavLink>
                                 </li>
                             </ul>
                         </li>
                     </ul>
-
                 </div>
             </div>
         </nav>
+    );
+}
+
+// ---------------------------
+// ⬇ NAVIGATION ITEMS FACTORY
+// ---------------------------
+function renderNavItems() {
+    return (
+        <>
+            <DropdownMenu title="License" icon={<FaKey/>} items={[
+                {label: 'DFIA', to: '/licenses/dfia', icon: <FaFileAlt/>},
+                {label: 'RODTEP', to: '/licenses/rodtep', icon: <FaFileAlt/>}
+            ]}/>
+
+            <SingleLink to="/allotment" label="Allotment" icon={<FaListAlt/>}/>
+            <SingleLink to="/bill-of-entry" label="Bill of Entry" icon={<FaFileAlt/>}/>
+
+            <DropdownMenu title="Master" icon={<FaCogs/>} items={[
+                {label: 'Company', to: '/master/company', icon: <FaBuilding/>},
+                {label: 'Port', to: '/master/port', icon: <FaWarehouse/>},
+                {label: 'HS Code', to: '/master/hs-codes', icon: <FaBuilding/>},
+                {label: 'Item Head', to: '/master/item-heads', icon: <FaBuilding/>},
+                {label: 'Item Name', to: '/master/item-names', icon: <FaBuilding/>},
+                {label: 'Sion Norms', to: '/master/sion', icon: <FaListAlt/>}
+            ]}/>
+
+            <DropdownMenu title="Additional" icon={<FaBoxes/>} items={[
+                {label: 'Upload Ledger', to: '/additional/ledger', icon: <FaFileUpload/>},
+                {label: 'Fetch BOE', to: '/additional/fetch-boe', icon: <FaDownload/>}
+            ]}/>
+
+            <DropdownMenu title="Reports" icon={<FaChartPie/>} items={[
+                {label: 'Item Search', to: '/reports/item-search', icon: <FaSearch/>},
+                {
+                    label: 'Biscuit DFIA',
+                    submenu: [
+                        {label: 'PARLE', to: '/reports/biscuit/parle', icon: <FaFileAlt/>},
+                        {label: 'GLOBAL', to: '/reports/biscuit/global', icon: <FaFileAlt/>},
+                        {label: 'CONVERSION', to: '/reports/biscuit/conversion', icon: <FaFileAlt/>}
+                    ]
+                }
+            ]}/>
+        </>
+    );
+}
+
+// ---------------------------
+// ⬇ COMPONENT: Single Nav Link
+// ---------------------------
+function SingleLink({to, label, icon}) {
+    return (
+        <li className="nav-item">
+            <NavLink className="nav-link" to={to}>
+                {icon && <span className="me-2">{icon}</span>}
+                {label}
+            </NavLink>
+        </li>
+    );
+}
+
+// ---------------------------
+// ⬇ COMPONENT: Dropdown Menu
+// ---------------------------
+function DropdownMenu({title, icon, items}) {
+    return (
+        <li className="nav-item dropdown">
+            <a
+                className="nav-link dropdown-toggle"
+                href="#"
+                role="button"
+                data-bs-toggle="dropdown"
+                aria-expanded="false"
+            >
+                {icon && <span className="me-2">{icon}</span>}
+                {title}
+            </a>
+            <ul className="dropdown-menu">
+                {items.map((item, index) =>
+                    item.submenu ? (
+                        <li className="dropdown-submenu" key={index}>
+                            <a
+                                className="dropdown-item dropdown-toggle"
+                                href="#"
+                                role="button"
+                                data-bs-toggle="dropdown"
+                                aria-expanded="false"
+                            >
+                                {item.label}
+                            </a>
+                            <ul className="dropdown-menu">
+                                {item.submenu.map((subItem, subIndex) => (
+                                    <li key={subIndex}>
+                                        <NavLink className="dropdown-item" to={subItem.to}>
+                                            {subItem.icon && <span className="me-2">{subItem.icon}</span>}
+                                            {subItem.label}
+                                        </NavLink>
+                                    </li>
+                                ))}
+                            </ul>
+                        </li>
+                    ) : (
+                        <li key={index}>
+                            <NavLink className="dropdown-item" to={item.to}>
+                                {item.icon && <span className="me-2">{item.icon}</span>}
+                                {item.label}
+                            </NavLink>
+                        </li>
+                    )
+                )}
+            </ul>
+        </li>
     );
 }

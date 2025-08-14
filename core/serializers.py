@@ -1,7 +1,12 @@
+import re
+
 from rest_framework import serializers
 
-from .models import CompanyModel, PortModel, ItemHeadModel, ItemNameModel, HSCodeModel, SIONImportModel, \
-    SIONExportModel, SionNormClassModel, HeadSIONNormsModel, TransferLetterModel, InvoiceEntity
+from .models import PortModel, ItemHeadModel, ItemNameModel, HSCodeModel, SIONImportModel, \
+    SIONExportModel, SionNormClassModel, HeadSIONNormsModel, TransferLetterModel, InvoiceEntity, CompanyModel
+
+PAN_RE = re.compile(r'^[A-Z]{5}[0-9]{4}[A-Z]$', re.IGNORECASE)
+GST_RE = re.compile(r'^\d{2}[A-Z]{5}\d{4}[A-Z][A-Z0-9]Z[A-Z0-9]$', re.IGNORECASE)
 
 
 # ports/serializers.py
@@ -12,9 +17,35 @@ class PortOptionSerializer(serializers.ModelSerializer):
 
 
 class CompanyOptionSerializer(serializers.ModelSerializer):
+    pan = serializers.CharField(required=False, allow_blank=True, max_length=10)
+    gst_number = serializers.CharField(required=False, allow_blank=True, max_length=15)
+
     class Meta:
         model = CompanyModel
         fields = ['id', 'name', 'address_line_1', 'address_line_2', 'pan', 'gst_number']
+
+    def validate_pan(self, value):
+        v = (value or '').strip().upper()
+        if v and not PAN_RE.fullmatch(v):
+            raise serializers.ValidationError(
+                'PAN must be 10 chars: 5 letters, 4 digits, 1 letter (e.g., ABCDE1234F).'
+            )
+        return v
+
+    def validate_gst_number(self, value):
+        v = (value or '').strip().upper()
+        if v and not GST_RE.fullmatch(v):
+            raise serializers.ValidationError(
+                'GSTIN must be 15 chars: 2 digits + PAN + 1 alnum + Z + 1 alnum (e.g., 27ABCDE1234F1Z5).'
+            )
+        return v
+
+    def validate(self, attrs):
+        pan = (attrs.get('pan') or (self.instance.pan if self.instance else '')).strip().upper()
+        gst = (attrs.get('gst_number') or (self.instance.gst_number if self.instance else '')).strip().upper()
+        if pan and gst and len(gst) == 15 and gst[2:12] != pan:
+            raise serializers.ValidationError({'gst_number': 'GSTIN PAN segment does not match PAN.'})
+        return attrs
 
 
 class CompanySerializer(serializers.ModelSerializer):

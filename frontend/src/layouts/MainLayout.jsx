@@ -1,18 +1,17 @@
-// src/layouts/MainLayout.jsx
+import {useRef} from 'react';
 import {Outlet} from 'react-router-dom';
 import Navbar from './Navbar';
 
 export default function MainLayout() {
+    const navbarRef = useRef();
+
     return (
-        <div>
-            {/* Accessibility: tab to skip straight to content */}
-            <a href="#main" className="skip-link">Skip to content</a>
+        <div className="d-flex flex-column min-vh-100">
+            {/* Fixed Navbar */}
+            <Navbar ref={navbarRef}/>
 
-            {/* Your Navbar should have Bootstrap's `fixed-top` if you want it pinned */}
-            <Navbar/>
-
-            {/* Top padding so content isn’t hidden behind a fixed navbar */}
-            <main id="main" className="main-content container-fluid">
+            {/* Main Content with padding to avoid overlap */}
+            <main id="main" className="container-fluid flex-grow-1 pt-navbar">
                 <Outlet/>
             </main>
         </div>

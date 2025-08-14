@@ -1,6 +1,6 @@
 import React, {useEffect, useState} from 'react';
 import {Button, Col, Form, Row, Spinner, Table} from 'react-bootstrap';
-import EntitySelect from './EntitySelect.jsx';
+import EntitySelect from './EntitySelect';
 import {toast} from 'react-toastify';
 import axios from '../../api/axiosInstance';
 import ValidatedInput from '../../components/ValidatedInput';
@@ -124,7 +124,7 @@ const InvoiceForm = ({boe, onSaved}) => {
         } else if (!PAN_REGEX.test(pan)) {
             newErrors.to_company_pan = 'Invalid PAN format.';
         }
-        
+
         if (!gst) {
             newErrors.to_company_gst = 'GST number is required.';
         } else if (!GST_REGEX.test(gst)) {
@@ -179,10 +179,10 @@ const InvoiceForm = ({boe, onSaved}) => {
             let res;
             if (invoice?.id) {
                 // Update existing invoice
-                res = await axios.put(`/api/invoices/${invoice.id}/`, payload);
+                res = await axios.put(`invoices/${invoice.id}/`, payload);
             } else {
                 // Create new invoice
-                res = await axios.post('/api/invoices/', payload);
+                res = await axios.post('invoices/', payload);
             }
             const inv = res.data;
             inv.items = inv.items.map(it => ({
@@ -231,7 +231,7 @@ const InvoiceForm = ({boe, onSaved}) => {
         if (!window.confirm('Are you sure you want to delete this invoice?')) return;
 
         try {
-            await axios.delete(`/api/invoices/${invoice.id}/`);
+            await axios.delete(`invoices/${invoice.id}/`);
             toast.success('Invoice deleted');
             setInvoice(null);
             setIsEditing(true);
@@ -257,7 +257,7 @@ const InvoiceForm = ({boe, onSaved}) => {
             return;
         }
 
-        const url = `/api/invoices/${invoice.id}/pdf/`;
+        const url = `invoices/${invoice.id}/pdf/`;
         const filename = `${invoice.invoice_number || 'invoice'}.pdf`;
 
         try {

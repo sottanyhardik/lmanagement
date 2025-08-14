@@ -111,7 +111,7 @@ const GroupedAccordion = ({
                                                             ref={(el) => (focusedRef.current[entry.id] = el)}
                                                         >
                                                             <Card.Header
-                                                                className="d-flex align-items-center justify-content-between bg-white border-bottom">
+                                                                className="d-flex align-companycompanys-center justify-content-between bg-white border-bottom">
                                                                 <Form.Check
                                                                     type="checkbox"
                                                                     className="me-2"

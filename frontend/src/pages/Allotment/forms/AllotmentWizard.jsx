@@ -41,7 +41,7 @@ export default function AllotmentWizard({allotmentId: initialId}) {
         if (!id) return;
         setLoadingEntry(true);
         try {
-            const {data} = await axios.get(`/api/allotments/${id}/`);
+            const {data} = await axios.get(`allotments/${id}/`);
             setEntry(data);
         } catch {
             toast.error("Failed to load allotment");
@@ -98,7 +98,7 @@ export default function AllotmentWizard({allotmentId: initialId}) {
 
         setCreateSaving(true);
         try {
-            const {data} = await axios.post("/api/allotments/", payload);
+            const {data} = await axios.post("allotments/", payload);
             setEntry(data);
             toast.success("Allotment created");
             setActiveKey("allot"); // auto-jump to Make Allotment
@@ -144,7 +144,7 @@ export default function AllotmentWizard({allotmentId: initialId}) {
         if (!entry?.id) return toast.warn("Create & save the allotment first");
         setTlSaving(true);
         try {
-            await axios.post(`/api/allotments/${entry.id}/transfer-letter/`, {
+            await axios.post(`allotments/${entry.id}/transfer-letter/`, {
                 to_company: tlForm.to_company || null,
                 remarks: tlForm.remarks || "",
             });
