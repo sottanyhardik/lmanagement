@@ -1,4 +1,4 @@
-// pages/License/DeleteSelectedButton.jsx
+// src/pages/License/DeleteSelectedButton.jsx
 import React, {useState} from 'react';
 import {Button, Spinner} from 'react-bootstrap';
 import {toast} from 'react-toastify';
@@ -7,7 +7,7 @@ import axios from '../../api/axiosInstance';
 const DeleteSelectedButton = ({
                                   selectedIds = [],
                                   onDeleted,
-                                  resourceBase = 'licenses', // reuse for other resources if needed
+                                  resourceBase = 'licenses',
                                   size = 'sm',
                                   className = '',
                               }) => {
@@ -17,13 +17,8 @@ const DeleteSelectedButton = ({
 
     const plural = selectedIds.length > 1 ? 's' : '';
 
-    const tryBulkDelete = async () => {
-        // Many DRF setups accept DELETE with body at a custom action
-        // axios supports body via the `data` key in the config
-        return axios.delete(`${resourceBase}/bulk-delete/`, {
-            data: {ids: selectedIds},
-        });
-    };
+    const tryBulkDelete = async () =>
+        axios.delete(`${resourceBase}/bulk-delete/`, {data: {ids: selectedIds}});
 
     const fallbackPerItemDelete = async () => {
         const results = await Promise.allSettled(
@@ -49,7 +44,6 @@ const DeleteSelectedButton = ({
         } catch (err) {
             const status = err?.response?.status;
             if (status === 405 || status === 404) {
-                // Bulk endpoint/method not available — fall back
                 try {
                     await fallbackPerItemDelete();
                     onDeleted?.();

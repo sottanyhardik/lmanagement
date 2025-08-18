@@ -2,7 +2,6 @@
 from datetime import date as _date
 from io import BytesIO
 
-from django.db.models import Q
 from django.http import HttpResponse
 from django.utils import timezone
 from django.views import View
@@ -11,6 +10,7 @@ from openpyxl.styles import Alignment, Font, PatternFill, Border, Side
 from openpyxl.utils import get_column_letter
 
 from license.models import LicenseDetailsModel
+from license.utils import apply_license_filters
 
 
 class LicenseImportItemsXLSX(View):
@@ -31,48 +31,27 @@ class LicenseImportItemsXLSX(View):
 
     # ---------------- Queryset ----------------
     def get_queryset(self, request):
-        g = request.GET
         qs = (
             LicenseDetailsModel.objects
             .select_related("exporter", "port")
             .prefetch_related(
                 "export_license",
                 "import_license",
-                # allotments for each import item
                 "import_license__allotment_details",
                 "import_license__allotment_details__allotment",
                 "import_license__allotment_details__allotment__company",
                 "import_license__allotment_details__allotment__related_company",
                 "import_license__allotment_details__allotment__bill_of_entry",
-                # BOE item rows for each import item (+ their BOEs)
                 "import_license__item_details",
                 "import_license__item_details__bill_of_entry",
             )
             .order_by("license_expiry_date", "license_number")
         )
 
-        s = (g.get("search") or "").strip()
-        if s:
-            qs = qs.filter(
-                Q(license_number__icontains=s) |
-                Q(file_number__icontains=s) |
-                Q(exporter__name__icontains=s) |
-                Q(port__name__icontains=s)
-            )
-        if g.get("exporter"):
-            qs = qs.filter(exporter_id=g["exporter"])
-        if g.get("port"):
-            qs = qs.filter(port_id=g["port"])
-        if g.get("purchase_status"):
-            qs = qs.filter(purchase_status=g["purchase_status"])
-        if g.get("active") in ("0", "1"):
-            qs = qs.filter(is_active=(g["active"] == "1"))
-        if g.get("expired") == "1":
-            qs = qs.filter(license_expiry_date__lt=timezone.localdate())
-        if g.get("from"):
-            qs = qs.filter(license_date__gte=g["from"])
-        if g.get("to"):
-            qs = qs.filter(license_date__lte=g["to"])
+        qs = apply_license_filters(qs, request.GET)
+        if 'status' not in request.GET and 'is_expired' not in request.GET:
+            qs = qs.filter(is_expired=False)
+
         return qs
 
     # ---------------- Helpers ----------------

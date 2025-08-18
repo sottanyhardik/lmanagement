@@ -30,7 +30,7 @@ export default function Navbar() {
         <nav className="navbar navbar-expand-lg navbar-dark navbar-custom fixed-top">
             <div className="container-fluid">
                 <NavLink className="navbar-brand d-flex align-items-center" to="/dashboard">
-                    <img src="/Logo.png" alt="Logo" className="dashboard-logo-img me-2"/>
+                    <img src="/static/Logo.png" alt="Logo" className="dashboard-logo-img me-2"/>
                     <div className="dashboard-logo-text">
                         License<br/>Manager
                     </div>

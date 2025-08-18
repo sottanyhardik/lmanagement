@@ -1,3 +1,4 @@
+// src/pages/License/PurchaseTab.jsx
 import React, {useMemo, useState} from 'react';
 import {Badge, Button, Col, Form, InputGroup, Row, Table} from 'react-bootstrap';
 import axios from '../../api/axiosInstance';
@@ -27,7 +28,7 @@ const TotalChip = ({label, value, onClick}) => (
 /**
  * Props:
  * - entry: license object (must include export_license array if available)
- * - onSaved: (id) => void   // to refresh parent entry after successful save
+ * - onSaved: (id) => void
  */
 export default function PurchaseTab({entry, onSaved}) {
     const [purchaseType, setPurchaseType] = useState('full'); // 'full' | 'partial'

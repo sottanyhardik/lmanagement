@@ -1,4 +1,4 @@
-// LicenseForm.jsx
+// src/pages/License/LicenseForm.jsx
 import React, {useEffect, useState} from 'react';
 import {Button, Form, Table} from 'react-bootstrap';
 import AsyncCompanySelect from '../../components/AsyncSelect/AsyncCompanySelect';

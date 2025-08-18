@@ -1,3 +1,4 @@
+// src/pages/License/GroupedAccordionLicense.jsx
 import React, {useRef, useState} from 'react';
 import {Accordion, Badge, Card, Col, Collapse, Form, Row, Tab, Table, Tabs} from 'react-bootstrap';
 import LicenseForm from './LicenseForm';
@@ -20,7 +21,7 @@ const calcTotals = (items = []) =>
     );
 
 /**
- * groups shape (back-compat object):
+ * Groups shape (back-compat object):
  * {
  *   [exporter]: {
  *     ports: {
@@ -109,28 +110,19 @@ export default function GroupedAccordionLicense({
                                                          style={{cursor: 'pointer', flex: 1}}>
                                                         <Row
                                                             className="gx-3 flex-nowrap overflow-auto small text-nowrap">
-                                                            <Col className="flex-shrink-0">
-                                                                <strong className="text-primary">License
-                                                                    #: {entry.license_number}</strong>
-                                                            </Col>
-                                                            <Col className="flex-shrink-0">
-                                                                Issue Date: <strong>{entry.license_date}</strong>
-                                                            </Col>
-                                                            <Col className="flex-shrink-0">
-                                                                Expiry:<strong> {entry.license_expiry_date}</strong>
-                                                            </Col>
-                                                            <Col className="flex-shrink-0">
-                                                                Norm Class:{' '}
-                                                                <strong>{entry?.export_license?.[0]?.norm_class?.norm_class || ''}</strong>
-                                                            </Col>
-                                                            <Col className="flex-shrink-0">
-                                                                Notification
-                                                                No: <strong>{entry?.notification_number || ''}</strong>
-                                                            </Col>
-                                                            <Col className="flex-shrink-0">
-                                                                CIF
-                                                                $: <strong>{formatNumber(entry.balance_cif)}</strong>
-                                                            </Col>
+                                                            <Col className="flex-shrink-0"><strong
+                                                                className="text-primary">License
+                                                                #: {entry.license_number}</strong></Col>
+                                                            <Col className="flex-shrink-0">Issue
+                                                                Date: <strong>{entry.license_date}</strong></Col>
+                                                            <Col
+                                                                className="flex-shrink-0">Expiry:<strong> {entry.license_expiry_date}</strong></Col>
+                                                            <Col className="flex-shrink-0">Norm
+                                                                Class: <strong>{entry?.export_license?.[0]?.norm_class?.norm_class || ''}</strong></Col>
+                                                            <Col className="flex-shrink-0">Notification
+                                                                No: <strong>{entry?.notification_number || ''}</strong></Col>
+                                                            <Col className="flex-shrink-0">CIF
+                                                                $: <strong>{formatNumber(entry.balance_cif)}</strong></Col>
                                                         </Row>
                                                     </div>
                                                 </Card.Header>

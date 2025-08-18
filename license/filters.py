@@ -39,8 +39,7 @@ class LicenseDetailsFilterSet(django_filters.FilterSet):
     is_null = django_filters.BooleanFilter(method="filter_is_null", label="Is Null")
 
     # NEW: numeric thresholds
-    balance_cif__gte = django_filters.NumberFilter(field_name="balance_cif", lookup_expr="gte")
-    balance_cif__lte = django_filters.NumberFilter(field_name="balance_cif", lookup_expr="lte")
+    balance_val = django_filters.NumberFilter(method="filter_balance")
 
     class Meta:
         model = lic_model.LicenseDetailsModel
@@ -53,8 +52,7 @@ class LicenseDetailsFilterSet(django_filters.FilterSet):
             "is_expired",
             "is_active",
             "is_not_registered",
-            "balance_cif__gte",  # numeric
-            "balance_cif__lte",  # numeric
+            "balance_val",  # numeric
         ]
         filter_overrides = {
             models.CharField: {
@@ -80,13 +78,18 @@ class LicenseDetailsFilterSet(django_filters.FilterSet):
             return queryset.filter(import_license__item_details__cif_fc=0.01).distinct()
         return queryset
 
-    def filter_is_null(self, queryset, name, value: bool):
-        # Legacy toggle for a fixed 100 threshold; prefer numeric filters above
-        if value is True:
-            return queryset.filter(balance_cif__lte=100).distinct()
-        if value is False:
-            return queryset.filter(balance_cif__gte=100).distinct()
-        return queryset
+    def filter_balance(self, queryset, name, value):
+        """
+        Translate ?balance_val=123&balance_cmp=gte|lte
+        into balance_cif__gte=123 or balance_cif__lte=123
+        """
+        if value is None or value == "":
+            return queryset
+        cmp_ = (self.data.get("balance_cmp") or "gte").lower()
+        if cmp_ == "lte":
+            return queryset.filter(balance_cif__lte=value)
+        # default to gte
+        return queryset.filter(balance_cif__gte=value)
 
 
 class LicenseReportFilter(django_filters.FilterSet):

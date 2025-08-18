@@ -3,7 +3,7 @@ import {useEffect, useMemo, useState} from 'react';
 import axios from '../api/axiosInstance';
 import {clearEntry, getFromCache, getInflight, resolveInflight, setInflight,} from '../Cache/requestCache';
 
-const ENDPOINT = 'licenses/choices/'; // relies on axiosInstance baseURL (/api/)
+const ENDPOINT = 'choices/'; // relies on axiosInstance baseURL (/api/)
 const TTL_MS = 10 * 60 * 1000;       // 10 minutes
 
 // ---------- utils ----------

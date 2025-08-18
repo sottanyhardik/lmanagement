@@ -1,4 +1,4 @@
-// src/utils/groupLicenses.js
+// src/utils/License/groupLicenses.js
 
 /**
  * Group licenses by Exporter → Port.

@@ -8,6 +8,7 @@ from rest_framework import filters, viewsets
 from rest_framework.generics import ListAPIView
 from rest_framework.pagination import PageNumberPagination
 
+from license.utils import apply_license_filters  # <-- import
 from .filters import LicenseDetailsFilterSet
 from .models import LicenseDetailsModel, LicenseImportItemsModel
 from .serializers import LicenseDetailsSerializer, LicenseImportItemsSelectSerializer
@@ -23,19 +24,11 @@ class SmallPagination(PageNumberPagination):
 
 # ---------------- License Details ----------------
 
+# license/views.py (excerpt)
 class LicenseDetailsViewSet(viewsets.ModelViewSet):
     """
     Default: show NON-EXPIRED (active) unless the client explicitly asks otherwise.
-
-    Supports FilterSet:
-      - status=active|expired|all
-      - exporter__in=1,2,3
-      - port__in=5,9
-      - from_date=YYYY-MM-DD
-      - to_date=YYYY-MM-DD
-      - license_number=...
-      - is_individual=true|false
-      - is_null=true|false
+    ...
     """
     queryset = (
         LicenseDetailsModel.objects
@@ -59,13 +52,14 @@ class LicenseDetailsViewSet(viewsets.ModelViewSet):
         qs = super().get_queryset()
         params = self.request.query_params
 
-        # If the client explicitly sets status (or direct is_expired),
-        # we do NOT enforce the default.
-        if 'status' in params or 'is_expired' in params:
-            return qs
+        # Apply all explicit filters:
+        qs = apply_license_filters(qs, params)
 
-        # Default to active (non-expired)
-        return qs.filter(is_expired=False)
+        # Enforce default Active-only when neither 'status' nor 'is_expired' provided:
+        if 'status' not in params and 'is_expired' not in params:
+            qs = qs.filter(is_expired=False)
+
+        return qs
 
 
 # ---------------- Helpers for select endpoint ----------------

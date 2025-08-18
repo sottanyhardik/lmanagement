@@ -249,7 +249,7 @@ const useLicenseListManager = (apiUrl = 'licenses/') => {
 
     const handleExportXLSX = async () => {
         try {
-            const res = await axios.get(`${base}export-excel/?${buildExportParams()}`, {
+            const res = await axios.get(`${base}export/excel/?${buildExportParams()}`, {
                 responseType: 'blob',
             });
             const blob = new Blob([res.data], {
