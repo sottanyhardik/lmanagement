@@ -78,8 +78,20 @@ else
   "$PY" manage.py migrate
   "$PY" manage.py collectstatic --noinput
 
-  sudo systemctl restart gunicorn || sudo systemctl restart gunicorn_lmanagement
-  sudo systemctl reload nginx || true
+  echo "[server] Restarting services..."
+  if ! sudo systemctl restart gunicorn 2>/tmp/sudo_err.log; then
+    echo "⚠️  Could not restart gunicorn via sudo."
+    echo "👉 Fix: run 'sudo visudo' and add:"
+    echo "    django ALL=(ALL) NOPASSWD: /bin/systemctl restart gunicorn, /bin/systemctl reload nginx"
+    cat /tmp/sudo_err.log
+  fi
+
+  if ! sudo systemctl reload nginx 2>/tmp/sudo_err.log; then
+    echo "⚠️  Could not reload nginx via sudo."
+    echo "👉 Fix: run 'sudo visudo' and add:"
+    echo "    django ALL=(ALL) NOPASSWD: /bin/systemctl reload nginx"
+    cat /tmp/sudo_err.log
+  fi
 fi
 echo "[server] Deploy done."
 REMOTE_EOF
