@@ -129,3 +129,36 @@ def apply_license_filters(qs, params):
         )
 
     return qs
+
+
+import math
+
+
+def safe_get(data, key, default=0, ndigits=0):
+    """
+    Works with both dicts and objects (attribute access).
+    Always rounds down numeric values (Excel ROUNDDOWN style).
+
+    Args:
+        data: dict or object
+        key: key/attribute name
+        default: fallback value if missing
+        ndigits: number of decimals to keep (default 0 → integer floor)
+    """
+    if data is None:
+        return default
+
+    # Get value
+    if isinstance(data, dict):
+        val = data.get(key, default)
+    else:
+        val = getattr(data, key, default)
+
+    # Apply round down if numeric
+    if isinstance(val, (int, float)):
+        if ndigits == 0:
+            return math.floor(val)
+        factor = 10 ** ndigits
+        return math.floor(val * factor) / factor
+
+    return val

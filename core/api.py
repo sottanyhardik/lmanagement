@@ -232,3 +232,13 @@ class ChoicesAPIView(APIView):
             'notification_number': [{'value': k, 'label': v} for k, v in NOTIFICATION_NORM_CHOICES],
             'purchase_status': [{'value': k, 'label': v} for k, v in LICENCE_PURCHASE],
         })
+
+
+class SchemeCodeViewSet(viewsets.ModelViewSet):
+    queryset = HSCodeModel.objects.all()
+    serializer_class = HSCodeSerializer
+    pagination_class = CustomPagination  # ✅
+    filter_backends = [filters.SearchFilter, filters.OrderingFilter]  # ✅
+    search_fields = ['hs_code', 'product_description']
+    ordering_fields = ['hs_code', 'product_description']
+    ordering = ['-modified_on']  # Default: newest first

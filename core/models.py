@@ -252,3 +252,27 @@ class InvoiceEntity(models.Model):
 
     def __str__(self):
         return self.name
+
+
+class SchemeCode(models.Model):
+    code = models.CharField(max_length=10, unique=True)
+    label = models.CharField(max_length=100)
+
+    def __str__(self):
+        return f"{self.code} - {self.label}"
+
+
+class NotificationNumber(models.Model):
+    code = models.CharField(max_length=10, unique=True)
+    label = models.CharField(max_length=100)
+
+    def __str__(self):
+        return self.label
+
+
+class PurchaseStatus(models.Model):
+    code = models.CharField(max_length=2, unique=True)
+    label = models.CharField(max_length=100)
+
+    def __str__(self):
+        return self.label

@@ -1,16 +1,22 @@
 # license/views.py
+import datetime
 from datetime import date
 
 from dateutil.relativedelta import relativedelta
 from django.db.models import Q
 from django_filters.rest_framework import DjangoFilterBackend
 from rest_framework import filters, viewsets
+from rest_framework import status
 from rest_framework.generics import ListAPIView
 from rest_framework.pagination import PageNumberPagination
+from rest_framework.response import Response
+from rest_framework.views import APIView
 
 from license.utils import apply_license_filters  # <-- import
 from .filters import LicenseDetailsFilterSet
-from .models import LicenseDetailsModel, LicenseImportItemsModel
+from .models import LicenseDetailsModel, GE, MI, SM, OT, CO, RA, LM
+from .models import LicenseImportItemsModel
+from .serializers import BiscuitReportSerializer
 from .serializers import LicenseDetailsSerializer, LicenseImportItemsSelectSerializer
 
 
@@ -227,3 +233,39 @@ class LicenseImportItemsViewSet(viewsets.ReadOnlyModelViewSet):
             )
 
         return queryset.distinct()
+
+
+class BiscuitReportAPIView(APIView):
+
+    def get(self, request, party, status_flag):
+        date = datetime.datetime.now() - datetime.timedelta(days=30)
+        is_expired = status_flag == "expired"
+
+        qs = LicenseDetailsModel.objects.filter(
+            export_license__norm_class__norm_class="E5",
+            balance_cif__gte=500,
+        )
+
+        party_map = {
+            "parle": GE,
+            "mi": MI,
+            "sm": SM,
+            "ot": OT,
+            "co": CO,
+            "ra": RA,
+            "lm": LM,
+        }
+        if is_expired:
+            qs = qs.filter(license_expiry_date__lt=date)
+        else:
+            qs = qs.filter(license_expiry_date__gte=date)
+
+        if party.lower() in party_map:
+            qs = qs.filter(purchase_status=party_map[party.lower()])
+            if party.lower() == "parle":
+                qs = qs.filter(exporter__name__icontains="parle")
+        else:
+            qs = qs.filter(purchase_status=GE).exclude(exporter__name__icontains="parle")
+
+        serializer = BiscuitReportSerializer(qs, many=True)
+        return Response(serializer.data, status=status.HTTP_200_OK)

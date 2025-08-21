@@ -1,8 +1,10 @@
 import time
+
 import requests
 from django.core.management.base import BaseCommand
-from license.models import LicenseDetailsModel
+
 from data_script.fetch_ownership import fetch_scrip_ownership
+from license.models import LicenseDetailsModel
 
 # === Config ===
 SERVER_API = "http://167.71.233.211/api/update-license-transfer/"
@@ -72,7 +74,6 @@ def fetch_and_post_license_status(dfia):
         data = response.json()
         payload = build_payload(dfia, data)
         res = requests.post(SERVER_API, json=payload)
-
         print(f"✅ DFIA {dfia.license_number} updated | Status Code: {res.status_code}")
     except Exception as e:
         print(f"❌ Error for DFIA {dfia.license_number}: {e}")

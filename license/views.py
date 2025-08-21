@@ -1,5 +1,4 @@
 import datetime
-import json
 from io import StringIO
 
 import xlsxwriter
@@ -19,6 +18,7 @@ from license.excel import get_license_table
 from license.helper import check_license, fetch_item_details
 from . import forms, tables, filters
 from . import models as license
+from .filters import LicenseDetailsFilterSet
 from .item_report import item_filter
 from .models import GE, MI, LicenseDetailsModel, SM, OT, CO, RA, LM
 from .tables import LicenseBiscuitReportTable, LicenseConfectioneryReportTable, LicenseNamkeenReportTable, \
@@ -145,7 +145,7 @@ class LicenseDetailUpdateView(UpdateWithInlinesView):
 class LicenseListView(FilterView):
     template_name = 'dfia/list.html'
     model = license.LicenseDetailsModel
-    filterset_class = filters.LicenseDetailFilter
+    filterset_class = filters.LicenseDetailsFilterSet
     paginate_by = 50
     queryset = license.LicenseDetailsModel.objects.filter()
     ordering = "license_expiry_date"
@@ -183,7 +183,7 @@ class LicenseListView(FilterView):
 class LicenseAjaxListView(FilterView):
     template_name = 'license/ajax-list.html'
     model = license.LicenseDetailsModel
-    filterset_class = filters.LicenseDetailFilter
+    filterset_class = LicenseDetailsFilterSet
     paginate_by = 50
     queryset = license.LicenseDetailsModel.objects.filter()
     ordering = "license_expiry_date"
@@ -328,6 +328,7 @@ class PDFLedgerLicenseDetailView(PDFTemplateResponseMixin, DetailView):
 
         context["object"] = license_obj
         return context
+
 
 class BaseReportView(TemplateView):
     template_name = 'license/report_list.html'
@@ -730,12 +731,12 @@ class MovementItemInline(InlineFormSetFactory):
     form_class = forms.LicenseInwardOutwardForm
 
 
-class MovementListView(PagedFilteredTableView):
-    template_name = 'core/list.html'
-    model = license.LicenseInwardOutwardModel
-    table_class = tables.LicenseInwardOutwardTable
-    filter_class = filters.LicenseInwardOutwardFilter
-    ordering = ('date__date', 'license__ge_file_number')
+# class MovementListView(PagedFilteredTableView):
+#     template_name = 'core/list.html'
+#     model = license.LicenseInwardOutwardModel
+#     table_class = tables.LicenseInwardOutwardTable
+#     filter_class = filters.LicenseInwardOutwardFilter
+#     ordering = ('date__date', 'license__ge_file_number')
 
 
 class MovementUpdateView(UpdateWithInlinesView):

@@ -3,7 +3,7 @@ from rest_framework.routers import DefaultRouter
 
 from .Export.item_excel import LicenseImportItemsXLSX
 from .Export.item_pdf import LicenseImportItemsUltraWidePDF
-from .api import LicenseImportItemsViewSet, LicenseDetailsViewSet, LicenseImportItemsSelectView
+from .api import LicenseImportItemsViewSet, LicenseDetailsViewSet, LicenseImportItemsSelectView, BiscuitReportAPIView
 
 router = DefaultRouter()
 router.register(r'license-import-items', LicenseImportItemsViewSet, basename='license-import-items')
@@ -14,6 +14,7 @@ urlpatterns = [
          name="license-import-items-select"),
     path('licenses/export/pdf/', LicenseImportItemsUltraWidePDF.as_view(), name='license-details-pdf'),
     path('licenses/export/excel/', LicenseImportItemsXLSX.as_view(), name="licenses-export-xlsx"),
+    path("licenses/biscuit-report/<str:party>/<str:status_flag>/", BiscuitReportAPIView.as_view()),
     path('', include(router.urls)),
 
     # path('license/report/biscuits/', login_required(views.PDFSummaryLicenseDetailView.as_view()),
@@ -42,8 +43,6 @@ urlpatterns = [
     # path('movement/update/', login_required(views.MovementUpdateView.as_view()), name='movement-update'),
     # path('summary/<slug:license>.pdf', login_required(views.PDFSummaryLicenseDetailView.as_view()),
     #      name='license_summary'),
-    # path('report/biscuit/<slug:status>/<slug:party>/', login_required(views.BiscuitReportView.as_view()),
-    #      name='report_biscuit'),
     # path('report/confectionery/<slug:status>/<slug:party>/', login_required(views.ConfectioneryReportView.as_view()),
     #      name='report_confectionery'),
     # path('report/confectionery/milk/<slug:status>', login_required(views.ConfectioneryMilkReportView.as_view()),

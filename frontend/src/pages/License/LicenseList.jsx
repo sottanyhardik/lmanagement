@@ -1,15 +1,38 @@
 // src/pages/License/LicenseList.jsx
-import React from 'react';
-import {Card, Container} from 'react-bootstrap';
+import React from "react";
+import {Card, Container} from "react-bootstrap";
+import * as XLSX from "xlsx";
+import axios from "../../api/axiosInstance";
 
-import ListControls from '../../components/ListControls';
-import DeleteSelectedButton from './DeleteSelectedButton';
-import LicenseFilters from './LicenseFilters';
-import LicenseForm from './LicenseForm';
-import GroupedAccordionLicense from './GroupedAccordionLicense';
+import ListControls from "../../components/ListControls";
+import DeleteSelectedButton from "./DeleteSelectedButton";
+import LicenseFilters from "./LicenseFilters";
+import LicenseForm from "./LicenseForm";
+import GroupedAccordionLicense from "./GroupedAccordionLicense";
 
-import useListManager from '../../hooks/License/useLicenseListManager';
-import {groupLicensesAsObject} from '../../utils/License/groupLicenses';
+import useListManager from "../../hooks/License/useLicenseListManager";
+import {groupLicensesAsObject} from "../../utils/License/groupLicenses";
+
+// 🔹 helper for Biscuit report export
+const exportBiscuitReport = async (statusFlag) => {
+    try {
+        const res = await axios.get(`licenses/biscuit-report/GE/${statusFlag}/`);
+        const data = res.data || [];
+
+        if (data.length === 0) {
+            alert(`No data found for Biscuit Report (${statusFlag})`);
+            return;
+        }
+
+        const ws = XLSX.utils.json_to_sheet(data);
+        const wb = XLSX.utils.book_new();
+        XLSX.utils.book_append_sheet(wb, ws, "BiscuitReport");
+        XLSX.writeFile(wb, `biscuit_report_${statusFlag}.xlsx`);
+    } catch (err) {
+        console.error("Error exporting biscuit report:", err);
+        alert("Failed to download Biscuit Report");
+    }
+};
 
 const LicenseList = () => {
     const {
@@ -48,21 +71,20 @@ const LicenseList = () => {
         handleExportXLSX,
         handleExportPDF,
         fetchData,
-    } = useListManager('licenses/');
+    } = useListManager("licenses/");
 
     const onAddNewClick = () =>
         setNewEntry({
-            license_number: '',
-            license_date: '',
-            license_expiry_date: '',
+            license_number: "",
+            license_date: "",
+            license_expiry_date: "",
             exporter: null,
             port: null,
             import_license: [],
             export_license: [],
         });
 
-    const onSavedEntry = (id /*, updatedEntry */) => {
-        // fetch the fresh row and expand it
+    const onSavedEntry = (id /* , updatedEntry */) => {
         updateSingleEntry(id);
         setExpanded((prev) => ({...prev, [id]: true}));
     };
@@ -80,19 +102,37 @@ const LicenseList = () => {
                 setSortField={setSortField}
                 setSortOrder={setSortOrder}
                 sortOptions={[
-                    {label: 'License No', value: 'license_number'},
-                    {label: 'Date', value: 'license_date'},
-                    {label: 'Expiry', value: 'license_expiry_date'},
-                    {label: 'Recently Modified', value: 'modified_on'},
+                    {label: "License No", value: "license_number"},
+                    {label: "Date", value: "license_date"},
+                    {label: "Expiry", value: "license_expiry_date"},
+                    {label: "Recently Modified", value: "modified_on"},
                 ]}
                 Filters={<LicenseFilters filters={filters} setFilters={setFilters}/>}
                 handleReset={handleReset}
                 setPage={setPage}
-                // Export actions
                 handleExportCSV={handleExportXLSX}
                 handleExportPDF={handleExportPDF}
                 onAddNewClick={onAddNewClick}
             />
+
+            {/* 🔹 Biscuit Report Section */}
+            <div className="my-3 p-3 border rounded bg-light">
+                <h6 className="mb-2">Download Biscuit Report</h6>
+                <div className="d-flex gap-2">
+                    <button
+                        className="btn btn-sm btn-success"
+                        onClick={() => exportBiscuitReport("live")}
+                    >
+                        Biscuit Live
+                    </button>
+                    <button
+                        className="btn btn-sm btn-danger"
+                        onClick={() => exportBiscuitReport("expired")}
+                    >
+                        Biscuit Expired
+                    </button>
+                </div>
+            </div>
 
             <DeleteSelectedButton
                 selectedIds={selectedIds}
@@ -130,14 +170,12 @@ const LicenseList = () => {
                 onSaved={onSavedEntry}
             />
 
-            {/* Loading indicator */}
             {loading && (
                 <div className="text-center my-3">
                     <div className="spinner-border text-primary" role="status"/>
                 </div>
             )}
 
-            {/* Infinite-scroll sentinel (only when useful) */}
             {!loading && hasMore && (
                 <div ref={loadMoreRef} className="text-center my-4" style={{minHeight: 24}}/>
             )}
