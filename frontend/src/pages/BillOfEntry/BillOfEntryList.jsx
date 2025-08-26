@@ -1,15 +1,18 @@
-// src/pages/BillOfEntry/BillOfEntryList.jsx
-import React from 'react';
-import {Card, Container} from 'react-bootstrap';
+import React, {useMemo} from 'react';
+import {Container} from 'react-bootstrap';
 
 import ListControls from '../../components/ListControls';
 import DeleteSelectedButton from './DeleteSelectedButton';
 import BoeFilters from './BoeFilters';
-import BillOfEntryForm from './BillOfEntryForm';
 import GroupedAccordion from './GroupedAccordion';
 
 import {groupEntries} from '../../utils/groupEntries';
 import useBillOfEntryListManager from '../../hooks/BillOfEntry/useBillOfEntryListManager';
+
+import StatsBar from './components/StatsBar';
+import FilterChips from './components/FilterChips';
+import NewEntryCard from './components/NewEntryCard';
+import LoadMoreSection from './components/LoadMoreSection';
 
 const BillOfEntryList = () => {
     const {
@@ -49,7 +52,7 @@ const BillOfEntryList = () => {
         handleReset,
         handleExportXLSX,
         handleExportPDF,
-    } = useBillOfEntryListManager(); // hook baseURL already includes /api via axiosInstance
+    } = useBillOfEntryListManager();
 
     const onAddNewClick = () =>
         setNewEntry({
@@ -61,13 +64,7 @@ const BillOfEntryList = () => {
             invoice_no: '',
             product_name: '',
             item_details: [
-                {
-                    sr_number: '',
-                    transaction_type: 'D', // Debit by default
-                    qty: '',
-                    cif_fc: '',
-                    cif_inr: '',
-                },
+                {sr_number: '', transaction_type: 'D', qty: '', cif_fc: '', cif_inr: ''},
             ],
         });
 
@@ -77,7 +74,10 @@ const BillOfEntryList = () => {
         setExpanded((prev) => ({...prev, [id]: true}));
     };
 
-    const groups = groupEntries(entries);
+    const groups = useMemo(() => groupEntries(entries), [entries]);
+    const totalLoaded = entries.length;
+    const groupCount = useMemo(() => Object.keys(groups || {}).length, [groups]);
+    const selectedCount = selectedIds.length;
 
     return (
         <Container className="mt-4">
@@ -99,6 +99,16 @@ const BillOfEntryList = () => {
                 onAddNewClick={onAddNewClick}
             />
 
+            <StatsBar
+                totalLoaded={totalLoaded}
+                groupCount={groupCount}
+                selectedCount={selectedCount}
+                allExpanded={allExpanded}
+                onToggleExpand={() => setAllExpanded((prev) => !prev)}
+            />
+
+            <FilterChips filters={filters} setFilters={setFilters} onClearAll={handleReset}/>
+
             <DeleteSelectedButton
                 selectedIds={selectedIds}
                 onDeleted={() => {
@@ -107,31 +117,14 @@ const BillOfEntryList = () => {
                 }}
             />
 
-            <div className="d-flex justify-content-end mb-2">
-                <button
-                    className="btn btn-outline-primary btn-sm"
-                    onClick={() => setAllExpanded((prev) => !prev)}
-                >
-                    {allExpanded ? 'Collapse All' : 'Expand All'}
-                </button>
-            </div>
-
-            {newEntry && (
-                <Card className="mb-3 border-success">
-                    <Card.Header className="bg-success text-white">New Bill of Entry</Card.Header>
-                    <Card.Body>
-                        <BillOfEntryForm
-                            entry={newEntry}
-                            isNew
-                            onClose={() => setNewEntry(null)}
-                            onSaved={() => {
-                                setNewEntry(null);
-                                fetchData(false, 1);
-                            }}
-                        />
-                    </Card.Body>
-                </Card>
-            )}
+            <NewEntryCard
+                newEntry={newEntry}
+                onClose={() => setNewEntry(null)}
+                onSaved={() => {
+                    setNewEntry(null);
+                    fetchData(false, 1);
+                }}
+            />
 
             <GroupedAccordion
                 groups={groups}
@@ -144,15 +137,13 @@ const BillOfEntryList = () => {
                 onSaved={onSavedRow}
             />
 
-            {/* Loading + infinite-scroll sentinel */}
-            {loading && (
-                <div className="text-center my-3">
-                    <div className="spinner-border text-primary" role="status"/>
-                </div>
-            )}
-            {!loading && hasMore && (
-                <div ref={loadMoreRef} className="text-center my-4" style={{minHeight: 24}}/>
-            )}
+            <LoadMoreSection
+                loading={loading}
+                hasMore={hasMore}
+                onManualLoadMore={() => setPage((p) => p + 1)}
+                loadMoreRef={loadMoreRef}
+            />
+
             {!loading && !entries.length && (
                 <div className="text-center text-muted my-4">No entries found.</div>
             )}

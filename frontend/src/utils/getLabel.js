@@ -1,0 +1,2 @@
+export const getLabel = (obj) =>
+    obj?.name ?? obj?.label ?? obj?.display_name ?? obj?.code ?? (obj?.id != null ? `#${obj.id}` : '');
