@@ -1,7 +1,6 @@
 // src/pages/License/LicenseList.jsx
 import React from "react";
 import {Card, Container} from "react-bootstrap";
-import * as XLSX from "xlsx";
 import axios from "../../api/axiosInstance";
 
 import ListControls from "../../components/ListControls";
@@ -23,6 +22,9 @@ const exportBiscuitReport = async (statusFlag) => {
             alert(`No data found for Biscuit Report (${statusFlag})`);
             return;
         }
+
+        // Lazy-load xlsx when needed (avoids Vite build issues)
+        const XLSX = await import("xlsx");
 
         const ws = XLSX.utils.json_to_sheet(data);
         const wb = XLSX.utils.book_new();
@@ -144,7 +146,9 @@ const LicenseList = () => {
 
             {newEntry && (
                 <Card className="mb-3 border-success">
-                    <Card.Header className="bg-success text-white">New License</Card.Header>
+                    <Card.Header className="bg-success text-white">
+                        New License
+                    </Card.Header>
                     <Card.Body>
                         <LicenseForm
                             entry={newEntry}
@@ -163,7 +167,9 @@ const LicenseList = () => {
                 groups={grouped}
                 allExpanded={allExpanded}
                 expanded={expanded}
-                toggle={(id) => setExpanded((prev) => ({...prev, [id]: !prev[id]}))}
+                toggle={(id) =>
+                    setExpanded((prev) => ({...prev, [id]: !prev[id]}))
+                }
                 selectedIds={selectedIds}
                 toggleSelect={toggleSelect}
                 toggleSelectAll={toggleSelectAll}
