@@ -1,3 +1,7 @@
+@use "sass:color";
+@use "sass:math";
+
+// Then keep the rest of your custom styles...
 :root {
   --primary-color: #e16123;
   --primary-hover: #c9521d;

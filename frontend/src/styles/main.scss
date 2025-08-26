@@ -1,4 +1,4 @@
-// Import custom Bootstrap theme
-@import './variables';
-@import 'bootstrap/scss/bootstrap';
-@import './custom';
+// Import custom Bootstrap theme with @use
+@use './variables' as *;
+@use 'bootstrap/scss/bootstrap' as *;
+@use './custom' as *;
