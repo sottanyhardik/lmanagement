@@ -155,7 +155,6 @@ class InvoiceSerializer(serializers.ModelSerializer):
             if hasattr(sr, 'pk'):
                 item['sr_number'] = sr
             # transaction_type default
-            item.setdefault('transaction_type', 'D')
             InvoiceItem.objects.create(invoice=invoice, **item)
 
         # Totals + BOE backfill
@@ -191,7 +190,6 @@ class InvoiceSerializer(serializers.ModelSerializer):
                 sr_id = sr.id if hasattr(sr, 'id') else sr
                 seen.add(sr_id)
                 obj = existing_by_sr.get(sr_id)
-                item.setdefault('transaction_type', 'D')
                 if obj:
                     # Update existing
                     for k, v in item.items():
