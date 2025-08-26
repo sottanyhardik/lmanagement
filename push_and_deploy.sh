@@ -79,6 +79,7 @@ else
   fi
 
   cd "\$REMOTE_ROOT"
+  "\$PY" manage.py makemigrations
   "\$PY" manage.py migrate
   "\$PY" manage.py collectstatic --noinput
 
