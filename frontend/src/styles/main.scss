@@ -1,4 +1,11 @@
-// Import custom Bootstrap theme with @use
-@use './variables' as *;
-@use 'bootstrap/scss/bootstrap' as *;
-@use './custom' as *;
+@use "./variables" as vars;
+
+@use "bootstrap" with (
+  $primary: vars.$primary,
+  $body-bg: vars.$body-bg,
+  $body-color: vars.$body-color,
+  $theme-colors: vars.$theme-colors,
+  $card-bg: vars.$card-bg
+);
+
+@use "./custom" as *;
