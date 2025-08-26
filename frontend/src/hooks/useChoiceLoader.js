@@ -1,77 +1,58 @@
 // src/hooks/useChoiceLoader.js
 import {useEffect, useMemo, useState} from "react";
 import axios from "../api/axiosInstance";
-import {clearEntry, getFromCache, getInflight, resolveInflight, setInflight,} from "../Cache/requestCache";
 
 const ENDPOINT = "choices/"; // served from /api/choices/
-const TTL_MS = 10 * 60 * 1000; // 10 min cache
 
 const stableStringify = (obj) =>
     JSON.stringify(obj, Object.keys(obj || {}).sort());
 
-export async function fetchLicenseChoices({force = false, params = {}, signal} = {}) {
-    const cached = getFromCache(ENDPOINT, params, TTL_MS);
-    if (!force && cached) return cached;
-
-    const inflight = getInflight(ENDPOINT, params);
-    if (inflight) return inflight;
-
-    const req = (async () => {
-        try {
-            const res = await axios.get(ENDPOINT, {params, signal});
-            const data = res?.data ?? {};
-            resolveInflight(ENDPOINT, params, data); // also caches
-            return data;
-        } catch (err) {
-            resolveInflight(ENDPOINT, params, null);
-            throw err;
-        }
-    })();
-
-    setInflight(ENDPOINT, params, req);
-    return req;
+/**
+ * Simple fetcher – no cache, no inflight dedupe.
+ */
+export async function fetchLicenseChoices({params = {}, signal} = {}) {
+    const res = await axios.get(ENDPOINT, {params, signal});
+    return res?.data ?? {};
 }
 
-export function clearLicenseChoices(params = {}) {
-    clearEntry(ENDPOINT, params);
+/**
+ * No-ops kept for compatibility where these functions are imported.
+ */
+export function clearLicenseChoices() {
 }
 
-export function prefetchLicenseChoices(params = {}) {
-    return fetchLicenseChoices({params}).catch(() => {
-    });
+export function prefetchLicenseChoices() {
 }
 
-export function useLicenseChoices(params = {}, opts = {}) {
-    const {force = false} = opts;
+/**
+ * Hook – no cache. Fetches on mount and whenever params change.
+ */
+export function useLicenseChoices(params = {}, _opts = {}) {
     const key = useMemo(() => stableStringify(params), [params]);
-    const initial = getFromCache(ENDPOINT, params, TTL_MS);
 
-    const [state, setState] = useState(() => ({
-        choices: initial ?? null,
-        loading: !initial,
+    const [state, setState] = useState({
+        choices: null,
+        loading: true,
         error: null,
-    }));
+    });
 
     useEffect(() => {
         let cancelled = false;
         const controller = new AbortController();
 
-        if (!force && initial) {
-            setState((s) => ({...s, loading: false}));
-            return;
-        }
+        setState((s) => ({...s, loading: true, error: null}));
 
-        fetchLicenseChoices({force, params, signal: controller.signal})
+        fetchLicenseChoices({params, signal: controller.signal})
             .then((data) => {
                 if (!cancelled) setState({choices: data, loading: false, error: null});
             })
             .catch((err) => {
                 if (!cancelled) {
-                    setState((s) => ({
-                        ...s,
+                    setState({
+                        choices: null,
                         loading: false,
                         error: err?.message || String(err),
-                    }));
+                    });
                 }
             });
 
@@ -79,10 +60,11 @@ export function useLicenseChoices(params = {}, opts = {}) {
             cancelled = true;
             controller.abort();
         };
-    }, [key, force]);
+    }, [key]);
 
-    const refetch = (extra = {}) =>
-        fetchLicenseChoices({force: true, params: {...params, ...extra}})
+    const refetch = (extra = {}) => {
+        setState((s) => ({...s, loading: true, error: null}));
+        return fetchLicenseChoices({params: {...params, ...extra}})
             .then((data) => setState({choices: data, loading: false, error: null}))
             .catch((err) =>
                 setState((s) => ({
@@ -91,6 +73,7 @@ export function useLicenseChoices(params = {}, opts = {}) {
                     error: err?.message || String(err),
                 }))
             );
+    };
 
     return {...state, refetch};
 }

@@ -26,9 +26,10 @@ export default function ChoiceSelect({
                                          instanceId,
                                          ...props
                                      }) {
-    const {choices, loading} = useLicenseChoices();
-    const group = useMemo(() => choices?.[choiceKey] || [], [choices, choiceKey]);
+    // no cache, no force
+    const {choices, loading, error} = useLicenseChoices();
 
+    const group = useMemo(() => choices?.[choiceKey] || [], [choices, choiceKey]);
     const valueMap = useMemo(() => new Map(group.map((o) => [o.value, o])), [group]);
 
     const resolvedValue = useMemo(() => {
@@ -66,6 +67,12 @@ export default function ChoiceSelect({
     );
 
     const portalTarget = typeof document !== "undefined" ? document.body : undefined;
+
+    if (error && !group.length) {
+        return <div style={{fontSize: 12, color: "#b00020"}}>
+            Failed to load choices for {String(choiceKey)}.
+        </div>;
+    }
 
     if (loading && !group.length) {
         return (

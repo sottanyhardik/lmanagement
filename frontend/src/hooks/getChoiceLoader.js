@@ -9,7 +9,6 @@ export function getChoiceLoader(
     {maxResults = 50, minLength = 0, sortStartsFirst = true, trim = true} = {}
 ) {
     const group = Array.isArray(choices?.[key]) ? choices[key] : [];
-
     const withNorm = group.map((opt) => ({
         ...opt,
         _norm: normalize(opt?.label),

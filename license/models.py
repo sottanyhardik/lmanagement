@@ -81,12 +81,9 @@ def license_path(instance, filename):
 # -----------------------------
 
 class LicenseDetailsModel(models.Model):
+    purchase_status = models.CharField(choices=LICENCE_PURCHASE, max_length=2, default=GE)
     scheme_code = models.CharField(choices=SCHEME_CODE_CHOICES, max_length=10, default=DFIA)
     notification_number = models.CharField(choices=NOTIFICATION_NORM_CHOICES, max_length=10, default=N2023)
-
-    purchase_status_fk = models.ForeignKey(PurchaseStatus, null=True, blank=True, on_delete=models.PROTECT)
-    scheme_code_fk = models.ForeignKey(SchemeCode, null=True, blank=True, on_delete=models.PROTECT)
-    notification_number_fk = models.ForeignKey(NotificationNumber, null=True, blank=True, on_delete=models.PROTECT)
 
     license_number = models.CharField(max_length=50, unique=True)
     license_date = models.DateField(null=True, blank=True)
@@ -109,7 +106,6 @@ class LicenseDetailsModel(models.Model):
     is_mnm = models.BooleanField(default=False)
     is_not_registered = models.BooleanField(default=False)
     is_null = models.BooleanField(default=False)
-    purchase_status = models.CharField(choices=LICENCE_PURCHASE, max_length=2, default=GE)
     is_au = models.BooleanField(default=False)
     is_active = models.BooleanField(default=True)
 

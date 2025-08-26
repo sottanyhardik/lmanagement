@@ -1,3 +1,4 @@
+// src/App.jsx
 import React, {useContext} from 'react';
 import {Navigate, Route, Routes} from 'react-router-dom';
 
@@ -24,6 +25,7 @@ import AllotmentList from './pages/Allotment/AllotmentList';
 import PrivateRoute from './routes/PrivateRoute';
 import AuthContext from './context/AuthContext';
 
+import SessionExpiryTimer from './components/SessionExpiryTimer'; // ⬅️ add this
 import {ToastContainer} from 'react-toastify';
 import 'react-toastify/dist/ReactToastify.css';
 
@@ -48,7 +50,7 @@ function App() {
                 <Route path="/forgot-password" element={<ForgotPassword/>}/>
                 <Route path="/reset/:uid/:token" element={<ResetPassword/>}/>
 
-                {/* Protected area: single PrivateRoute wraps MainLayout + all child routes */}
+                {/* Protected area */}
                 <Route
                     element={
                         <PrivateRoute>
@@ -89,7 +91,11 @@ function App() {
                 />
             </Routes>
 
-            <ToastContainer position="top-right" autoClose={3000}/>
+            {/* Small top-right pill that counts down to earliest expiry (token/idle) */}
+            <SessionExpiryTimer/>
+
+            {/* Nudge the toasts down slightly so they don't overlap the timer */}
+            <ToastContainer position="top-right" autoClose={3000} style={{marginTop: 40}}/>
         </>
     );
 }

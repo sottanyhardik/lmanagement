@@ -92,13 +92,12 @@ const ExportLicenseTable = ({exportItems = [], onChange, onAdd, onFetchSionInput
                                               onChange={e => handleFieldChange(i, 'cif_fc', e.target.value)}/></td>
                             <td><Form.Control value={item.cif_inr ?? ''}
                                               onChange={e => handleFieldChange(i, 'cif_inr', e.target.value)}/></td>
+
                             <td>
                                 <div className="d-flex flex-column gap-2">
-                                    <AsyncNormSelect
-                                        value={item.norm_class ?? null}
-                                        onChange={v => handleFieldChange(i, 'norm_class', v)}
-                                        placeholder="Select SION Norm"
-                                    />
+                                    <AsyncNormSelect value={2}
+                                                     onChange={(v) => setForm((f) => ({...f, norm_class: v}))}/>
+
                                     <InputGroup size="sm">
                                         <InputGroup.Text>Start Serial</InputGroup.Text>
                                         <Form.Control

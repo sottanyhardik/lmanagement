@@ -8,11 +8,13 @@ const LineItemTable = ({
                            selectedSrNumbers = [],
                            onItemChange,
                            onAddRow,
-                           onRemoveRow
+                           onRemoveRow,
+                           lastRowRef,
                        }) => {
     return (
         <div className="border p-2 rounded">
             <h6>Item Details</h6>
+
             {items.map((item, index) => (
                 <Row key={index} className="mb-2 align-items-end">
                     <Col md={4}>
@@ -20,7 +22,10 @@ const LineItemTable = ({
                         <AsyncSrNumberSelect
                             value={item.sr_number}
                             onChange={(v) => onItemChange(index, 'sr_number', v)}
-                            excludeIds={items.map((it, i) => i !== index ? it.sr_number?.value : null).filter(Boolean)}
+                            // tolerate both shapes: {value} and {id}
+                            excludeIds={items
+                                .map((it, i) => (i !== index ? (it.sr_number?.value ?? it.sr_number?.id) : null))
+                                .filter(Boolean)}
                             placeholder="Select SR"
                             styles={{
                                 control: (base) => ({
@@ -28,10 +33,11 @@ const LineItemTable = ({
                                     minHeight: '32px',
                                     fontSize: '0.875rem',
                                     borderColor: errors[`item_${index}_sr`] ? 'red' : base.borderColor,
-                                    boxShadow: errors[`item_${index}_sr`] ? '0 0 0 0.2rem rgba(255,0,0,0.25)' : base.boxShadow
+                                    boxShadow: errors[`item_${index}_sr`] ? '0 0 0 0.2rem rgba(255,0,0,0.25)' : base.boxShadow,
                                 }),
                             }}
                             name={`item_${index}_sr`}
+                            ref={index === items.length - 1 ? lastRowRef : undefined}
                         />
                         {errors[`item_${index}_sr`] && (
                             <div className="text-danger small">{errors[`item_${index}_sr`]}</div>
@@ -84,11 +90,7 @@ const LineItemTable = ({
                     </Col>
 
                     <Col md={2} className="d-flex align-items-end">
-                        <Button
-                            variant="danger"
-                            size="sm"
-                            onClick={() => onRemoveRow(index)}
-                        >
+                        <Button variant="danger" size="sm" onClick={() => onRemoveRow(index)}>
                             Remove
                         </Button>
                     </Col>

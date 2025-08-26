@@ -7,6 +7,25 @@ import axios from '../../api/axiosInstance';
 import {toast} from 'react-toastify';
 import LineItemTable from './LineItemTable';
 
+const emptyRow = () => ({
+    sr_number: null, // normalized as {value,label} | null
+    transaction_type: 'D',
+    qty: '',
+    cif_fc: '',
+    cif_inr: '',
+});
+
+/** Normalize any SR shape into {value, label} */
+function toSrOption(sr) {
+    if (!sr) return null;
+    if (typeof sr === 'number') return {value: sr, label: String(sr)};
+    if (typeof sr === 'object') {
+        if ('value' in sr) return sr;
+        if ('id' in sr) return {value: sr.id, label: sr.display_name ?? String(sr.id)};
+    }
+    return null;
+}
+
 const BillOfEntryForm = ({entry, isNew = false, onClose, onSaved}) => {
     const [saving, setSaving] = useState(false);
     const [errors, setErrors] = useState({});
@@ -14,214 +33,232 @@ const BillOfEntryForm = ({entry, isNew = false, onClose, onSaved}) => {
     const exchangeRateRef = useRef();
     const lastRowRef = useRef();
 
-    const normalizeEntry = (entry) => ({
-        ...entry,
-        item_details: entry.item_details.map(item => ({
-            ...item,
-            sr_number_display: item.sr_number?.id
-                ? {value: item.sr_number.id, label: item.sr_number.display_name}
-                : null
-        }))
+    // Normalize initial entry
+    const [data, setData] = useState(() => {
+        const e = entry ?? {};
+        const items = Array.isArray(e.item_details) ? e.item_details : [];
+        return {
+            ...e,
+            item_details: items.length
+                ? items.map((it) => ({
+                    ...emptyRow(),
+                    ...it,
+                    sr_number: toSrOption(it.sr_number),
+                    transaction_type: it.transaction_type || 'D',
+                    qty: it.qty ?? '',
+                    cif_fc: it.cif_fc ?? '',
+                    cif_inr: it.cif_inr ?? '',
+                }))
+                : [emptyRow()],
+            allotment: Array.isArray(e.allotment) ? e.allotment : [],
+            company: e.company ?? null,
+            port: e.port ?? null,
+            invoice_no: e.invoice_no ?? '',
+            product_name: e.product_name ?? '',
+            exchange_rate: e.exchange_rate ?? '',
+            bill_of_entry_number: e.bill_of_entry_number ?? '',
+            bill_of_entry_date: e.bill_of_entry_date ?? '',
+        };
     });
 
-    const [data, setData] = useState(() => {
-        const normalized = normalizeEntry(entry);
-        return normalized;
-    });
-    const selectedSrNumbers = useMemo(() =>
-        data.item_details.map(item => item.sr_number?.value).filter(Boolean), [data.item_details]);
+    const selectedSrNumbers = useMemo(
+        () =>
+            (data.item_details || [])
+                .map((r) => r.sr_number?.value ?? r.sr_number?.id)
+                .filter(Boolean),
+        [data.item_details]
+    );
 
     const handleChange = useCallback((field, value) => {
         if (field === 'allotment') {
-            const first = Array.isArray(value) && value.length > 0 ? value[0] : null;
+            const first = Array.isArray(value) && value.length ? value[0] : null;
 
-            const newItems = value.flatMap(a =>
-                (a.item_details || []).map(item => ({
-                    sr_number: item.item
-                        ? {
-                            value: item.item.id,
-                            label: item.item.display_name
-                        }
-                        : null,
+            const newItemsFromAllotments = (value || []).flatMap((a) =>
+                (a.item_details || []).map((item) => ({
+                    sr_number: item.item ? {value: item.item.id, label: item.item.display_name} : null,
                     transaction_type: item.transaction_type || 'D',
-                    qty: item.qty || '',
-                    cif_fc: item.cif_fc || '',
-                    cif_inr: item.cif_inr || ''
+                    qty: item.qty ?? '',
+                    cif_fc: item.cif_fc ?? '',
+                    cif_inr: item.cif_inr ?? '',
                 }))
             );
 
-            setData(prev => {
+            setData((prev) => {
                 const prevNames = prev.product_name
-                    ? prev.product_name.split(',').map(n => n.trim()).filter(Boolean)
+                    ? prev.product_name.split(',').map((n) => n.trim()).filter(Boolean)
                     : [];
-                const newNames = value.map(a => a.item_name).filter(Boolean);
-                const combinedNames = Array.from(new Set([...prevNames, ...newNames]));
+                const newNames = (value || []).map((a) => a.item_name).filter(Boolean);
+                const product_name = Array.from(new Set([...prevNames, ...newNames])).join(', ');
 
-                // Decide base items to work with
-                const isEmptyOrSingleBlank = prev.item_details.length === 0 || (
-                    prev.item_details.length === 1 &&
-                    !prev.item_details[0].sr_number &&
-                    !prev.item_details[0].qty &&
-                    !prev.item_details[0].cif_fc &&
-                    !prev.item_details[0].cif_inr
-                );
-                const baseItems = isEmptyOrSingleBlank ? [] : prev.item_details;
+                const isEmptyOrSingleBlank =
+                    prev.item_details.length === 0 ||
+                    (prev.item_details.length === 1 &&
+                        !prev.item_details[0].sr_number &&
+                        !prev.item_details[0].qty &&
+                        !prev.item_details[0].cif_fc &&
+                        !prev.item_details[0].cif_inr);
 
-                // Combine old + new items, filtering duplicates by sr_number.value
+                const base = isEmptyOrSingleBlank ? [] : prev.item_details;
+
                 const seen = new Set();
-                const combinedItems = [...baseItems, ...newItems].filter(item => {
-                    const id = item.sr_number?.value;
+                const merged = [...base, ...newItemsFromAllotments].filter((row) => {
+                    const id = row.sr_number?.value ?? row.sr_number?.id;
                     if (!id || seen.has(id)) return false;
                     seen.add(id);
                     return true;
                 });
 
-                console.log('[Allotment] Combined Items:', combinedItems);
-
                 return {
                     ...prev,
                     allotment: value,
-                    product_name: combinedNames.join(', '),
+                    product_name,
                     company: prev.company || first?.company || null,
                     port: prev.port || first?.port || null,
-                    item_details: combinedItems
+                    item_details: merged.length ? merged : [emptyRow()],
                 };
             });
 
-            // Clear any existing errors for allotment field
-            setErrors(prev => {
-                const newErrors = {...prev};
-                delete newErrors[field];
-                return newErrors;
+            setErrors((prev) => {
+                const copy = {...prev};
+                delete copy[field];
+                return copy;
             });
-        } else {
-            setData(prev => ({...prev, [field]: value}));
-            setErrors(prev => {
-                const newErrors = {...prev};
-                delete newErrors[field];
-                return newErrors;
-            });
+            return;
         }
 
-
-        setErrors(prev => {
-            const newErrors = {...prev};
-            delete newErrors[field];
-            return newErrors;
+        setData((prev) => ({...prev, [field]: value}));
+        setErrors((prev) => {
+            const copy = {...prev};
+            delete copy[field];
+            return copy;
         });
     }, []);
 
-    const handleItemChange = useCallback((index, field, value) => {
-        const updatedItems = [...data.item_details];
-        const item = {...updatedItems[index], [field]: value};
-        const rate = parseFloat(data.exchange_rate || 0);
+    const handleItemChange = useCallback(
+        (index, field, value) => {
+            const updatedItems = [...data.item_details];
 
-        if ((field === 'cif_fc' || field === 'cif_inr')) {
-            if (!rate || rate <= 0) {
-                toast.warning('Please enter a valid Exchange Rate first');
-                setExchangeRateError(true);
-                exchangeRateRef.current?.focus();
-                return;
-            } else {
-                setExchangeRateError(false);
+            // Normalize SR value on change
+            const normalized =
+                field === 'sr_number'
+                    ? value
+                        ? 'value' in value
+                            ? value
+                            : {
+                                value: value.id ?? value.value,
+                                label: value.label ?? value.display_name ?? String(value.id ?? value.value ?? '')
+                            }
+                        : null
+                    : value;
 
-                if (field === 'cif_fc') {
-                    const fc = parseFloat(value || 0);
-                    item.cif_inr = (fc * rate).toFixed(2);
-                } else if (field === 'cif_inr') {
-                    const inr = parseFloat(value || 0);
-                    item.cif_fc = (inr / rate).toFixed(2);
+            const row = {...updatedItems[index], [field]: normalized};
+            const rate = parseFloat(data.exchange_rate || 0);
+
+            // Only auto-fill the counterpart if it's blank; never overwrite user input.
+            if (field === 'cif_fc') {
+                if ((row.cif_inr === '' || row.cif_inr == null) && value !== '') {
+                    if (!rate || rate <= 0) {
+                        toast.warning('Please enter a valid Exchange Rate first');
+                        setExchangeRateError(true);
+                        exchangeRateRef.current?.focus();
+                    } else {
+                        setExchangeRateError(false);
+                        const fcNum = parseFloat(value);
+                        if (Number.isFinite(fcNum)) row.cif_inr = (fcNum * rate).toFixed(2);
+                    }
                 }
             }
-        }
-        updatedItems[index] = item;
-        setData(prev => ({...prev, item_details: updatedItems}));
-        setErrors(prev => {
-            const newErrors = {...prev};
-            delete newErrors[`item_${index}_${field}`];
-            return newErrors;
-        });
-
-        if (field === 'sr_number') {
-            const srValue = value?.value;
-            const count = updatedItems.filter(item => item.sr_number?.value === srValue).length;
-            if (srValue && count > 1) {
-                toast.warning('Duplicate SR number selected in another row');
+            if (field === 'cif_inr') {
+                if ((row.cif_fc === '' || row.cif_fc == null) && value !== '') {
+                    if (!rate || rate <= 0) {
+                        toast.warning('Please enter a valid Exchange Rate first');
+                        setExchangeRateError(true);
+                        exchangeRateRef.current?.focus();
+                    } else {
+                        setExchangeRateError(false);
+                        const inrNum = parseFloat(value);
+                        if (Number.isFinite(inrNum) && rate) row.cif_fc = (inrNum / rate).toFixed(4);
+                    }
+                }
             }
-        }
-    }, [data.exchange_rate, selectedSrNumbers]);
+
+            updatedItems[index] = row;
+            setData((prev) => ({...prev, item_details: updatedItems}));
+
+            setErrors((prev) => {
+                const copy = {...prev};
+                delete copy[`item_${index}_${field}`];
+                return copy;
+            });
+
+            if (field === 'sr_number') {
+                const srVal = normalized?.value ?? normalized?.id;
+                const dupCount = updatedItems.filter((r) => (r.sr_number?.value ?? r.sr_number?.id) === srVal).length;
+                if (srVal && dupCount > 1) toast.warning('Duplicate SR number selected in another row');
+            }
+        },
+        [data.exchange_rate, data.item_details]
+    );
 
     const addItemRow = () => {
-        setData(prev => ({
-            ...prev,
-            item_details: [
-                ...prev.item_details,
-                {
-                    sr_number: null,
-                    transaction_type: 'D',
-                    qty: '',
-                    cif_fc: '',
-                    cif_inr: ''
-                }
-            ]
-        }));
-        setTimeout(() => lastRowRef.current?.focus(), 100);
+        setData((prev) => ({...prev, item_details: [...prev.item_details, emptyRow()]}));
+        setTimeout(() => lastRowRef.current?.focus?.(), 100);
     };
 
     const removeItemRow = (index) => {
         const updated = [...data.item_details];
         updated.splice(index, 1);
-
-        // If empty after deletion, insert a blank row
-        if (updated.length === 0) {
-            updated.push({
-                sr_number: null,
-                transaction_type: 'D',
-                qty: '',
-                cif_fc: '',
-                cif_inr: ''
-            });
-        }
-
-        setData(prev => ({...prev, item_details: updated}));
+        if (!updated.length) updated.push(emptyRow());
+        setData((prev) => ({...prev, item_details: updated}));
     };
 
+    // When rate changes, only back-fill the missing counterpart; don't overwrite existing values.
     useEffect(() => {
-        if (!data.exchange_rate || isNaN(data.exchange_rate) || data.exchange_rate <= 0) return;
-
         const rate = parseFloat(data.exchange_rate);
-        const updatedItems = data.item_details.map(item => {
-            const fc = parseFloat(item.cif_fc || 0);
-            const inr = parseFloat(item.cif_inr || 0);
-
-            if (fc > 0) {
-                return {...item, cif_inr: (fc * rate).toFixed(2)};
-            } else if (inr > 0) {
-                return {...item, cif_fc: (inr / rate).toFixed(2)};
+        if (!rate || rate <= 0) return;
+        const updated = (data.item_details || []).map((row) => {
+            const hasFC = row.cif_fc !== '' && row.cif_fc != null;
+            const hasINR = row.cif_inr !== '' && row.cif_inr != null;
+            if (hasFC && !hasINR) {
+                const fcNum = parseFloat(row.cif_fc);
+                if (Number.isFinite(fcNum)) return {...row, cif_inr: (fcNum * rate).toFixed(2)};
             }
-            return item;
+            if (!hasFC && hasINR) {
+                const inrNum = parseFloat(row.cif_inr);
+                if (Number.isFinite(inrNum)) return {...row, cif_fc: (inrNum / rate).toFixed(4)};
+            }
+            return row; // both blank or both filled -> leave as-is
         });
-
-        setData(prev => ({...prev, item_details: updatedItems}));
+        setData((prev) => ({...prev, item_details: updated}));
+        // eslint-disable-next-line react-hooks/exhaustive-deps
     }, [data.exchange_rate]);
 
+    // ------------------------- Validation & Save -------------------------
     const validate = () => {
         const errs = {};
+        const items = data.item_details || [];
+
         if (!data.bill_of_entry_number) errs.bill_of_entry_number = 'Required';
         if (!data.bill_of_entry_date) errs.bill_of_entry_date = 'Required';
         if (!data.company) errs.company = 'Required';
         if (!data.port) errs.port = 'Required';
         if (!data.product_name) errs.product_name = 'Required';
-        if (!data.exchange_rate || isNaN(data.exchange_rate)) errs.exchange_rate = 'Enter valid number';
 
-        data.item_details.forEach((item, idx) => {
-            const srValue = item.sr_number?.value || item.sr_number_display?.value;
-            if (!srValue) {
-                errs[`item_${idx}_sr`] = 'License Number is required';
-            }
-            if (!item.qty || isNaN(item.qty)) errs[`item_${idx}_qty`] = 'Invalid';
-            if (!item.cif_fc || isNaN(item.cif_fc)) errs[`item_${idx}_fc`] = 'Invalid';
-            if (!item.cif_inr || isNaN(item.cif_inr)) errs[`item_${idx}_inr`] = 'Invalid';
+        const rateOk = data.exchange_rate !== '' && !Number.isNaN(parseFloat(data.exchange_rate));
+        if (!rateOk) errs.exchange_rate = 'Enter valid number';
+
+        items.forEach((row, idx) => {
+            const srValue = row.sr_number?.value ?? row.sr_number?.id;
+            if (!srValue) errs[`item_${idx}_sr`] = 'License Number is required';
+
+            const qtyOk = row.qty !== '' && Number.isFinite(parseFloat(row.qty));
+            if (!qtyOk) errs[`item_${idx}_qty`] = 'Invalid';
+
+            const fcOk = row.cif_fc !== '' && Number.isFinite(parseFloat(row.cif_fc));
+            if (!fcOk) errs[`item_${idx}_fc`] = 'Invalid';
+
+            const inrOk = row.cif_inr !== '' && Number.isFinite(parseFloat(row.cif_inr));
+            if (!inrOk) errs[`item_${idx}_inr`] = 'Invalid';
         });
 
         setErrors(errs);
@@ -236,17 +273,25 @@ const BillOfEntryForm = ({entry, isNew = false, onClose, onSaved}) => {
 
         setSaving(true);
         try {
+            // Build clean payload (PKs + numbers only)
             const payload = {
-                ...data,
-                port: data.port?.id,
-                company: data.company?.id,
-                allotment: data.allotment.map(a => a.id),
-                item_details: data.item_details.map((item) => ({
-                    ...item,
-                    sr_number: item.sr_number?.value || item.sr_number_display?.value || null
-                }))
+                company: data.company?.id ?? data.company,
+                bill_of_entry_number: data.bill_of_entry_number,
+                bill_of_entry_date: data.bill_of_entry_date,
+                port: data.port?.id ?? data.port,
+                exchange_rate: data.exchange_rate === '' ? null : Number(data.exchange_rate),
+                product_name: data.product_name,
+                allotment: (data.allotment || []).map((a) => a?.id ?? a).filter(Boolean),
+                invoice_no: data.invoice_no || '',
+                item_details: (data.item_details || []).map((row) => ({
+                    sr_number: row.sr_number?.value ?? row.sr_number?.id ?? null, // PK
+                    qty: row.qty === '' ? null : Number(row.qty),
+                    cif_fc: row.cif_fc === '' ? null : Number(row.cif_fc),
+                    cif_inr: row.cif_inr === '' ? null : Number(row.cif_inr),
+                    transaction_type: row.transaction_type || 'D',
+                })),
             };
-            console.log(payload);
+
             if (isNew) {
                 await axios.post('bill-of-entries/', payload);
                 toast.success('Bill of Entry Created');
@@ -256,16 +301,28 @@ const BillOfEntryForm = ({entry, isNew = false, onClose, onSaved}) => {
             }
             onSaved?.();
         } catch (err) {
-            console.error(err);
-            toast.error('Failed to save entry');
+            console.error('[BOE save] error:', err?.response?.data || err);
+            const detail = err?.response?.data;
+            if (detail) {
+                const firstKey = Object.keys(detail)[0];
+                toast.error(
+                    typeof detail === 'string'
+                        ? detail
+                        : `${firstKey}: ${Array.isArray(detail[firstKey]) ? detail[firstKey][0] : JSON.stringify(detail[firstKey])}`
+                );
+            } else {
+                toast.error('Failed to save entry');
+            }
         } finally {
             setSaving(false);
         }
     };
+
     return (
         <Form>
             {Object.keys(errors).length > 0 && (
-                console.log(errors),
+                <>
+                    {console.log(errors)}
                     <div className="alert alert-danger py-2 small">
                         <strong className="d-block mb-1">Please resolve the following validation issues:</strong>
                         <ul className="mb-0 ps-3">
@@ -276,35 +333,47 @@ const BillOfEntryForm = ({entry, isNew = false, onClose, onSaved}) => {
                             ))}
                         </ul>
                     </div>
+                </>
             )}
 
             <Row className="mb-3">
                 <Col md={3}>
                     <Form.Label htmlFor="boe_number">BOE Number</Form.Label>
-                    <Form.Control id="boe_number" name="boe_number" size="sm" value={data.bill_of_entry_number ?? ""}
-                                  isInvalid={!!errors.bill_of_entry_number}
-                                  onChange={(e) => handleChange('bill_of_entry_number', e.target.value)}/>
+                    <Form.Control
+                        id="boe_number"
+                        name="boe_number"
+                        size="sm"
+                        value={data.bill_of_entry_number ?? ''}
+                        isInvalid={!!errors.bill_of_entry_number}
+                        onChange={(e) => handleChange('bill_of_entry_number', e.target.value)}
+                    />
                     <Form.Control.Feedback type="invalid">{errors.bill_of_entry_number}</Form.Control.Feedback>
                 </Col>
                 <Col md={3}>
                     <Form.Label htmlFor="boe_date">Date</Form.Label>
-                    <Form.Control id="boe_date" name="boe_date" size="sm" type="date"
-                                  value={data.bill_of_entry_date ?? ""}
-                                  isInvalid={!!errors.bill_of_entry_date}
-                                  onChange={(e) => handleChange('bill_of_entry_date', e.target.value)}/>
+                    <Form.Control
+                        id="boe_date"
+                        name="boe_date"
+                        size="sm"
+                        type="date"
+                        value={data.bill_of_entry_date ?? ''}
+                        isInvalid={!!errors.bill_of_entry_date}
+                        onChange={(e) => handleChange('bill_of_entry_date', e.target.value)}
+                    />
                     <Form.Control.Feedback type="invalid">{errors.bill_of_entry_date}</Form.Control.Feedback>
                 </Col>
                 <Col md={3}>
                     <Form.Label>Company</Form.Label>
-                    <AsyncCompanySelect value={data.company ?? ""} onChange={(v) => handleChange('company', v)}/>
+                    <AsyncCompanySelect value={data.company ?? ''} onChange={(v) => handleChange('company', v)}/>
                     {errors.company && <div className="text-danger small">{errors.company}</div>}
                 </Col>
                 <Col md={3}>
                     <Form.Label>Port</Form.Label>
-                    <AsyncPortSelect value={data.port ?? ""} onChange={(v) => handleChange('port', v)}/>
+                    <AsyncPortSelect value={data.port ?? ''} onChange={(v) => handleChange('port', v)}/>
                     {errors.port && <div className="text-danger small">{errors.port}</div>}
                 </Col>
             </Row>
+
             <Row className="mb-3">
                 <Col>
                     <Form.Label>Allotments</Form.Label>
@@ -316,19 +385,30 @@ const BillOfEntryForm = ({entry, isNew = false, onClose, onSaved}) => {
                     {errors.allotment && <div className="text-danger small">{errors.allotment}</div>}
                 </Col>
             </Row>
+
             <Row className="mb-3">
                 <Col md={4}>
                     <Form.Label htmlFor="invoice_no">Invoice No</Form.Label>
-                    <Form.Control id="invoice_no" name="invoice_no" size="sm" value={data.invoice_no ?? ""}
-                                  isInvalid={!!errors.invoice_no}
-                                  onChange={(e) => handleChange('invoice_no', e.target.value)}/>
+                    <Form.Control
+                        id="invoice_no"
+                        name="invoice_no"
+                        size="sm"
+                        value={data.invoice_no ?? ''}
+                        isInvalid={!!errors.invoice_no}
+                        onChange={(e) => handleChange('invoice_no', e.target.value)}
+                    />
                     <Form.Control.Feedback type="invalid">{errors.invoice_no}</Form.Control.Feedback>
                 </Col>
                 <Col md={4}>
                     <Form.Label htmlFor="product_name">Product Name</Form.Label>
-                    <Form.Control id="product_name" name="product_name" size="sm" value={data.product_name ?? ""}
-                                  isInvalid={!!errors.product_name}
-                                  onChange={(e) => handleChange('product_name', e.target.value)}/>
+                    <Form.Control
+                        id="product_name"
+                        name="product_name"
+                        size="sm"
+                        value={data.product_name ?? ''}
+                        isInvalid={!!errors.product_name}
+                        onChange={(e) => handleChange('product_name', e.target.value)}
+                    />
                     <Form.Control.Feedback type="invalid">{errors.product_name}</Form.Control.Feedback>
                 </Col>
                 <Col md={4}>
@@ -339,7 +419,7 @@ const BillOfEntryForm = ({entry, isNew = false, onClose, onSaved}) => {
                         size="sm"
                         type="number"
                         step="0.0001"
-                        value={data.exchange_rate ?? ""}
+                        value={data.exchange_rate ?? ''}
                         ref={exchangeRateRef}
                         isInvalid={!!errors.exchange_rate || exchangeRateError}
                         onChange={(e) => {
@@ -353,7 +433,6 @@ const BillOfEntryForm = ({entry, isNew = false, onClose, onSaved}) => {
                 </Col>
             </Row>
 
-
             <LineItemTable
                 items={data.item_details}
                 errors={errors}
@@ -361,13 +440,18 @@ const BillOfEntryForm = ({entry, isNew = false, onClose, onSaved}) => {
                 onItemChange={handleItemChange}
                 onAddRow={addItemRow}
                 onRemoveRow={removeItemRow}
+                lastRowRef={lastRowRef}
             />
 
             <div className="mt-3">
                 <Button variant="success" size="sm" onClick={save} disabled={saving}>
                     {saving ? 'Saving...' : 'Save'}
                 </Button>
-                {onClose && <Button variant="secondary" size="sm" className="ms-2" onClick={onClose}>Cancel</Button>}
+                {onClose && (
+                    <Button variant="secondary" size="sm" className="ms-2" onClick={onClose}>
+                        Cancel
+                    </Button>
+                )}
             </div>
         </Form>
     );
