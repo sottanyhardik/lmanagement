@@ -27,12 +27,10 @@ class InvoiceItemSerializer(serializers.ModelSerializer):
     cif_inr = serializers.DecimalField(max_digits=15, decimal_places=2, required=False, allow_null=True)
     rate = serializers.DecimalField(max_digits=15, decimal_places=4, required=False, allow_null=True)
     amount = serializers.DecimalField(max_digits=15, decimal_places=2, required=False, allow_null=True)
-    transaction_type = serializers.ChoiceField(choices=['D', 'C'], required=False, default='D')
 
     class Meta:
         model = InvoiceItem
-        fields = ['sr_number', 'license_no', 'hsn_code', 'qty', 'cif_fc', 'cif_inr', 'rate', 'amount',
-                  'transaction_type']
+        fields = ['sr_number', 'license_no', 'hsn_code', 'qty', 'cif_fc', 'cif_inr', 'rate', 'amount']
 
 
 class ToCompanySerializer(serializers.Serializer):
