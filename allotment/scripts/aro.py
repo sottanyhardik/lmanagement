@@ -87,7 +87,11 @@ def generate_tl_software(data, tl_path, path='', transfer_letter_name=""):
     if not data:
         return
 
-    remove(path)
+    # Ensure directory exists
+    if os.path.exists(path):
+        # optional: remove everything if you want a fresh dir
+        # shutil.rmtree(path)
+        pass
     os.makedirs(path, exist_ok=True)
 
     for context in data:
@@ -97,11 +101,18 @@ def generate_tl_software(data, tl_path, path='', transfer_letter_name=""):
         license_str = str(context['license']).zfill(10)  # Ensures leading zero if needed
         base_filename = f"{license_str}_{context['status']}_{transfer_letter_name}"
         docx_file = os.path.join(path, f"{base_filename}.docx")
+        pdf_file = os.path.join(path, f"{base_filename}.pdf")
+
+        # 🔹 Delete if already exists
+        for f in [docx_file, pdf_file]:
+            if os.path.exists(f):
+                os.remove(f)
 
         try:
             context['file_number'] = ''
             doc.save(docx_file)
         except Exception:
+            # Fallback save
             doc.save(docx_file)
 
         # Convert DOCX to PDF using LibreOffice (headless mode)
@@ -114,7 +125,7 @@ def generate_tl_software(data, tl_path, path='', transfer_letter_name=""):
                 docx_file
             ], check=True)
             if os.path.exists(docx_file):
-                os.remove(docx_file)
+                os.remove(docx_file)  # remove docx after successful conversion
         except subprocess.CalledProcessError as e:
             print(f"Error converting to PDF: {e}")
 

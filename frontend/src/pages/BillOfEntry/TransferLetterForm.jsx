@@ -15,7 +15,7 @@ import {fetchTransferLetterTemplates} from '../../Cache/templateCache';
 const TransferLetterForm = ({
                                 boe,
                                 autoDownload = false,
-                                generatePath = (b) => `bill-of-entries/${b?.id}/generate-transfer-letter/`,
+                                generatePath = (b) => `bill-of-entries/${b?.id}/generate/`,
                                 onGenerated,
                             }) => {
     const [templates, setTemplates] = useState([]);

@@ -1,10 +1,13 @@
 # Create your views here.
 import datetime
 from datetime import date
+from datetime import datetime
 from decimal import Decimal
+from shutil import make_archive
 
 from django.db.models import Prefetch
 from django.db.models import Q
+from django.http import HttpResponse
 from django.http import HttpResponseRedirect
 from django.urls import reverse, reverse_lazy
 from django.views.generic import DetailView, FormView, DeleteView, UpdateView, CreateView
@@ -16,8 +19,13 @@ from extra_views import UpdateWithInlinesView, InlineFormSetFactory
 from openpyxl import Workbook
 from openpyxl.styles import Font, Border, Side
 from openpyxl.utils import get_column_letter
+from rest_framework import status
+from rest_framework.response import Response
+from rest_framework.views import APIView
 
+from allotment.scripts.aro import generate_tl_software
 from bill_of_entry.models import RowDetails
+from core.models import TransferLetterModel
 from core.utils import render_to_pdf
 from lmanagement.tasks import fetch_data_to_model
 from . import forms, tables, filters
@@ -132,8 +140,6 @@ class BillOfEntryUpdateView(UpdateWithInlinesView):
         return super(BillOfEntryUpdateView, self).get_inlines()
 
 
-# Create your views here.
-
 class BillOfEntryFetchView(FormView):
     template_name = 'bill_of_entry/fetch.html'
     form_class = forms.BillOfEntryCaptcha
@@ -198,34 +204,6 @@ class DownloadPendingBillView(PDFTemplateResponseMixin, FilterView):
         import datetime
         context['today'] = datetime.datetime.now().date
         return context
-
-
-class DownloadPortView(PDFTemplateResponseMixin, FilterView):
-    table_class = tables.BillOfEntryTable
-    filterset_class = filters.BillOfEntryFilter
-    paginate_by = 5000
-    template_name = 'bill_of_entry/download_port.html'
-    model = bill_of_entry.BillOfEntryModel
-    ordering = ('company', 'product_name', 'bill_of_entry_date')
-
-    def get_context_data(self, **kwargs):
-        context = super().get_context_data(**kwargs)
-        queryset = self.filterset_class(self.request.GET, queryset=self.get_queryset()).qs
-        total_list_inr = [Decimal(data.get_total_inr) for data in queryset]
-        context['get_total_inr'] = sum(total_list)
-        import datetime
-        context['today'] = datetime.datetime.now().date
-        return context
-
-
-from rest_framework.views import APIView
-from rest_framework.response import Response
-from rest_framework import status
-from django.http import HttpResponse
-from shutil import make_archive
-from datetime import datetime
-from core.models import TransferLetterModel
-from allotment.scripts.aro import generate_tl_software
 
 
 class GenerateTransferLetterAPI(APIView):

@@ -1,11 +1,3 @@
-@use "./variables" as vars;
-
-@use "bootstrap" with (
-  $primary: vars.$primary,
-  $body-bg: vars.$body-bg,
-  $body-color: vars.$body-color,
-  $theme-colors: vars.$theme-colors,
-  $card-bg: vars.$card-bg
-);
-
-@use "./custom" as *;
+@use "./_bootstrap";
+// config + re-export (no "with" here)
+@use "./_custom";

@@ -1,6 +1,8 @@
+from django.contrib.auth.decorators import login_required
 from django.urls import path, include
 from rest_framework.routers import DefaultRouter
 
+from . import views
 from .Export.item_excel import LicenseImportItemsXLSX
 from .Export.item_pdf import LicenseImportItemsUltraWidePDF
 from .api import LicenseImportItemsViewSet, LicenseDetailsViewSet, LicenseImportItemsSelectView, BiscuitReportAPIView
@@ -30,7 +32,7 @@ urlpatterns = [
     # path('<slug:license>/item/update', login_required(views.LicenseItemListUpdateView.as_view()),
     #      name='license-item-update'),
     # # path('<int:pk>/verify', login_required(views.LicenseVerifyView.as_view()), name='license-verify'),
-    # path('<slug:license>.pdf', login_required(views.PDFLicenseDetailView.as_view()), name='license-pdf'),
+    path('license/<slug:license>.pdf', login_required(views.PDFLicenseDetailView.as_view()), name='license-pdf'),
     # path('ledger/<slug:license>.pdf', login_required(views.PDFLedgerLicenseDetailView.as_view()),
     #      name='license_ledger'),
     # path('ledger/item/<slug:license>.pdf', login_required(views.PDFLedgerItemLicenseDetailView.as_view()),

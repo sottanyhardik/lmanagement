@@ -1,14 +1,15 @@
-// src/pages/License/GroupedAccordionLicense.jsx
 import React, {useRef, useState} from 'react';
-import {Accordion, Badge, Card, Col, Collapse, Form, Row, Tab, Table, Tabs} from 'react-bootstrap';
+import {Accordion, Badge, Card, Col, Collapse, Form, Row, Tab, Table, Tabs,} from 'react-bootstrap';
 import LicenseForm from './LicenseForm';
 import PurchaseTab from './PurchaseTab';
 
 const formatNumber = (val) =>
-    (Number.isFinite(+val) ? Number(val).toLocaleString('en-IN', {
-        minimumFractionDigits: 2,
-        maximumFractionDigits: 2
-    }) : '-') || '-';
+    (Number.isFinite(+val)
+        ? Number(val).toLocaleString('en-IN', {
+            minimumFractionDigits: 2,
+            maximumFractionDigits: 2,
+        })
+        : '-') || '-';
 
 const calcTotals = (items = []) =>
     items.reduce(
@@ -21,13 +22,8 @@ const calcTotals = (items = []) =>
     );
 
 /**
- * Groups shape (back-compat object):
- * {
- *   [exporter]: {
- *     ports: {
- *       [port]: [entry, ...]
- *     }
- *   }
+ * groups = {
+ *   [exporter]: { ports: { [port]: [entry, ...] } }
  * }
  */
 export default function GroupedAccordionLicense({
@@ -55,19 +51,26 @@ export default function GroupedAccordionLicense({
     const exporterKeys = Object.keys(groups || {}).sort((a, b) => a.localeCompare(b));
 
     return (
-        <Accordion alwaysOpen activeKey={allExpanded ? exporterKeys.map((_, i) => `exporter-${i}`) : []}>
+        <Accordion
+            alwaysOpen
+            activeKey={allExpanded ? exporterKeys.map((_, i) => `exporter-${i}`) : []}
+        >
             {exporterKeys.map((exporter, exporterIndex) => {
                 const ports = groups[exporter]?.ports || {};
                 const portKeys = Object.keys(ports);
 
                 return (
-                    <Accordion.Item eventKey={`exporter-${exporterIndex}`} key={exporter}
-                                    className="border border-primary mb-3">
+                    <Accordion.Item
+                        eventKey={`exporter-${exporterIndex}`}
+                        key={exporter}
+                        className="border border-primary mb-3"
+                    >
                         <Accordion.Header>
                             <div className="w-100">
                                 <div className="fw-bold fs-5 text-primary">🏭 Exporter: {exporter}</div>
                             </div>
                         </Accordion.Header>
+
                         <Accordion.Body className="bg-white">
                             {portKeys.map((port) => {
                                 const licenses = Array.isArray(ports[port]) ? ports[port] : [];
@@ -76,11 +79,14 @@ export default function GroupedAccordionLicense({
                                 );
 
                                 return (
-                                    <div key={port} className="border rounded p-3 mb-4 bg-light shadow-sm">
+                                    <div
+                                        key={port}
+                                        className="border rounded p-3 mb-4 bg-light shadow-sm"
+                                    >
                                         <div className="fw-semibold text-primary mb-2">
-                                            🛳 Port: {port} — Qty: <Badge
-                                            bg="primary">{formatNumber(totals.qty)}</Badge> | CIF $:{' '}
-                                            <Badge bg="info">{formatNumber(totals.fc)}</Badge> | INR ₹
+                                            🛳 Port: {port} — Qty:{' '}
+                                            <Badge bg="primary">{formatNumber(totals.qty)}</Badge> | CIF $:{' '}
+                                            <Badge bg="info">{formatNumber(totals.fc)}</Badge> | INR ₹{' '}
                                             <Badge bg="success">{formatNumber(totals.inr)}</Badge>
                                         </div>
 
@@ -88,7 +94,10 @@ export default function GroupedAccordionLicense({
                                             type="checkbox"
                                             className="mb-2"
                                             label={`Select All (${licenses.length})`}
-                                            checked={licenses.length > 0 && licenses.every((e) => selectedIds.includes(e.id))}
+                                            checked={
+                                                licenses.length > 0 &&
+                                                licenses.every((e) => selectedIds.includes(e.id))
+                                            }
                                             onChange={() => toggleSelectAll(licenses.map((e) => e.id))}
                                         />
 
@@ -106,23 +115,37 @@ export default function GroupedAccordionLicense({
                                                         checked={selectedIds.includes(entry.id)}
                                                         onChange={() => toggleSelect(entry.id)}
                                                     />
-                                                    <div onClick={() => toggle(entry.id)}
-                                                         style={{cursor: 'pointer', flex: 1}}>
+                                                    <div
+                                                        onClick={() => toggle(entry.id)}
+                                                        style={{cursor: 'pointer', flex: 1}}
+                                                    >
                                                         <Row
                                                             className="gx-3 flex-nowrap overflow-auto small text-nowrap">
-                                                            <Col className="flex-shrink-0"><strong
-                                                                className="text-primary">License
-                                                                #: {entry.license_number}</strong></Col>
-                                                            <Col className="flex-shrink-0">Issue
-                                                                Date: <strong>{entry.license_date}</strong></Col>
-                                                            <Col
-                                                                className="flex-shrink-0">Expiry:<strong> {entry.license_expiry_date}</strong></Col>
-                                                            <Col className="flex-shrink-0">Norm
-                                                                Class: <strong>{entry?.export_license?.[0]?.norm_class?.norm_class || ''}</strong></Col>
-                                                            <Col className="flex-shrink-0">Notification
-                                                                No: <strong>{entry?.notification_number || ''}</strong></Col>
-                                                            <Col className="flex-shrink-0">CIF
-                                                                $: <strong>{formatNumber(entry.balance_cif)}</strong></Col>
+                                                            <Col className="flex-shrink-0">
+                                                                <strong className="text-primary">
+                                                                    License #: {entry.license_number}
+                                                                </strong>
+                                                            </Col>
+                                                            <Col className="flex-shrink-0">
+                                                                Issue Date: <strong>{entry.license_date}</strong>
+                                                            </Col>
+                                                            <Col className="flex-shrink-0">
+                                                                Expiry:<strong> {entry.license_expiry_date}</strong>
+                                                            </Col>
+                                                            <Col className="flex-shrink-0">
+                                                                Norm Class:{' '}
+                                                                <strong>
+                                                                    {entry?.export_license?.[0]?.norm_class?.norm_class || ''}
+                                                                </strong>
+                                                            </Col>
+                                                            <Col className="flex-shrink-0">
+                                                                Notification No:{' '}
+                                                                <strong>{entry?.notification_number || ''}</strong>
+                                                            </Col>
+                                                            <Col className="flex-shrink-0">
+                                                                CIF $:{' '}
+                                                                <strong>{formatNumber(entry.balance_cif)}</strong>
+                                                            </Col>
                                                         </Row>
                                                     </div>
                                                 </Card.Header>
@@ -131,16 +154,21 @@ export default function GroupedAccordionLicense({
                                                     <Card.Body>
                                                         <Tabs
                                                             activeKey={activeTab[entry.id] || 'view'}
-                                                            onSelect={(k) => setActiveTab((prev) => ({
-                                                                ...prev,
-                                                                [entry.id]: k
-                                                            }))}
+                                                            onSelect={(k) =>
+                                                                setActiveTab((prev) => ({...prev, [entry.id]: k}))
+                                                            }
                                                             className="mb-3"
                                                             justify
                                                         >
                                                             <Tab eventKey="view" title="📄 View">
-                                                                <Table striped bordered hover responsive size="sm"
-                                                                       className="mt-2">
+                                                                <Table
+                                                                    striped
+                                                                    bordered
+                                                                    hover
+                                                                    responsive
+                                                                    size="sm"
+                                                                    className="mt-2"
+                                                                >
                                                                     <thead className="table-light">
                                                                     <tr>
                                                                         <th>#</th>
@@ -158,10 +186,16 @@ export default function GroupedAccordionLicense({
                                                                             <td>{idx + 1}</td>
                                                                             <td>{item.serial_number || '-'}</td>
                                                                             <td>{item.description || '-'}</td>
-                                                                            <td className="text-end">{formatNumber(item.quantity)}</td>
+                                                                            <td className="text-end">
+                                                                                {formatNumber(item.quantity)}
+                                                                            </td>
                                                                             <td>{item.unit}</td>
-                                                                            <td className="text-end">{formatNumber(item.cif_fc)}</td>
-                                                                            <td className="text-end">{formatNumber(item.cif_inr)}</td>
+                                                                            <td className="text-end">
+                                                                                {formatNumber(item.cif_fc)}
+                                                                            </td>
+                                                                            <td className="text-end">
+                                                                                {formatNumber(item.cif_inr)}
+                                                                            </td>
                                                                         </tr>
                                                                     ))}
                                                                     </tbody>

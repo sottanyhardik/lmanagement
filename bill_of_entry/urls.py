@@ -14,6 +14,9 @@ urlpatterns = [
     path('bill-of-entries/Export/pdf', views.BillOfEntryExportView.as_view(), name='bill-of-entry-Export'),
     path('bill-of-entries/bulk-delete/', BillOfEntryBulkDeleteView.as_view(), name='bill-of-entry-bulk-delete'),
     path('invoices/<int:pk>/pdf/', InvoicePDFView.as_view(), name='invoice-pdf'),
+    path('bill-of-entries/<int:pk>/generate/', views.GenerateTransferLetterAPI.as_view(),
+         name='bill-of-entry-tl'),
+
     path('', include(router.urls)),
 
     # path('', login_required(views.BillOfEntryView.as_view()), name='bill-of-entry-list'),
@@ -25,8 +28,6 @@ urlpatterns = [
     # path('<slug:boe>/delete', login_required(views.BillOfEntryDeleteView.as_view()), name='bill-of-entry-delete'),
     # path('fetch/', login_required(views.BillOfEntryFetchView.as_view()), name='bill_of_entry_fetch'),
     #
-    path('boe/<slug:pk>/generate', views.GenerateTransferLetterAPI.as_view(),
-         name='bill-of-entry-tl'),
     #
     # path('download/port/', login_required(views.DownloadPortView.as_view()), name='bill_of_entry_download_boe'),
 ]

@@ -1,0 +1,10 @@
+@use "./variables" as vars;
+
+// Configure once and re-export
+@forward "bootstrap/scss/bootstrap" with (
+  $primary: vars.$primary,
+  $body-bg: vars.$body-bg,
+  $body-color: vars.$body-color,
+  $theme-colors: vars.$theme-colors,
+  $card-bg: vars.$card-bg
+);

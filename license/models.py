@@ -781,7 +781,7 @@ class LicenseExportItemModel(models.Model):
                 ).aggregate(Sum("cif_fc"))["cif_fc__sum"]
                 or 0
         )
-        return credit - (debit + allotment)
+        return float(credit) - float(debit + allotment)
 
 
 # -----------------------------

@@ -38,7 +38,6 @@ const exportBiscuitReport = async (statusFlag) => {
 
 const LicenseList = () => {
     const {
-        // data/state
         entries,
         expanded,
         setExpanded,
@@ -48,14 +47,10 @@ const LicenseList = () => {
         setNewEntry,
         allExpanded,
         setAllExpanded,
-
-        // selection
         selectedIds,
         toggleSelect,
         toggleSelectAll,
         clearSelection,
-
-        // sorting/search/filtering
         sortField,
         sortOrder,
         setSortField,
@@ -65,8 +60,6 @@ const LicenseList = () => {
         filters,
         setFilters,
         setPage,
-
-        // fetching / export / update
         loadMoreRef,
         updateSingleEntry,
         handleReset,
@@ -146,9 +139,7 @@ const LicenseList = () => {
 
             {newEntry && (
                 <Card className="mb-3 border-success">
-                    <Card.Header className="bg-success text-white">
-                        New License
-                    </Card.Header>
+                    <Card.Header className="bg-success text-white">New License</Card.Header>
                     <Card.Body>
                         <LicenseForm
                             entry={newEntry}
@@ -167,9 +158,7 @@ const LicenseList = () => {
                 groups={grouped}
                 allExpanded={allExpanded}
                 expanded={expanded}
-                toggle={(id) =>
-                    setExpanded((prev) => ({...prev, [id]: !prev[id]}))
-                }
+                toggle={(id) => setExpanded((prev) => ({...prev, [id]: !prev[id]}))}
                 selectedIds={selectedIds}
                 toggleSelect={toggleSelect}
                 toggleSelectAll={toggleSelectAll}

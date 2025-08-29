@@ -21,17 +21,39 @@ const LicenseForm = ({entry, isNew = false, onClose, onSaved}) => {
         setErrors(prev => ({...prev, [field]: null}));
     };
 
-    // helper to blank Export norm on prefill (requested)
-    const blankExportNorms = (exportList = []) =>
-        exportList.map(item => ({...item, norm_class: null}));
+    // ---- helpers ----
+    const normalizeNormOption = (nc) => {
+        if (!nc) return null;
+        const id = nc.id ?? nc.value ?? null;
+        const value = nc.value ?? id;
+        const label = nc.label ?? nc.norm_class ?? nc.name ?? String(id ?? '');
+        return {id, value, label};
+    };
+
+    // (kept for SION fetch)
+    const getNormId = normClass => {
+        if (normClass == null) return null;
+        if (typeof normClass === 'number' || typeof normClass === 'string') return normClass;
+        return normClass.id ?? normClass.value ?? null;
+    };
+    // ---- end helpers ----
 
     useEffect(() => {
-        if (entry) {
-            setData({
-                ...entry,
-                export_license: blankExportNorms(entry.export_license || []),
-            });
-        }
+        if (!entry) return;
+
+        const normalizedExport = (entry.export_license || []).map(row => {
+            const norm = normalizeNormOption(row?.norm_class);
+            return {
+                ...row,
+                norm_class: norm,                // for UI
+                norm_class_id: norm?.id ?? null, // for payload
+            };
+        });
+
+        setData({
+            ...entry,
+            export_license: normalizedExport,
+        });
     }, [entry]);
 
     const validate = () => {
@@ -57,7 +79,8 @@ const LicenseForm = ({entry, isNew = false, onClose, onSaved}) => {
             currency: item.currency || 'usd',
             cif_fc: item.cif_fc || '',
             cif_inr: item.cif_inr || '',
-            norm_class_id: item.norm_class?.id ?? item.norm_class ?? null,
+            // prefer explicit id tracked, then option object, then raw
+            norm_class_id: item.norm_class_id ?? item.norm_class?.id ?? item.norm_class ?? null,
         })),
         import_license: (data.import_license || []).map(item => ({
             id: item.id || null,
@@ -73,13 +96,6 @@ const LicenseForm = ({entry, isNew = false, onClose, onSaved}) => {
     });
 
     // ---- SION fetch/prefill support ----
-    const getNormId = normClass => {
-        if (normClass == null) return null;
-        if (typeof normClass === 'number' || typeof normClass === 'string')
-            return normClass;
-        return normClass.id ?? normClass.value ?? null;
-    };
-
     const handleFetchSionInputs = async ({normClass, startSerial}) => {
         const normId = getNormId(normClass);
         if (!normId) {
@@ -89,9 +105,7 @@ const LicenseForm = ({entry, isNew = false, onClose, onSaved}) => {
 
         try {
             const {data: sion} = await axios.get(`sion-classes/${normId}/`);
-            const importNorms = Array.isArray(sion?.import_norm)
-                ? sion.import_norm
-                : [];
+            const importNorms = Array.isArray(sion?.import_norm) ? sion.import_norm : [];
             if (importNorms.length === 0) {
                 toast.info('No SION import norms found for the selected class.');
                 return;
@@ -122,6 +136,7 @@ const LicenseForm = ({entry, isNew = false, onClose, onSaved}) => {
                     }
                 });
 
+                // resequence serials
                 existing.forEach((r, i) => (r.serial_number = i + 1));
 
                 return {...prev, import_license: existing};
@@ -155,6 +170,8 @@ const LicenseForm = ({entry, isNew = false, onClose, onSaved}) => {
             onSaved?.(response.data.id, response.data);
         } catch (err) {
             console.error('Save failed', err?.response?.data || err);
+            const apiErrors = err?.response?.data || {};
+            setErrors(apiErrors); // surface inline
             toast.error('Failed to save license');
         } finally {
             setSaving(false);
@@ -178,6 +195,7 @@ const LicenseForm = ({entry, isNew = false, onClose, onSaved}) => {
                             value={data.license_number ?? ''}
                             isInvalid={!!errors.license_number}
                             onChange={e => handleChange('license_number', e.target.value)}
+                            disabled={saving}
                         />
                         <Form.Control.Feedback type="invalid">
                             {errors.license_number}
@@ -189,6 +207,7 @@ const LicenseForm = ({entry, isNew = false, onClose, onSaved}) => {
                             value={data.license_date || ''}
                             isInvalid={!!errors.license_date}
                             onChange={e => handleChange('license_date', e.target.value)}
+                            disabled={saving}
                         />
                         <Form.Control.Feedback type="invalid">
                             {errors.license_date}
@@ -199,9 +218,8 @@ const LicenseForm = ({entry, isNew = false, onClose, onSaved}) => {
                             type="date"
                             value={data.license_expiry_date || ''}
                             isInvalid={!!errors.license_expiry_date}
-                            onChange={e =>
-                                handleChange('license_expiry_date', e.target.value)
-                            }
+                            onChange={e => handleChange('license_expiry_date', e.target.value)}
+                            disabled={saving}
                         />
                         <Form.Control.Feedback type="invalid">
                             {errors.license_expiry_date}
@@ -211,6 +229,7 @@ const LicenseForm = ({entry, isNew = false, onClose, onSaved}) => {
                         <AsyncCompanySelect
                             value={data.exporter}
                             onChange={v => handleChange('exporter', v)}
+                            isDisabled={saving}
                         />
                         {errors.exporter && (
                             <div className="text-danger small">{errors.exporter}</div>
@@ -220,6 +239,7 @@ const LicenseForm = ({entry, isNew = false, onClose, onSaved}) => {
                         <AsyncPortSelect
                             value={data.port}
                             onChange={v => handleChange('port', v)}
+                            isDisabled={saving}
                         />
                         {errors.port && (
                             <div className="text-danger small">{errors.port}</div>
@@ -239,9 +259,8 @@ const LicenseForm = ({entry, isNew = false, onClose, onSaved}) => {
                         <Form.Control
                             value={data.registration_number || ''}
                             isInvalid={!!errors.registration_number}
-                            onChange={e =>
-                                handleChange('registration_number', e.target.value)
-                            }
+                            onChange={e => handleChange('registration_number', e.target.value)}
+                            disabled={saving}
                         />
                         <Form.Control.Feedback type="invalid">
                             {errors.registration_number}
@@ -252,9 +271,8 @@ const LicenseForm = ({entry, isNew = false, onClose, onSaved}) => {
                             type="date"
                             value={data.registration_date || ''}
                             isInvalid={!!errors.registration_date}
-                            onChange={e =>
-                                handleChange('registration_date', e.target.value)
-                            }
+                            onChange={e => handleChange('registration_date', e.target.value)}
+                            disabled={saving}
                         />
                         <Form.Control.Feedback type="invalid">
                             {errors.registration_date}
@@ -265,19 +283,29 @@ const LicenseForm = ({entry, isNew = false, onClose, onSaved}) => {
                             value={data.file_number || ''}
                             isInvalid={!!errors.file_number}
                             onChange={e => handleChange('file_number', e.target.value)}
+                            disabled={saving}
                         />
                         <Form.Control.Feedback type="invalid">
                             {errors.file_number}
                         </Form.Control.Feedback>
                     </td>
                     <td>
-                        <ChoiceSelect choiceKey="scheme_codes" value={data.scheme_code}
-                                      onChange={(v) => setData({...data, scheme_code: v})} returnValues/>
-
+                        <ChoiceSelect
+                            choiceKey="scheme_codes"
+                            value={data.scheme_code}
+                            onChange={(v) => setData(prev => ({...prev, scheme_code: v}))}
+                            returnValues
+                            isDisabled={saving}
+                        />
                     </td>
                     <td>
-                        <ChoiceSelect choiceKey="notification_number" value={data.notification_number}
-                                      onChange={(v) => setData({...data, notification_number: v})} returnValues/>
+                        <ChoiceSelect
+                            choiceKey="notification_number"
+                            value={data.notification_number}
+                            onChange={(v) => setData(prev => ({...prev, notification_number: v}))}
+                            returnValues
+                            isDisabled={saving}
+                        />
                     </td>
                 </tr>
 
@@ -289,14 +317,20 @@ const LicenseForm = ({entry, isNew = false, onClose, onSaved}) => {
                             type="switch"
                             checked={!!data.is_registered}
                             onChange={e => handleChange('is_registered', e.target.checked)}
+                            disabled={saving}
                         />
                     </th>
                     <th colSpan={4}>Condition Sheet</th>
                 </tr>
                 <tr>
                     <td>
-                        <ChoiceSelect choiceKey="purchase_status" value={data.purchase_status}
-                                      onChange={(v) => setData({...data, purchase_status: v})} returnValues/>
+                        <ChoiceSelect
+                            choiceKey="purchase_status"
+                            value={data.purchase_status}
+                            onChange={(v) => setData(prev => ({...prev, purchase_status: v}))}
+                            returnValues
+                            isDisabled={saving}
+                        />
                     </td>
                     <th>
                         <Form.Check
@@ -304,6 +338,7 @@ const LicenseForm = ({entry, isNew = false, onClose, onSaved}) => {
                             type="switch"
                             checked={!!data.is_au}
                             onChange={e => handleChange('is_au', e.target.checked)}
+                            disabled={saving}
                         />
                     </th>
                     <td colSpan={3}>
@@ -311,6 +346,7 @@ const LicenseForm = ({entry, isNew = false, onClose, onSaved}) => {
                             value={data.file_number || ''}
                             isInvalid={!!errors.file_number}
                             onChange={e => handleChange('file_number', e.target.value)}
+                            disabled={saving}
                         />
                         <Form.Control.Feedback type="invalid">
                             {errors.file_number}
@@ -335,11 +371,14 @@ const LicenseForm = ({entry, isNew = false, onClose, onSaved}) => {
                                 cif_fc: '',
                                 cif_inr: '',
                                 norm_class: null,
+                                norm_class_id: null,
                             },
                         ],
                     }))
                 }
                 onFetchSionInputs={handleFetchSionInputs}
+                errors={errors}
+                disabled={saving}
             />
 
             <ImportLicenseTable
@@ -363,6 +402,8 @@ const LicenseForm = ({entry, isNew = false, onClose, onSaved}) => {
                         ],
                     }))
                 }
+                errors={errors}
+                disabled={saving}
             />
 
             <div className="mt-3">
@@ -375,6 +416,7 @@ const LicenseForm = ({entry, isNew = false, onClose, onSaved}) => {
                         size="sm"
                         className="ms-2"
                         onClick={onClose}
+                        disabled={saving}
                     >
                         Cancel
                     </Button>

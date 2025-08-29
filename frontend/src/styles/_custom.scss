@@ -1,36 +1,28 @@
-@use "./variables" as *;
-// If you later need them:
-// @use "sass:color";
-// @use "sass:math";
+@use "./variables" as vars;
+@use "./bootstrap"; // ensure bootstrap classes are available
 
-:root {
-  --primary-color: #e16123;
-  --primary-hover: #c9521d;
-  --primary-text: #ffffff;
-  --bg-color: #f7f7f7;
-  --text-color: #212529;
-}
-
+/* Global base */
 body {
   font-family: 'Segoe UI', sans-serif;
-  background-color: var(--bg-color);
-  color: var(--text-color);
+  background-color: vars.$body-bg;
+  color: vars.$body-color;
   margin: 0;
 }
 
 a, .text-primary {
-  color: $primary !important;
+  color: vars.$primary !important;
   text-decoration: none;
 
   &:hover {
-    color: $primary-hover;
+    color: vars.$primary-hover;
     text-decoration: underline;
   }
 }
 
+/* Buttons */
 button, .btn {
-  background-color: $primary;
-  color: $primary-text !important;
+  background-color: vars.$primary;
+  color: vars.$primary-text !important;
   border: none;
   border-radius: 6px;
   padding: 0.6em 1.2em;
@@ -39,7 +31,7 @@ button, .btn {
   transition: background-color 0.3s ease;
 
   &:hover {
-    background-color: $primary-hover;
+    background-color: vars.$primary-hover;
   }
 
   &:disabled {
@@ -49,27 +41,28 @@ button, .btn {
 }
 
 .btn-primary {
-  background-color: $primary;
-  border-color: $primary;
-  color: $primary-text;
+  background-color: vars.$primary;
+  border-color: vars.$primary;
+  color: vars.$primary-text;
 
   &:hover, &:focus, &:active {
-    background-color: $primary-hover;
-    border-color: $primary-hover;
-    color: $primary-text;
+    background-color: vars.$primary-hover;
+    border-color: vars.$primary-hover;
+    color: vars.$primary-text;
   }
 }
 
 .btn-outline-primary {
-  color: $primary;
-  border-color: $primary;
+  color: vars.$primary;
+  border-color: vars.$primary;
 
   &:hover, &:focus, &:active {
-    background-color: $primary;
-    color: $primary-text;
+    background-color: vars.$primary;
+    color: vars.$primary-text;
   }
 }
 
+/* Form controls */
 input.form-control,
 textarea.form-control,
 select.form-select {
@@ -86,28 +79,35 @@ select.form-select {
   }
 }
 
+.is-invalid .react-select__control {
+  border-color: var(--bs-danger) !important;
+  box-shadow: 0 0 0 .25rem rgba(220, 53, 69, .25);
+}
+
+/* Cards */
 .card {
   border-radius: 0.75rem;
-  background-color: $card-bg;
+  background-color: vars.$card-bg;
   box-shadow: 0 4px 16px rgba(0, 0, 0, 0.1);
   transition: all 0.3s ease-in-out;
 }
 
+/* Navbar */
 .navbar {
-  background-color: $primary;
-  color: $primary-text !important;
+  background-color: vars.$primary;
+  color: vars.$primary-text !important;
   font-weight: 500;
 }
 
 .navbar .nav-link {
-  background-color: $primary;
-  color: $primary-text !important;
+  background-color: vars.$primary;
+  color: vars.$primary-text !important;
   font-weight: 500;
   margin-left: 1rem;
 
   &:hover, &:focus, &.active {
-    color: $primary-text !important;
-    outline: 1px solid $primary-text;
+    color: vars.$primary-text !important;
+    outline: 1px solid vars.$primary-text;
     border-radius: 4px;
     font-weight: bold;
   }
@@ -115,13 +115,66 @@ select.form-select {
 
 .dropdown-item {
   &:focus, &.active {
-    color: $primary-text !important;
-    outline: 1px solid $primary-text;
+    color: vars.$primary-text !important;
+    outline: 1px solid vars.$primary-text;
     border-radius: 4px;
     font-weight: bold;
   }
 }
 
+/* Tabs (React-Bootstrap <Tabs/>) */
+.nav-tabs .nav-link {
+  color: vars.$primary;
+  border-radius: 0.5rem;
+  margin-right: 0.25rem;
+  border: 1px solid transparent;
+  background-color: #fff;
+}
+
+.nav-tabs .nav-link:hover {
+  color: vars.$primary;
+  border-color: vars.$primary;
+  background-color: #fff;
+}
+
+.nav-tabs .nav-link.active {
+  background-color: vars.$primary !important;
+  color: vars.$primary-text !important;
+  border-color: vars.$primary !important;
+}
+
+/* Also style .nav-item > button the same way (if you render buttons in navs) */
+.nav-item button {
+  background-color: #fff;
+  color: vars.$primary !important;
+  border: 1px solid transparent;
+  border-radius: 0.5rem;
+  margin-right: 0.25rem;
+  padding: 0.5rem 1rem;
+  font-weight: 500;
+  transition: all 0.2s ease-in-out;
+
+  &:hover, &:focus {
+    color: vars.$primary;
+    border-color: vars.$primary;
+    background-color: #fff;
+    outline: none;
+  }
+
+  &.active,
+  &[aria-selected="true"] {
+    background-color: vars.$primary !important;
+    color: vars.$primary-text !important;
+    border-color: vars.$primary !important;
+  }
+
+  &:disabled {
+    opacity: 0.6;
+    cursor: not-allowed;
+  }
+}
+
+/* Navbar spacing helper */
 .pt-navbar {
   padding-top: 72px;
 }

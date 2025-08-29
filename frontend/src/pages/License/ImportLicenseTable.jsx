@@ -1,16 +1,17 @@
 // src/pages/License/ImportLicenseTable.jsx
 import React from 'react';
+import PropTypes from 'prop-types';
 import {Button, Form, Table} from 'react-bootstrap';
 import AsyncHSCodeSelect from '../../components/AsyncSelect/AsyncHSCodeSelect';
 import AsyncItemSelect from '../../components/AsyncSelect/AsyncItemSelect';
 
 /**
- * @param {Array}  importItems
+ * @param {Array}    importItems
  * @param {Function} onChange
  * @param {Function} onAdd
  * @param {Function} onRemove
- * @param {Object}  errors
- * @param {boolean} disabled
+ * @param {Object}   errors
+ * @param {boolean}  disabled
  */
 const ImportLicenseTable = ({
                                 importItems = [],
@@ -38,9 +39,9 @@ const ImportLicenseTable = ({
                 items: [],
                 description: '',
                 quantity: '',
-                unit: '',
+                unit: 'kg',
                 cif_fc: '',
-                cif_inr: ''
+                cif_inr: '',
             },
         ]);
     };
@@ -56,6 +57,8 @@ const ImportLicenseTable = ({
         errors?.[`import_license.${i}.${key}`] ||
         errors?.[`import_norm.${i}.${key}`] ||
         '';
+
+    const invalidWrapCls = (hasErr) => (hasErr ? 'is-invalid' : '');
 
     return (
         <>
@@ -77,85 +80,207 @@ const ImportLicenseTable = ({
                 <tbody>
                 {importItems.map((item, i) => {
                     const idKey = item?.id ?? i;
+
+                    const errSerial = getErr(i, 'serial_number');
+                    const errHS = getErr(i, 'hs_code_id') || getErr(i, 'hs_code');
+                    const errItems = getErr(i, 'items');
+                    const errDesc = getErr(i, 'description');
+                    const errQty = getErr(i, 'quantity');
+                    const errUnit = getErr(i, 'unit');
+                    const errCifFc = getErr(i, 'cif_fc');
+                    const errCifInr = getErr(i, 'cif_inr');
+
                     return (
                         <tr key={idKey}>
                             <td>
-                                <Form.Control size="sm" value={item?.serial_number ?? ''}
-                                              onChange={(e) => handleField(i, 'serial_number', e.target.value)}
-                                              isInvalid={!!getErr(i, 'serial_number')} disabled={disabled}
-                                              placeholder="SR"/>
+                                <Form.Control
+                                    size="sm"
+                                    value={item?.serial_number ?? ''}
+                                    onChange={(e) => handleField(i, 'serial_number', e.target.value)}
+                                    isInvalid={!!errSerial}
+                                    disabled={disabled}
+                                    placeholder="SR"
+                                    aria-describedby={`err-serial-${i}`}
+                                />
+                                <Form.Control.Feedback type="invalid" id={`err-serial-${i}`}>
+                                    {errSerial}
+                                </Form.Control.Feedback>
+                            </td>
+
+                            <td>
+                                <div className={invalidWrapCls(!!errHS)}>
+                                    <AsyncHSCodeSelect
+                                        classNamePrefix="react-select"
+                                        value={item?.hs_code ?? null}
+                                        onChange={(v) => handleField(i, 'hs_code', v)}
+                                        isDisabled={disabled}
+                                        placeholder="Select HS code…"
+                                    />
+                                </div>
+                                {errHS && (
+                                    <div className="invalid-feedback d-block" id={`err-hscode-${i}`}>
+                                        {errHS}
+                                    </div>
+                                )}
+                            </td>
+
+                            <td>
+                                <div className={invalidWrapCls(!!errItems)}>
+                                    <AsyncItemSelect
+                                        classNamePrefix="react-select"
+                                        value={Array.isArray(item?.items) ? item.items : []}
+                                        onChange={(v) => handleField(i, 'items', v || [])}
+                                        isMulti
+                                        isDisabled={disabled}
+                                        placeholder="Select item(s)…"
+                                    />
+                                </div>
+                                {errItems && (
+                                    <div className="invalid-feedback d-block" id={`err-items-${i}`}>
+                                        {errItems}
+                                    </div>
+                                )}
+                            </td>
+
+                            <td>
+                                <Form.Control
+                                    as="textarea"
+                                    rows={2}
+                                    size="sm"
+                                    value={item?.description ?? ''}
+                                    onChange={(e) => handleField(i, 'description', e.target.value)}
+                                    isInvalid={!!errDesc}
+                                    disabled={disabled}
+                                    placeholder="Description"
+                                    aria-describedby={`err-desc-${i}`}
+                                />
+                                <Form.Control.Feedback type="invalid" id={`err-desc-${i}`}>
+                                    {errDesc}
+                                </Form.Control.Feedback>
+                            </td>
+
+                            <td>
+                                <Form.Control
+                                    type="number"
+                                    size="sm"
+                                    className="text-end"
+                                    value={item?.quantity ?? ''}
+                                    onChange={(e) => handleField(i, 'quantity', e.target.value)}
+                                    isInvalid={!!errQty}
+                                    disabled={disabled}
+                                    placeholder="0.0000"
+                                    step="0.0001"
+                                    min="0"
+                                    aria-describedby={`err-qty-${i}`}
+                                />
                                 <Form.Control.Feedback
-                                    type="invalid">{getErr(i, 'serial_number')}</Form.Control.Feedback>
+                                    type="invalid"
+                                    className="text-end d-block"
+                                    id={`err-qty-${i}`}
+                                >
+                                    {errQty}
+                                </Form.Control.Feedback>
                             </td>
+
                             <td>
-                                <AsyncHSCodeSelect value={item?.hs_code ?? null}
-                                                   onChange={(v) => handleField(i, 'hs_code', v)}
-                                                   isInvalid={!!getErr(i, 'hs_code')} isDisabled={disabled}
-                                                   placeholder="Select HS code…"/>
-                                {getErr(i, 'hs_code') &&
-                                    <div className="invalid-feedback d-block">{getErr(i, 'hs_code')}</div>}
+                                <Form.Control
+                                    size="sm"
+                                    value={item?.unit ?? ''}
+                                    onChange={(e) => handleField(i, 'unit', e.target.value)}
+                                    isInvalid={!!errUnit}
+                                    disabled={disabled}
+                                    placeholder="Unit"
+                                    aria-describedby={`err-unit-${i}`}
+                                />
+                                <Form.Control.Feedback type="invalid" id={`err-unit-${i}`}>
+                                    {errUnit}
+                                </Form.Control.Feedback>
                             </td>
+
                             <td>
-                                <AsyncItemSelect value={Array.isArray(item?.items) ? item.items : []}
-                                                 onChange={(v) => handleField(i, 'items', v || [])} isMulti
-                                                 isDisabled={disabled} placeholder="Select item(s)…"/>
-                                {getErr(i, 'items') &&
-                                    <div className="invalid-feedback d-block">{getErr(i, 'items')}</div>}
+                                <Form.Control
+                                    type="number"
+                                    size="sm"
+                                    className="text-end"
+                                    value={item?.cif_fc ?? ''}
+                                    onChange={(e) => handleField(i, 'cif_fc', e.target.value)}
+                                    isInvalid={!!errCifFc}
+                                    disabled={disabled}
+                                    placeholder="0.00"
+                                    step="0.01"
+                                    min="0"
+                                    aria-describedby={`err-ciffc-${i}`}
+                                />
+                                <Form.Control.Feedback
+                                    type="invalid"
+                                    className="text-end d-block"
+                                    id={`err-ciffc-${i}`}
+                                >
+                                    {errCifFc}
+                                </Form.Control.Feedback>
                             </td>
+
                             <td>
-                                <Form.Control as="textarea" rows={2} size="sm" value={item?.description ?? ''}
-                                              onChange={(e) => handleField(i, 'description', e.target.value)}
-                                              isInvalid={!!getErr(i, 'description')} disabled={disabled}
-                                              placeholder="Description"/>
-                                <Form.Control.Feedback type="invalid">{getErr(i, 'description')}</Form.Control.Feedback>
+                                <Form.Control
+                                    type="number"
+                                    size="sm"
+                                    className="text-end"
+                                    value={item?.cif_inr ?? ''}
+                                    onChange={(e) => handleField(i, 'cif_inr', e.target.value)}
+                                    isInvalid={!!errCifInr}
+                                    disabled={disabled}
+                                    placeholder="0.00"
+                                    step="0.01"
+                                    min="0"
+                                    aria-describedby={`err-cifinr-${i}`}
+                                />
+                                <Form.Control.Feedback
+                                    type="invalid"
+                                    className="text-end d-block"
+                                    id={`err-cifinr-${i}`}
+                                >
+                                    {errCifInr}
+                                </Form.Control.Feedback>
                             </td>
-                            <td>
-                                <Form.Control type="number" size="sm" className="text-end" value={item?.quantity ?? ''}
-                                              onChange={(e) => handleField(i, 'quantity', e.target.value)}
-                                              isInvalid={!!getErr(i, 'quantity')} disabled={disabled} placeholder="0.00"
-                                              step="0.0001" min="0"/>
-                                <Form.Control.Feedback type="invalid"
-                                                       className="text-end d-block">{getErr(i, 'quantity')}</Form.Control.Feedback>
-                            </td>
-                            <td>
-                                <Form.Control size="sm" value={item?.unit ?? ''}
-                                              onChange={(e) => handleField(i, 'unit', e.target.value)}
-                                              isInvalid={!!getErr(i, 'unit')} disabled={disabled} placeholder="Unit"/>
-                                <Form.Control.Feedback type="invalid">{getErr(i, 'unit')}</Form.Control.Feedback>
-                            </td>
-                            <td>
-                                <Form.Control type="number" size="sm" className="text-end" value={item?.cif_fc ?? ''}
-                                              onChange={(e) => handleField(i, 'cif_fc', e.target.value)}
-                                              isInvalid={!!getErr(i, 'cif_fc')} disabled={disabled} placeholder="0.00"
-                                              step="0.01" min="0"/>
-                                <Form.Control.Feedback type="invalid"
-                                                       className="text-end d-block">{getErr(i, 'cif_fc')}</Form.Control.Feedback>
-                            </td>
-                            <td>
-                                <Form.Control type="number" size="sm" className="text-end" value={item?.cif_inr ?? ''}
-                                              onChange={(e) => handleField(i, 'cif_inr', e.target.value)}
-                                              isInvalid={!!getErr(i, 'cif_inr')} disabled={disabled} placeholder="0.00"
-                                              step="0.01" min="0"/>
-                                <Form.Control.Feedback type="invalid"
-                                                       className="text-end d-block">{getErr(i, 'cif_inr')}</Form.Control.Feedback>
-                            </td>
+
                             <td className="text-center">
-                                <Button size="sm" variant="outline-danger" onClick={() => removeRow(i)}
-                                        disabled={disabled}>Remove</Button>
+                                <Button
+                                    size="sm"
+                                    variant="outline-danger"
+                                    onClick={() => removeRow(i)}
+                                    disabled={disabled}
+                                >
+                                    Remove
+                                </Button>
                             </td>
                         </tr>
                     );
                 })}
+
                 {!importItems.length && (
                     <tr>
-                        <td colSpan={9} className="text-center text-muted py-3">No import items added yet.</td>
+                        <td colSpan={9} className="text-center text-muted py-3">
+                            No import items added yet.
+                        </td>
                     </tr>
                 )}
                 </tbody>
             </Table>
-            <Button size="sm" variant="primary" onClick={addRow} disabled={disabled}>+ Add Import Item</Button>
+
+            <Button size="sm" variant="primary" onClick={addRow} disabled={disabled}>
+                + Add Import Item
+            </Button>
         </>
     );
+};
+
+ImportLicenseTable.propTypes = {
+    importItems: PropTypes.arrayOf(PropTypes.object),
+    onChange: PropTypes.func,
+    onAdd: PropTypes.func,
+    onRemove: PropTypes.func,
+    errors: PropTypes.object,
+    disabled: PropTypes.bool,
 };
 
 export default ImportLicenseTable;
