@@ -43,21 +43,14 @@ read -rsp "Enter sudo password for $SSH_USER@$SSH_HOST: " SUDO_PASS
 echo
 
 echo "→ Pulling & deploying on server"
-ssh -o StrictHostKeyChecking=accept-new "$SSH_USER@$SSH_HOST" bash -s <<'REMOTE_EOF'
+ssh -o StrictHostKeyChecking=accept-new "$SSH_USER@$SSH_HOST" bash -s <<REMOTE_EOF
 set -euo pipefail
 
-# ====== REMOTE CONFIG (from heredoc env) ======
-REMOTE_ROOT="__REMOTE_ROOT__"
-BRANCH="__BRANCH__"
-SUDO_PASS_PLACEHOLDER="__SUDO_PASS__"
-# =============================================
+REMOTE_ROOT="$REMOTE_ROOT"
+BRANCH="$BRANCH"
+SUDO_PASS="$SUDO_PASS"
 
-# Replace placeholders with actual values passed via env substitution below
-REMOTE_ROOT="${REMOTE_ROOT}"
-BRANCH="${BRANCH}"
-SUDO_PASS="${SUDO_PASS_PLACEHOLDER}"
-
-cd "$REMOTE_ROOT"
+cd "\$REMOTE_ROOT"
 
 echo "[server] Fetch & checkout branch: \$BRANCH"
 git fetch --all --prune
@@ -115,7 +108,6 @@ fi
 if [[ -d "\$FRONTEND" ]]; then
   cd "\$FRONTEND"
 
-  # Reduce noise and speed things up slightly
   npm config set fund false >/dev/null 2>&1 || true
   npm config set audit false >/dev/null 2>&1 || true
 
@@ -150,14 +142,5 @@ echo "\$SUDO_PASS" | sudo -S systemctl reload nginx || echo "[server][warn] ngin
 
 echo "[server] Deploy done."
 REMOTE_EOF
-# ====== END REMOTE HEREDOC ======
-
-# Substitute variables in the heredoc after sending:
-# (We can't expand variables inside the single-quoted heredoc; pass them via environment)
-) <<EOFVARS
-__REMOTE_ROOT__="$REMOTE_ROOT"
-__BRANCH__="$BRANCH"
-__SUDO_PASS__="$SUDO_PASS"
-EOFVARS
 
 echo "✅ Push + pull + deploy complete."
