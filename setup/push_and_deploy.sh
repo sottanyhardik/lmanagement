@@ -70,7 +70,8 @@ else
   PIP="\$VENV/bin/pip"
   FRONTEND="\$REMOTE_ROOT/frontend"
 
-  "\$PIP" install -r "\$REMOTE_ROOT/requirements.txt"
+  # ✅ Updated to use merged requirenment.txt
+  "\$PIP" install -r "\$REMOTE_ROOT/requirenment.txt"
 
   if [[ -d "\$FRONTEND" ]]; then
     cd "\$FRONTEND"
