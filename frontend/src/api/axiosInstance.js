@@ -1,6 +1,7 @@
 // src/api/axiosInstance.js
 import axios from 'axios';
 
+/* ================================= Base URL ================================= */
 const rawBase = import.meta.env.VITE_API_BASE_URL || 'http://localhost:8000';
 let base = rawBase.replace(/\/+$/, '');          // trim trailing slashes
 if (!/\/api(?:\/)?$/.test(base)) base += '/api'; // append /api if missing
@@ -12,6 +13,29 @@ const api = axios.create({
     // Don't set a global Content-Type: let the browser choose (esp. for FormData)
     timeout: 120000,
 });
+
+/* ====================== Shared refresh state (declare early) ====================== */
+// Must live above anything that could call forceLogout()
+let isRefreshing = false;
+let subscribers = [];
+
+/** Subscribe a callback to be called once a refresh attempt resolves. */
+function subscribeTokenRefresh(cb) {
+    subscribers.push(cb);
+}
+
+/** Notify all subscribers with the new access token (or null on failure). */
+function onRefreshed(newAccess) {
+    subscribers.forEach((cb) => {
+        try {
+            cb(newAccess);
+        } catch { /* no-op */
+        }
+    });
+    subscribers = [];
+}
+
+/* ================================================================================ */
 
 /* ========================= Inactivity (15 minutes) ========================= */
 const INACTIVITY_LIMIT_MS = 15 * 60 * 1000;
@@ -46,37 +70,42 @@ function clearTokensStorage() {
     localStorage.removeItem('refresh_token');
 }
 
+/** Forcefully log out and notify listeners. */
 function forceLogout(reason = 'idle') {
     try {
         sessionStorage.setItem(LOGOUT_REASON_KEY, reason);
-    } catch {
+    } catch { /* no-op */
     }
+
     clearTokensStorage();
 
-    // Wake any refresh waiters (defined below) to fail fast
+    // Wake any refresh waiters (fail them fast). Safe because declared above.
     isRefreshing = false;
     onRefreshed(null);
 
-    // Broadcast to the app and other listeners
+    // Broadcast to the app
     try {
         window.dispatchEvent(new CustomEvent('session:logout', {detail: {reason}}));
-    } catch {
+    } catch { /* no-op */
     }
+
     if (logoutHandler) {
         try {
             logoutHandler(reason);
-        } catch {
+        } catch { /* no-op */
         }
     }
 }
 
-// Initialize activity listeners (once)
+// Initialize activity listeners (once, in browser only)
 if (typeof window !== 'undefined') {
     // Baseline on first load
     if (!readLastActive()) writeLastActive();
 
     const onActivity = () => {
-        if (document.visibilityState !== 'hidden') writeLastActive();
+        if (typeof document === 'undefined' || document.visibilityState !== 'hidden') {
+            writeLastActive();
+        }
     };
 
     [
@@ -124,47 +153,40 @@ function writeAccessToken(access) {
 /* ========================================================================== */
 
 /* =========================== Request interceptor =========================== */
-api.interceptors.request.use((config) => {
-    // Hard-stop requests if session is idle-expired
-    const last = readLastActive();
-    if (nowMs() - last >= INACTIVITY_LIMIT_MS) {
-        forceLogout('idle');
-        const err = new Error('Session expired due to inactivity');
-        err.code = 'ERR_SESSION_EXPIRED';
-        return Promise.reject(err);
-    }
+api.interceptors.request.use(
+    (config) => {
+        // Hard-stop requests if session is idle-expired
+        const last = readLastActive();
+        if (nowMs() - last >= INACTIVITY_LIMIT_MS) {
+            forceLogout('idle');
+            const err = new Error('Session expired due to inactivity');
+            err.code = 'ERR_SESSION_EXPIRED';
+            return Promise.reject(err);
+        }
 
-    // Mark activity on outgoing requests
-    writeLastActive();
+        // Mark activity on outgoing requests
+        writeLastActive();
 
-    // Attach access token, if any
-    const {access} = readTokens();
-    if (access) {
-        config.headers = config.headers || {};
-        config.headers.Authorization = `Bearer ${access}`;
-    }
-    return config;
-});
+        // Attach access token, if any
+        const {access} = readTokens();
+        if (access) {
+            config.headers = config.headers || {};
+            config.headers.Authorization = `Bearer ${access}`;
+        }
+
+        return config;
+    },
+    (err) => Promise.reject(err)
+);
 /* ========================================================================== */
 
 /* =========================== Response interceptor ========================== */
-let isRefreshing = false;
-let subscribers = [];
-
-function subscribeTokenRefresh(cb) {
-    subscribers.push(cb);
-}
-
-function onRefreshed(newAccess) {
-    subscribers.forEach((cb) => cb(newAccess));
-    subscribers = [];
-}
-
 api.interceptors.response.use(
     (resp) => resp,
     async (error) => {
+        // Pass through if there's no response (network/CORS/etc.)
         const {response, config} = error || {};
-        if (!response) throw error;
+        if (!response || !config) throw error;
 
         // If idle-expired mid-flight, do not attempt refresh
         if (nowMs() - readLastActive() >= INACTIVITY_LIMIT_MS) {
@@ -185,9 +207,14 @@ api.interceptors.response.use(
         if (!isRefreshing) {
             isRefreshing = true;
             try {
-                // Use plain axios to avoid stale Authorization
+                // Use plain axios to avoid stale Authorization header
                 const url = base + 'token/refresh/';
-                const {data} = await axios.post(url, {refresh}, {headers: {Authorization: undefined}});
+                const {data} = await axios.post(
+                    url,
+                    {refresh},
+                    {headers: {Authorization: undefined}}
+                );
+
                 if (!data?.access) throw new Error('No access token in refresh response');
 
                 writeAccessToken(data.access);
