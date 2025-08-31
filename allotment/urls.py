@@ -4,13 +4,15 @@ from django.urls import path, include
 from rest_framework.routers import DefaultRouter
 
 from . import views
-from .api import AllotmentOptionViewSet, AllotmentViewSet
+from .api import AllotmentOptionViewSet, AllotmentViewSet, GenerateTransferLetterForAllotmentAPI
 
 router = DefaultRouter()
 router.register(r'option-allotments', AllotmentOptionViewSet, basename='allotment')
 router.register(r"allotments", AllotmentViewSet, basename="allotments")
 
 urlpatterns = [
+    path('allotments/<int:pk>/generate-tl/', GenerateTransferLetterForAllotmentAPI.as_view(),
+         name='allotments-tl'),
     path('', include(router.urls)),
     # ex: /polls/
     path('add/', login_required(views.AllotmentCreateView.as_view()), name='allotment-add'),

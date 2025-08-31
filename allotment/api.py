@@ -1,5 +1,7 @@
 # allotment/views.py
+from datetime import datetime
 from decimal import Decimal, ROUND_FLOOR, ROUND_CEILING
+from shutil import make_archive
 
 from django.db import transaction
 from django.db.models import F, Value, FloatField, Q
@@ -8,14 +10,18 @@ from django.db.models.functions import Coalesce
 from django.utils.timezone import now
 from django_filters import rest_framework as dj_filters
 from django_filters.rest_framework import DjangoFilterBackend
-from rest_framework import permissions, viewsets, status
+from rest_framework import permissions, viewsets
+from rest_framework import status
 from rest_framework.decorators import action
 from rest_framework.filters import SearchFilter, OrderingFilter
 from rest_framework.pagination import PageNumberPagination
 from rest_framework.response import Response
+from rest_framework.views import APIView
 
+from core.models import TransferLetterModel
 from license.models import LicenseImportItemsModel
 from .models import AllotmentModel, AllotmentItems
+from .scripts.aro import generate_tl_software
 from .serializers import (
     AllotmentSerializer,
     AllotmentOptionSerializer,
@@ -476,3 +482,119 @@ class AllotmentViewSet(viewsets.ModelViewSet):
 
         detail.delete()
         return Response(status=status.HTTP_204_NO_CONTENT)
+
+
+class GenerateTransferLetterForAllotmentAPI(APIView):
+    """
+    POST /api/allotments/<pk>/generate-tl/
+
+    Body:
+    {
+      "company": "...",
+      "company_address_line1": "...",
+      "company_address_line2": "...",
+      "tl_choice": 123,                       # TransferLetterModel id
+      "modified_items": [                     # optional overrides; same length/order as details
+        {"id": <detail_id>, "cif_fc": 100.0},
+        ...
+      ]
+    }
+    """
+
+    def post(self, request, pk):
+        try:
+            allotment = (
+                AllotmentModel.objects
+                .select_related("company")
+                .get(id=pk)
+            )
+
+            # Required form fields
+            company = request.data.get('company')
+            address_1 = request.data.get('company_address_line1')
+            address_2 = request.data.get('company_address_line2')
+            tl_id = request.data.get('tl_choice')
+
+            if not (company and address_1 and address_2 and tl_id):
+                return Response({'error': 'Missing required fields'}, status=status.HTTP_400_BAD_REQUEST)
+
+            items_data = request.data.get('modified_items') or []
+
+            # Fetch details with useful relations
+            details_qs = (
+                allotment.allotment_details
+                .select_related('item__license', 'item__license__exporter')
+                .all()
+                .order_by('id')
+            )
+            details = list(details_qs)
+
+            # Build data payload for TL generator
+            data = []
+            for idx, detail in enumerate(details):
+                lic = getattr(detail.item, 'license', None)
+
+                # Allow overriding CIF FC from payload (by index or ignore if not present)
+                override = {}
+                if idx < len(items_data):
+                    override = items_data[idx] or {}
+                override_fc = override.get('cif_fc')
+
+                try:
+                    cif_fc = float(override_fc) if override_fc not in (None, '') else float(detail.cif_fc or 0)
+                except (TypeError, ValueError):
+                    cif_fc = float(detail.cif_fc or 0)
+
+                # Derive license fields safely
+                license_number = getattr(lic, 'license_number', '') if lic else getattr(detail, 'license_number', '')
+                license_date = getattr(detail, 'license_date', None) or (
+                    getattr(lic, 'license_date', None) if lic else None)
+                license_date_str = license_date.strftime("%d/%m/%Y") if license_date else ''
+                file_number = getattr(detail, 'file_number', None) or (getattr(lic, 'file_number', None) if lic else '')
+                exporter_obj = getattr(lic, 'exporter', None) if lic else getattr(detail, 'exporter', None)
+                exporter_name = getattr(exporter_obj, 'name', '') if exporter_obj else ''
+                purchase_status = getattr(lic, 'purchase_status', '') if lic else ''
+
+                # Keep key names identical to BOE version for template compatibility
+                data.append({
+                    'status': purchase_status,
+                    'company': company,
+                    'company_address_1': address_1,
+                    'company_address_2': address_2,
+                    'today': str(datetime.now().date()),
+                    'license': license_number,
+                    'license_date': license_date_str,
+                    'file_number': file_number,
+                    'quantity': float(detail.qty or 0),
+                    'v_allotment_inr': round(float(detail.cif_inr or 0), 2),
+                    'v_allotment_usd': round(float(cif_fc), 2),
+                    'exporter_name': exporter_name,
+                    # Reuse the same key your TL template expects ("boe"); feed something meaningful
+                    'boe': f"ALLOTMENT #{allotment.id}"
+                           + (f" • INVOICE :- {allotment.invoice}" if allotment.invoice else ""),
+                })
+
+            # Generate from chosen template
+            transfer_letter = TransferLetterModel.objects.get(pk=tl_id)
+            tl_path = transfer_letter.tl.path
+            file_name_prefix = f"TL_ALLOT_{allotment.id}_{transfer_letter.name.replace(' ', '_')}"
+            file_dir = f"media/{file_name_prefix}/"
+
+            generate_tl_software(
+                data=data,
+                tl_path=tl_path,
+                path=file_dir,
+                transfer_letter_name=transfer_letter.name.replace(' ', '_')
+            )
+
+            zip_path = make_archive(file_dir.rstrip('/'), 'zip', file_dir.rstrip('/'))
+            url = request.build_absolute_uri('/media/' + zip_path.split('media/')[-1])
+
+            return Response({'url': url, 'message': 'Success'})
+
+        except AllotmentModel.DoesNotExist:
+            return Response({'error': 'Allotment not found'}, status=status.HTTP_404_NOT_FOUND)
+        except TransferLetterModel.DoesNotExist:
+            return Response({'error': 'Transfer Letter not found'}, status=status.HTTP_404_NOT_FOUND)
+        except Exception as e:
+            return Response({'error': str(e)}, status=status.HTTP_500_INTERNAL_SERVER_ERROR)
