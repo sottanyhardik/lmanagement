@@ -2,7 +2,7 @@ import React, {useContext} from 'react';
 import {Card, CardHeader, Container} from 'react-bootstrap'; // ✅ FIXED: Missing import
 import AuthContext from '../../context/AuthContext';
 import './Dashboard.css';
-import ListControls from "../../components/ListControls";
+import ListControls from "../../components/generic/ListControls.jsx";
 
 const Dashboard = () => {
     const {user} = useContext(AuthContext);

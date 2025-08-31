@@ -1,144 +1,223 @@
+# filters.py — clean, standardized
 import datetime
 
 import django_filters
 from django.conf import settings
 from django.db import models
+from django.db.models import Q
 from django.forms import Select
 from django.utils.timezone import now
 from django_filters import DateFromToRangeFilter
 
-from core.filter_helper import RangeWidget
-from core.models import PortModel, CompanyModel
-from license import models as license_model
 from allotment import models as allotment_model
-
-BOOLEAN_CHOICES = (
-    (True, 'Yes'),
-    (False, 'No')
-)
+from core.filter_helper import RangeWidget
+from license import models as license_model
 
 
-class ListFilter(django_filters.Filter):
-    def filter(self, queryset, value):
-        if not value or value == "":
-            return queryset
-        value_list = value.split(u',')
-        queryset = queryset.filter(allotment_details__item__license__license_number__in=value_list).distinct()
-        return queryset
+# ---------- Generic helpers ----------
+class CharInFilter(django_filters.BaseInFilter, django_filters.CharFilter):
+    """Accepts comma-separated list of strings."""
+    pass
 
 
-class ListPortFilter(django_filters.Filter):
-    def filter(self, queryset, value):
-        if not value or value == "":
-            return queryset
-        value_list = value.split(u',')
-        queryset = queryset.filter(port__code__in=value_list).distinct()
-        return queryset
+class NumberInFilter(django_filters.BaseInFilter, django_filters.NumberFilter):
+    """Accepts comma-separated list of numbers."""
+    pass
 
 
+# ---------- License Import Items search (used by Allotment allot UI) ----------
 class AllotmentItemFilter(django_filters.FilterSet):
-    remove_expired = django_filters.BooleanFilter(method='filter_expired', label='Is Expired')
-    remove_null = django_filters.BooleanFilter(method='remove_null_values', label='Remove Null')
+    """
+    Filters LicenseImportItemsModel in the "pick items to allot" flow.
+    - remove_expired: items whose license expiry is older than EXPIRY_DAY days
+    - remove_null: keep rows with sufficient balances (optimized DB-side)
+    """
+
+    remove_expired = django_filters.BooleanFilter(
+        method="filter_expired",
+        label="Is Expired",
+    )
+    remove_null = django_filters.BooleanFilter(
+        method="filter_remove_null",
+        label="Remove Null",
+    )
 
     class Meta:
         model = license_model.LicenseImportItemsModel
-        fields = ['license__license_number', 'license__notification_number',
-                  'license__export_license__norm_class', 'hs_code__hs_code','description']
+        fields = [
+            "license__license_number",
+            "license__notification_number",
+            "license__export_license__norm_class",
+            "hs_code__hs_code",
+            "description",
+        ]
         widgets = {
-            'license__notification_number': Select(attrs={'class': 'form-control'}),
+            "license__notification_number": Select(attrs={"class": "form-control"}),
         }
         filter_overrides = {
             models.CharField: {
-                'filter_class': django_filters.CharFilter,
-                'extra': lambda f: {
-                    'lookup_expr': 'icontains',
-                },
+                "filter_class": django_filters.CharFilter,
+                "extra": lambda f: {"lookup_expr": "icontains"},
             },
             models.TextField: {
-                'filter_class': django_filters.CharFilter,
-                'extra': lambda f: {
-                    'lookup_expr': 'icontains',
-                },
-            }
+                "filter_class": django_filters.CharFilter,
+                "extra": lambda f: {"lookup_expr": "icontains"},
+            },
         }
 
-    def remove_null_values(self, queryset, name, value):
-        if value:
-            id = []
-            for row in queryset:
-                if row.balance_quantity > 100 and row.balance_cif_fc > 100:
-                    id.append(row.id)
-                elif row.balance_quantity > 100 and row.balance_cif_fc == 0.01:
-                    id.append(row.id)
-                    print(row.balance_cif_fc)
-            return queryset.filter(id__in=id)
-        return queryset
+    def filter_remove_null(self, queryset, name, value: bool):
+        """
+        Original logic (Python-iterating) replaced by DB-side filter:
 
-    def filter_expired(self, queryset, name, value):
-        """ ✅ Optimized expired license filtering using timezone.now() """
-        expiry_days = getattr(settings, "EXPIRY_DAY", 30)  # ✅ Default to 30 days if setting not found
+        Keep rows where:
+          balance_quantity > 100 AND (balance_cif_fc > 100 OR balance_cif_fc == 0.01)
+        """
+        if not value:
+            return queryset
+        return queryset.filter(
+            Q(balance_quantity__gt=100)
+            & (Q(balance_cif_fc__gt=100) | Q(balance_cif_fc=0.01))
+        )
+
+    def filter_expired(self, queryset, name, value: bool):
+        """
+        Filter by license_expiry_date against settings.EXPIRY_DAY (default 30).
+        If value==True: return expired items (older than limit).
+        If value==False: return non-expired items (newer than or equal to limit).
+        """
+        expiry_days = getattr(settings, "EXPIRY_DAY", 30)
         expiry_limit = now() - datetime.timedelta(days=expiry_days)
-
         if value:
             return queryset.filter(license__license_expiry_date__lt=expiry_limit).order_by(
-                'license__license_expiry_date')
+                "license__license_expiry_date"
+            )
         return queryset.filter(license__license_expiry_date__gte=expiry_limit)
 
 
+# ---------- Allotments list filters (DRF list endpoint) ----------
 class AllotmentFilter(django_filters.FilterSet):
-    allotment_details__item__license__license_number = ListFilter(
-        field_name='allotment_details__item__license__license_number', label='License Numbers')
-    exclude_company_name = django_filters.ModelMultipleChoiceFilter(
-        field_name='company__name', exclude=True, label='Exclude Company Name',
-        queryset=CompanyModel.objects.filter(company_allotments__isnull=False).distinct())
+    """
+    Filters for AllotmentModel list endpoint.
 
-    port_code = django_filters.ModelMultipleChoiceFilter(
-        field_name='port__code', label='Port Code', queryset=PortModel.objects.filter(allotments__isnull=False).distinct())
-    is_be = django_filters.BooleanFilter(method='check_be', label='Is BOE', initial=False)
-    is_alloted = django_filters.BooleanFilter(method='check_alloted', label='Is Alloted', initial=True)
+    Includes both "include" and "exclude" multi-selects for company and port,
+    plus convenience filters frequently used in the UI.
+    """
+
+    # License numbers present under nested details (CSV of strings)
+    license_numbers = CharInFilter(
+        field_name="allotment_details__item__license__license_number",
+        label="License Numbers",
+    )
+
+    # Company include/exclude (by ID)
+    company = NumberInFilter(
+        field_name="company_id",
+        lookup_expr="in",
+        label="Company (IDs)",
+    )
+    exclude_company = NumberInFilter(
+        field_name="company_id",
+        lookup_expr="in",
+        exclude=True,
+        label="Exclude Company (IDs)",
+    )
+
+    # Port include/exclude (by ID)
+    port = NumberInFilter(
+        field_name="port_id",
+        lookup_expr="in",
+        label="Port (IDs)",
+    )
+    exclude_port = NumberInFilter(
+        field_name="port_id",
+        lookup_expr="in",
+        exclude=True,
+        label="Exclude Port (IDs)",
+    )
+
+    # Optional: filter by port code list (CSV strings) – handy for quick queries
+    port_code = CharInFilter(
+        field_name="port__code",
+        label="Port Codes",
+    )
+
+    # Back-compat flags (kept with clearer behavior)
+    is_be = django_filters.BooleanFilter(
+        method="filter_has_boe",
+        label="Has BOE",
+        initial=False,
+    )
+    is_alloted = django_filters.BooleanFilter(
+        method="filter_has_allotted",
+        label="Has Allotted License",
+        initial=True,
+    )
+
+    # Date range on modified_on (uses your RangeWidget)
     modified_on = DateFromToRangeFilter(
-        widget=RangeWidget(attrs={'placeholder': 'DD/MM/YYYY', 'format': 'dd/mm/yyyy', 'type': 'date'}))
+        widget=RangeWidget(
+            attrs={"placeholder": "DD/MM/YYYY", "format": "dd/mm/yyyy", "type": "date"}
+        )
+    )
 
     class Meta:
         model = allotment_model.AllotmentModel
-        fields = ['type', 'company', 'item_name']
+        fields = [
+            # Free-text-ish
+            "type",
+            "item_name",
+            # Multi-selects
+            "company",
+            "exclude_company",
+            "port",
+            "exclude_port",
+            # Other helpers
+            "license_numbers",
+            "port_code",
+            # Flags & range
+            "is_be",
+            "is_alloted",
+            "modified_on",
+        ]
         widgets = {
-            'company': Select(attrs={'class': 'form-control'}),
-            'type': Select(attrs={'class': 'form-control'}),
+            "company": Select(attrs={"class": "form-control"}),
+            "type": Select(attrs={"class": "form-control"}),
         }
         filter_overrides = {
             models.CharField: {
-                'filter_class': django_filters.CharFilter,
-                'extra': lambda f: {
-                    'lookup_expr': 'icontains',
-                },
+                "filter_class": django_filters.CharFilter,
+                "extra": lambda f: {"lookup_expr": "icontains"},
             },
             models.TextField: {
-                'filter_class': django_filters.CharFilter,
-                'extra': lambda f: {
-                    'lookup_expr': 'icontains',
-                },
-            }
+                "filter_class": django_filters.CharFilter,
+                "extra": lambda f: {"lookup_expr": "icontains"},
+            },
         }
 
+    # Preserve prior behavior: auto-apply `initial` values when params omitted
     def __init__(self, data=None, *args, **kwargs):
-        # if filterset is bound, use initial values as defaults
         if data is not None:
-            # get a mutable copy of the QueryDict
             data = data.copy()
-
             for name, f in self.base_filters.items():
-                initial = f.extra.get('initial')
-
-                # filter param is either missing or empty, use initial as default
-                if not data.get(name) and initial:
+                initial = f.extra.get("initial")
+                if not data.get(name) and initial is not None:
                     data[name] = initial
-
         super().__init__(data, *args, **kwargs)
 
-    def check_be(self, queryset, name, value):
+    # ---- Custom filter methods ----
+    def filter_has_boe(self, queryset, name, value: bool):
+        """
+        If value is True: keep rows with a related BOE
+        If value is False: keep rows without related BOE
+        """
+        # bill_of_entry is assumed to be a FK/related name from Allotment to BOE
         return queryset.exclude(bill_of_entry__isnull=value).distinct()
 
-
-    def check_alloted(self, queryset, name, value):
-        return queryset.exclude(allotment_details__item__license__license_number__isnull=value).distinct()
+    def filter_has_allotted(self, queryset, name, value: bool):
+        """
+        If value is True: keep rows with any allotted license number present
+        If value is False: keep rows where that license number is null
+        """
+        return queryset.exclude(
+            allotment_details__item__license__license_number__isnull=value
+        ).distinct()

@@ -1,71 +1,142 @@
 // src/pages/Allotment/AllotmentFilters.jsx
-import React from 'react';
-import AsyncCompanySelect from '../../components/AsyncSelect/AsyncCompanySelect';
-import AsyncPortSelect from '../../components/AsyncSelect/AsyncPortSelect';
-import YesNoRadio from '../../components/YesNoRadio';
-import {Form} from 'react-bootstrap';
+import React from "react";
+import {Col, Form, Row} from "react-bootstrap";
+import AsyncCompanySelect from "../../components/AsyncSelect/AsyncCompanySelect";
+import AsyncPortSelect from "../../components/AsyncSelect/AsyncPortSelect";
+import YesNoRadio from "../../components/YesNoRadio";
 
 const AllotmentFilters = ({filters, setFilters}) => (
-    <>
-        <AsyncCompanySelect
-            key="company" value={filters.company}
-            onChange={v => setFilters(prev => ({...prev, company: v}))}
-            placeholder="Company"
-        />
-        <AsyncPortSelect
-            key="port" value={filters.port}
-            onChange={v => setFilters(prev => ({...prev, port: v}))}
-            placeholder="Port"
-        />
-        <AsyncCompanySelect
-            key="rel_company" value={filters.related_company}
-            onChange={v => setFilters(prev => ({...prev, related_company: v}))}
-            placeholder="Related Company"
-        />
-        <Form.Control
-            key="invoice" size="sm" placeholder="Invoice"
-            value={filters.invoice || ''}
-            onChange={e => setFilters(prev => ({...prev, invoice: e.target.value}))}
-        />
-        <Form.Control
-            key="item_name" size="sm" placeholder="Item Name"
-            value={filters.item_name || ''}
-            onChange={e => setFilters(prev => ({...prev, item_name: e.target.value}))}
-        />
-        <Form.Control
-            key="license_number" size="sm" placeholder="License Number"
-            value={filters.license_number || ''}
-            onChange={e => setFilters(prev => ({...prev, license_number: e.target.value}))}
-        />
-        <Form.Control
-            key="hs_code" size="sm" placeholder="HS Code"
-            value={filters.hs_code || ''}
-            onChange={e => setFilters(prev => ({...prev, hs_code: e.target.value}))}
-        />
-        <AsyncCompanySelect
-            key="exporter" value={filters.exporter}
-            onChange={v => setFilters(prev => ({...prev, exporter: v}))}
-            placeholder="Exporter"
-        />
-        <Form.Control
-            key="from_date" size="sm" type="date" value={filters.date_from || ''}
-            onChange={e => setFilters(prev => ({...prev, date_from: e.target.value}))}
-        />
-        <Form.Control
-            key="to_date" size="sm" type="date" value={filters.date_to || ''}
-            onChange={e => setFilters(prev => ({...prev, date_to: e.target.value}))}
-        />
-        <YesNoRadio
-            key="has_balance" label="Has Balance?"
-            value={filters.has_balance}
-            onChange={val => setFilters(prev => ({...prev, has_balance: val}))}
-        />
-        <YesNoRadio
-            key="include_assigned" label="Show All With BOE?"
-            value={filters.include_assigned}
-            onChange={val => setFilters(prev => ({...prev, include_assigned: val}))}
-        />
-    </>
+    <Row className="g-2 g-md-3 align-items-end">
+        {/* Row 1 */}
+        <Col md={4}>
+            <Form.Label className="mb-1">Company (Include)</Form.Label>
+            <AsyncCompanySelect
+                isMulti
+                value={filters.company_objs}
+                onChange={(v) => setFilters((p) => ({...p, company_objs: v || []}))}
+                placeholder="Select company(s)"
+            />
+        </Col>
+        <Col md={4}>
+            <Form.Label className="mb-1">Company (Exclude)</Form.Label>
+            <AsyncCompanySelect
+                isMulti
+                value={filters.exclude_company_objs}
+                onChange={(v) => setFilters((p) => ({...p, exclude_company_objs: v || []}))}
+                placeholder="Exclude company(s)"
+            />
+        </Col>
+        <Col md={4}>
+            <Form.Label className="mb-1">Related Company</Form.Label>
+            <AsyncCompanySelect
+                value={filters.related_company}
+                onChange={(v) => setFilters((p) => ({...p, related_company: v}))}
+                placeholder="Related company"
+            />
+        </Col>
+
+        {/* Row 2 */}
+        <Col md={4}>
+            <Form.Label className="mb-1">Port (Include)</Form.Label>
+            <AsyncPortSelect
+                isMulti
+                value={filters.port_objs}
+                onChange={(v) => setFilters((p) => ({...p, port_objs: v || []}))}
+                placeholder="Select port(s)"
+            />
+        </Col>
+        <Col md={4}>
+            <Form.Label className="mb-1">Port (Exclude)</Form.Label>
+            <AsyncPortSelect
+                isMulti
+                value={filters.exclude_port_objs}
+                onChange={(v) => setFilters((p) => ({...p, exclude_port_objs: v || []}))}
+                placeholder="Exclude port(s)"
+            />
+        </Col>
+        <Col md={4}>
+            <Form.Label className="mb-1">Exporter</Form.Label>
+            <AsyncCompanySelect
+                value={filters.exporter}
+                onChange={(v) => setFilters((p) => ({...p, exporter: v}))}
+                placeholder="Exporter"
+            />
+        </Col>
+
+        {/* Row 3 */}
+        <Col md={4}>
+            <Form.Label className="mb-1">Invoice</Form.Label>
+            <Form.Control
+                size="sm"
+                placeholder="Invoice number"
+                value={filters.invoice || ""}
+                onChange={(e) => setFilters((p) => ({...p, invoice: e.target.value}))}
+            />
+        </Col>
+        <Col md={4}>
+            <Form.Label className="mb-1">Item Name</Form.Label>
+            <Form.Control
+                size="sm"
+                placeholder="Item / product"
+                value={filters.item_name || ""}
+                onChange={(e) => setFilters((p) => ({...p, item_name: e.target.value}))}
+            />
+        </Col>
+        <Col md={4}>
+            <Form.Label className="mb-1">License Number</Form.Label>
+            <Form.Control
+                size="sm"
+                placeholder="License #"
+                value={filters.license_number || ""}
+                onChange={(e) => setFilters((p) => ({...p, license_number: e.target.value}))}
+            />
+        </Col>
+
+        {/* Row 4 */}
+        <Col md={4}>
+            <Form.Label className="mb-1">HS Code</Form.Label>
+            <Form.Control
+                size="sm"
+                placeholder="HS Code"
+                value={filters.hs_code || ""}
+                onChange={(e) => setFilters((p) => ({...p, hs_code: e.target.value}))}
+            />
+        </Col>
+        <Col md={4}>
+            <Form.Label className="mb-1">From Date</Form.Label>
+            <Form.Control
+                size="sm"
+                type="date"
+                value={filters.date_from || ""}
+                onChange={(e) => setFilters((p) => ({...p, date_from: e.target.value}))}
+            />
+        </Col>
+        <Col md={4}>
+            <Form.Label className="mb-1">To Date</Form.Label>
+            <Form.Control
+                size="sm"
+                type="date"
+                value={filters.date_to || ""}
+                onChange={(e) => setFilters((p) => ({...p, date_to: e.target.value}))}
+            />
+        </Col>
+
+        {/* Row 5 */}
+        <Col md={4}>
+            <Form.Label className="mb-1">Has Balance?</Form.Label>
+            <YesNoRadio
+                value={filters.has_balance}
+                onChange={(val) => setFilters((p) => ({...p, has_balance: val}))}
+            />
+        </Col>
+        <Col md={4}>
+            <Form.Label className="mb-1">Show All With BOE?</Form.Label>
+            <YesNoRadio
+                value={filters.include_assigned}
+                onChange={(val) => setFilters((p) => ({...p, include_assigned: val}))}
+            />
+        </Col>
+    </Row>
 );
 
 export default AllotmentFilters;

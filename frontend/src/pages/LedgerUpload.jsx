@@ -2,7 +2,7 @@
 import React, {useRef, useState} from 'react';
 import axios from '../api/axiosInstance';
 import {Alert, Button, Card, Container, Form, ListGroup, Spinner} from 'react-bootstrap';
-import ListControls from '../components/ListControls';
+import ListControls from '../components/generic/ListControls.jsx';
 import LedgerUploadResult from './LedgerUploadResult';
 // If you use react-toastify elsewhere, you can import { toast } and swap alerts for toasts.
 

@@ -1,6 +1,6 @@
 // src/pages/Allotment/forms/AllotmentMakeForm.jsx
 import React, {useEffect, useState} from 'react';
-import AllotmentLineItemTable from '../components/AllotmentLineItemTable';
+import AllotmentLineItemTable from '../components/AllotmentLineItemTable.jsx';
 
 
 const normalizeLines = (entry) =>

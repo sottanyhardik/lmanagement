@@ -3,9 +3,9 @@ import React, {useCallback, useEffect, useMemo, useRef, useState} from 'react';
 import axios from '../api/axiosInstance';
 import {toast} from 'react-toastify';
 import {Container} from 'react-bootstrap';
-import ListControls from '../components/ListControls';
-import GenericTable from '../components/GenericTable';
-import PaginationControls from '../components/PaginationControls';
+import ListControls from '../components/generic/ListControls.jsx';
+import GenericTable from '../components/generic/GenericTable.jsx';
+import PaginationControls from '../components/generic/PaginationControls.jsx';
 import AddItemModal from '../components/AddItemModal';
 
 const DEFAULT_PAGE_SIZE = 10;

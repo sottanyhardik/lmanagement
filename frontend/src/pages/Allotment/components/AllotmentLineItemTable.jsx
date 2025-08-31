@@ -1,9 +1,11 @@
+// AllotmentLineItemTable.jsx
 import React, {useCallback, useEffect, useMemo, useState} from 'react';
 import {Button, Col, Form, Modal, Row, Spinner, Table} from 'react-bootstrap';
-import AsyncNormSelect from '../../../../components/AsyncSelect/AsyncNormSelect';
-import axios from '../../../../api/axiosInstance';
+import AsyncNormSelect from '../../../components/AsyncSelect/AsyncNormSelect.jsx';
+import axios from '../../../api/axiosInstance.js';
 import {toast} from 'react-toastify';
-import '../../AllotmentList.css';
+import '../AllotmentList.css';
+import {FaCheck, FaTimes} from "react-icons/fa"; // ✅ icon
 
 const LICENSE_SEARCH_URL = 'license-import-items/select/';
 const ADD_DETAIL_URL = (id) => `allotments/${id}/details/`;
@@ -119,32 +121,49 @@ const AllotmentLineItemTable = ({
         return p;
     }, [srFilters, page]);
 
-    // Compute max allotable qty (integer) for a search row
+    /** ---------- caps/helpers so inputs never exceed availability or remaining need ---------- */
+    const maxCapsForRow = useCallback(
+        (row) => {
+            const availQty = roundQty(row?.available_quantity);
+            const availVal = safeNum(row?.available_value);
+
+            const remainingVal = reqVal > 0 ? Math.max(0, reqVal - totals.value) : Infinity;
+            const remainingQty = roundQty(requiredQuantity) > 0
+                ? Math.max(0, roundQty(requiredQuantity) - totals.qty)
+                : Infinity;
+
+            // Max qty limited by: available qty, available $, remaining $, remaining qty
+            const byValQty = price > 0 && Number.isFinite(availVal) && availVal > 0
+                ? roundQty(availVal / price)
+                : Infinity;
+            const byRemainValQty = price > 0 && Number.isFinite(remainingVal) && remainingVal > 0
+                ? roundQty(remainingVal / price)
+                : Infinity;
+
+            let maxQty = availQty;
+            if (Number.isFinite(byValQty)) maxQty = Math.min(maxQty, byValQty);
+            if (Number.isFinite(byRemainValQty)) maxQty = Math.min(maxQty, byRemainValQty);
+            if (Number.isFinite(remainingQty)) maxQty = Math.min(maxQty, remainingQty);
+            maxQty = Number.isFinite(maxQty) ? Math.max(0, maxQty) : Infinity;
+
+            // Max $ limited by: available $, remaining $, remaining qty * price, available qty * price
+            let maxVal = availVal;
+            if (Number.isFinite(remainingVal)) maxVal = Math.min(maxVal, remainingVal);
+            if (price > 0 && Number.isFinite(remainingQty)) maxVal = Math.min(maxVal, round2(remainingQty * price));
+            if (price > 0 && Number.isFinite(availQty)) maxVal = Math.min(maxVal, round2(availQty * price));
+            maxVal = Number.isFinite(maxVal) ? Math.max(0, round2(maxVal)) : Infinity;
+
+            return {maxQty, maxVal};
+        },
+        [price, reqVal, totals.value, requiredQuantity, totals.qty]
+    );
+
     const computeMaxAllotableQty = useCallback(
         (row) => {
-            if (price <= 0) return 0;
-
-            const availQty = roundQty(row.available_quantity);
-            const availVal = safeNum(row.available_value);
-
-            const byValueQty = Number.isFinite(availVal) && availVal > 0 ? roundQty(availVal / price) : Infinity;
-
-            const remainingValue = reqVal > 0 ? Math.max(0, reqVal - totals.value + 10) : Infinity;
-            const byRemainingValueQty =
-                Number.isFinite(remainingValue) && remainingValue > 0 ? roundQty(remainingValue / price) : Infinity;
-
-            const remainingReqQty =
-                roundQty(requiredQuantity) > 0 ? Math.max(0, roundQty(requiredQuantity) - totals.qty) : Infinity;
-
-            let q = availQty;
-            if (Number.isFinite(byValueQty)) q = Math.min(q, byValueQty);
-            if (Number.isFinite(byRemainingValueQty)) q = Math.min(q, byRemainingValueQty);
-            if (Number.isFinite(remainingReqQty)) q = Math.min(q, remainingReqQty);
-
-            q = roundQty(q);
-            return q > 0 ? q : 0;
+            const {maxQty} = maxCapsForRow(row);
+            return Number.isFinite(maxQty) ? maxQty : 0;
         },
-        [price, reqVal, totals.value, totals.qty, requiredQuantity]
+        [maxCapsForRow]
     );
 
     const fetchResults = useCallback(async () => {
@@ -160,12 +179,10 @@ const AllotmentLineItemTable = ({
             list.forEach((r) => {
                 let qty = '';
                 let cif_fc = '';
-                if (price > 0) {
-                    const maxQ = computeMaxAllotableQty(r);
-                    if (maxQ > 0) {
-                        qty = String(maxQ);
-                        cif_fc = String(round2(maxQ * price));
-                    }
+                const maxQ = computeMaxAllotableQty(r);
+                if (maxQ > 0 && price > 0) {
+                    qty = String(maxQ);
+                    cif_fc = String(round2(maxQ * price));
                 }
                 map[r.id] = {qty, cif_fc};
             });
@@ -199,7 +216,7 @@ const AllotmentLineItemTable = ({
         setPage(1);
     };
 
-    // Allot one row (POST) with confirm
+    // Allot one row (POST) with confirm — unchanged logic/caps on submit
     const allotRow = async (resRow) => {
         if (!allotmentId) return toast.error('Missing allotmentId to create detail.');
 
@@ -434,7 +451,7 @@ const AllotmentLineItemTable = ({
                                         disabled={isDel}
                                         onClick={() => removeDetail(row, i)}
                                     >
-                                        {isDel ? (<><Spinner size="sm" className="me-1"/> Removing…</>) : 'Remove'}
+                                        {isDel ? (<Spinner size="sm"/>) : (<FaTimes/>)}
                                     </Button>
                                 </td>
                             </tr>
@@ -577,6 +594,29 @@ const AllotmentLineItemTable = ({
                             }
                         };
 
+                        // Editable, two-way-linked inputs
+                        const handleQtyChange = (raw) => {
+                            const {maxQty} = maxCapsForRow(r);
+                            let q = roundQty(raw);
+                            if (Number.isFinite(maxQty)) q = Math.min(q, maxQty);
+                            setInput(r.id, 'qty', String(q));
+                            if (price > 0) {
+                                setInput(r.id, 'cif_fc', String(round2(q * price)));
+                            }
+                        };
+
+                        const handleValChange = (raw) => {
+                            const {maxVal, maxQty} = maxCapsForRow(r);
+                            let v = round2(raw);
+                            if (Number.isFinite(maxVal)) v = Math.min(v, maxVal);
+                            setInput(r.id, 'cif_fc', String(v));
+                            if (price > 0) {
+                                let q = roundQty(v / price);
+                                if (Number.isFinite(maxQty)) q = Math.min(q, maxQty);
+                                setInput(r.id, 'qty', String(q));
+                            }
+                        };
+
                         return (
                             <tr key={r.id}>
                                 <td>{(page - 1) * pageSize + idx + 1}</td>
@@ -595,25 +635,9 @@ const AllotmentLineItemTable = ({
                                             className="text-end"
                                             value={inpt.qty ?? ''}
                                             onKeyDown={onEnterAllot}
-                                            onChange={(e) => {
-                                                const raw = e.target.value;
-                                                setInput(r.id, 'qty', raw);
-                                                if (price <= 0) return;
-
-                                                const typedQty = roundQty(raw);
-
-                                                const maxByVal =
-                                                    Number.isFinite(availVal) && availVal > 0 && price > 0 ? roundQty(availVal / price) : Infinity;
-                                                const maxByQty = Number.isFinite(availQty) && availQty > 0 ? availQty : Infinity;
-
-                                                let finalQty = typedQty;
-                                                if (Number.isFinite(maxByVal)) finalQty = Math.min(finalQty, maxByVal);
-                                                if (Number.isFinite(maxByQty)) finalQty = Math.min(finalQty, maxByQty);
-
-                                                setInput(r.id, 'qty', String(finalQty));
-                                                setInput(r.id, 'cif_fc', String(round2(finalQty * price)));
-                                            }}
+                                            onChange={(e) => handleQtyChange(e.target.value)}
                                             aria-label={`Allot quantity for ${r.display_name}`}
+                                            inputMode="numeric"
                                         />
                                         <Button
                                             size="sm"
@@ -621,7 +645,7 @@ const AllotmentLineItemTable = ({
                                             onClick={() => {
                                                 const maxQ = computeMaxAllotableQty(r);
                                                 setInput(r.id, 'qty', String(maxQ));
-                                                setInput(r.id, 'cif_fc', String(round2(maxQ * price)));
+                                                if (price > 0) setInput(r.id, 'cif_fc', String(round2(maxQ * price)));
                                             }}
                                             aria-label={`Use maximum quantity for ${r.display_name}`}
                                         >
@@ -630,19 +654,16 @@ const AllotmentLineItemTable = ({
                                     </div>
                                 </td>
 
-                                {/* Allot $ (derived if unit price known) */}
+                                {/* Allot $ — now editable; syncs qty if price > 0 */}
                                 <td>
                                     <Form.Control
                                         size="sm"
                                         className="text-end"
-                                        value={price > 0 ? String(round2(roundQty(inpt.qty) * price)) : (inpt.cif_fc ?? '')}
-                                        readOnly={price > 0}
+                                        value={inpt.cif_fc ?? ''}
                                         onKeyDown={onEnterAllot}
-                                        onChange={(e) => {
-                                            if (price > 0) return;
-                                            setInput(r.id, 'cif_fc', e.target.value);
-                                        }}
+                                        onChange={(e) => handleValChange(e.target.value)}
                                         aria-label={`Allot amount (USD) for ${r.display_name}`}
+                                        inputMode="decimal"
                                     />
                                 </td>
 
@@ -653,9 +674,10 @@ const AllotmentLineItemTable = ({
                                         disabled={!!posting[r.id]}
                                         onClick={() => allotRow(r)}
                                         aria-label={`Allot for ${r.display_name}`}
+                                        className="d-flex align-items-center justify-content-center"
+                                        style={{width: "2rem", height: "2rem", padding: 0}}
                                     >
-                                        {posting[r.id] ? (<><Spinner size="sm"
-                                                                     className="me-1"/> Allotting…</>) : 'Allot'}
+                                        {posting[r.id] ? <Spinner size="sm"/> : <FaCheck/>}
                                     </Button>
                                 </td>
                             </tr>

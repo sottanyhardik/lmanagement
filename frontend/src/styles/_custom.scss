@@ -35,7 +35,9 @@ button, .btn {
   }
 
   &:disabled {
-    opacity: 0.6;
+    background-color: lighten(vars.$primary, 20%); // lighter orange bg
+    color: vars.$primary-hover; // strong orange text
+    opacity: 1; // don’t fade the text
     cursor: not-allowed;
   }
 }

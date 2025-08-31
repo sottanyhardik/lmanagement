@@ -4,7 +4,7 @@ import axios from "../../../api/axiosInstance";
 import {toast} from "react-toastify";
 
 // Reuse your existing component (from your latest version)
-import AllotmentLineItemTable from "../components/AllotmentLineItemTable";
+import AllotmentLineItemTable from "../components/AllotmentLineItemTable.jsx";
 import AllotmentMainForm from "../components/AllotmentMainForm";
 
 // Utils

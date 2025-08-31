@@ -5,7 +5,7 @@ import {toast} from 'react-toastify';
 import NormForm from './NormForm';
 import {parseFormErrors} from '../../utils/parseFormErrors';
 import AsyncHeadNormSelect from '../../components/AsyncSelect/AsyncHeadNormSelect';
-import ListControls from '../../components/ListControls';
+import ListControls from '../../components/generic/ListControls.jsx';
 
 const PAGE_SIZE = 10;
 

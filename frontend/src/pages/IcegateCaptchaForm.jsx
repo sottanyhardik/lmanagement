@@ -3,7 +3,7 @@ import React, {useEffect, useState} from 'react';
 import axios from '../api/axiosInstance';
 import {toast} from 'react-toastify';
 import {Card, Container} from 'react-bootstrap';
-import ListControls from '../components/ListControls';
+import ListControls from '../components/generic/ListControls.jsx';
 
 const IcegateCaptchaForm = () => {
     const [captchaData, setCaptchaData] = useState(null);

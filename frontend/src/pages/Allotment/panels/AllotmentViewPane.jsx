@@ -1,13 +1,21 @@
-import React from 'react';
-import {Badge, Col, Row, Table} from 'react-bootstrap';
+// src/pages/Allotment/panels/AllotmentViewPane.jsx
+import React from "react";
+import {Badge, Col, Row, Table} from "react-bootstrap";
 
-const fmt = (n) => (n == null || Number.isNaN(+n) ? '-' :
-    Number(n).toLocaleString('en-IN', {minimumFractionDigits: 2, maximumFractionDigits: 2}));
+const fmt = (n) =>
+    n == null || Number.isNaN(+n)
+        ? "-"
+        : Number(n).toLocaleString("en-IN", {minimumFractionDigits: 2, maximumFractionDigits: 2});
 
-const totals = (rows = []) => rows.reduce(
-    (a, r) => ({qty: a.qty + (+r.qty || 0), fc: a.fc + (+r.cif_fc || 0), inr: a.inr + (+r.cif_inr || 0)}),
-    {qty: 0, fc: 0, inr: 0}
-);
+const totals = (rows = []) =>
+    rows.reduce(
+        (a, r) => ({
+            qty: a.qty + (+r.qty || 0),
+            fc: a.fc + (+r.cif_fc || 0),
+            inr: a.inr + (+r.cif_inr || 0),
+        }),
+        {qty: 0, fc: 0, inr: 0}
+    );
 
 const AllotmentViewPane = ({entry}) => {
     const t = totals(entry?.allotment_details || []);
@@ -20,7 +28,7 @@ const AllotmentViewPane = ({entry}) => {
             </Row>
 
             <div className="mb-2 small">
-                <Badge bg={Number(entry?.balanced_quantity) > 0 ? 'warning' : 'success'} className="me-2">
+                <Badge bg={Number(entry?.balanced_quantity) > 0 ? "warning" : "success"} className="me-2">
                     Balance: {fmt(entry?.balanced_quantity)}
                 </Badge>
                 <Badge bg="info" className="me-2">
