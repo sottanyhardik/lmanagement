@@ -59,6 +59,12 @@ class CompanyModel(AuditModel):
     def get_absolute_url(self):
         return reverse('company-list')
 
+    def full_address(self):
+        if self.address_line_1 and self.address_line_2:
+            return f"{self.address_line_1} {self.address_line_2}"
+        else:
+            return self.address
+
     class Meta:
         ordering = ['name']
 

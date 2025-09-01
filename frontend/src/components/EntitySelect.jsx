@@ -1,6 +1,6 @@
 import React, {useEffect, useState} from 'react';
 import {Form} from 'react-bootstrap';
-import {fetchEntities} from '../../Cache/entityCache';
+import {fetchEntities} from '../Cache/entityCache.js';
 
 const EntitySelect = ({value, onChange}) => {
     const [options, setOptions] = useState([]);

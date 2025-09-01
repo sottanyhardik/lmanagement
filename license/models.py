@@ -1,5 +1,6 @@
 # models.py  — cleaned & optimized
 # NOTE: No schema changes; safe drop-in. Focused on correctness & perf within one file.
+# license/models.py
 
 from __future__ import annotations
 
@@ -17,6 +18,8 @@ from django.utils.functional import cached_property
 from allotment.models import AllotmentItems, Debit
 from bill_of_entry.models import RowDetails, ARO
 from bill_of_entry.tasks import update_balance_values_task
+from core.models import AuditModel  # your existing timestamp/made_by mixin
+from core.models import AuditModel  # your existing timestamp/made_by mixin
 from core.models import ItemNameModel, PurchaseStatus, SchemeCode, NotificationNumber
 from core.scripts.calculation import optimize_milk_distribution
 from license.helper import round_down
@@ -1156,3 +1159,151 @@ class LicenseTransferModel(models.Model):
         return self.to_company.name if self.to_company else "-"
 
     to_company_name.short_description = "To Company"
+
+
+class LicensePurchase(AuditModel):
+    MODE_AMOUNT = "AMOUNT"
+    MODE_QTY = "QTY"
+    MODE_CHOICES = (
+        (MODE_AMOUNT, "Amount-based"),
+        (MODE_QTY, "Quantity-based"),
+    )
+
+    SRC_FOB_INR = "FOB_INR"
+    SRC_CIF_INR = "CIF_INR"
+    SRC_CIF_USD = "CIF_USD"
+    AMOUNT_SOURCE_CHOICES = (
+        (SRC_FOB_INR, "FOB (INR)"),
+        (SRC_CIF_INR, "CIF (INR)"),
+        (SRC_CIF_USD, "CIF (USD)"),
+    )
+
+    # relations
+    license = models.ForeignKey("license.LicenseDetailsModel", on_delete=models.CASCADE, related_name="purchases")
+    purchasing_entity = models.ForeignKey("core.CompanyModel", null=True, blank=True,
+                                          on_delete=models.SET_NULL, related_name="entity_purchases")
+    supplier = models.ForeignKey("core.CompanyModel", null=True, blank=True,
+                                 on_delete=models.SET_NULL, related_name="supplier_purchases")
+
+    # supplier snapshot
+    supplier_pan = models.CharField(max_length=32, null=True, blank=True)
+    supplier_gst = models.CharField(max_length=32, null=True, blank=True)
+
+    # invoice
+    invoice_number = models.CharField(max_length=128, null=True, blank=True)
+    invoice_date = models.DateField(null=True, blank=True)
+    invoice_copy = models.FileField(upload_to="license_purchases/invoices/", null=True, blank=True)
+
+    # mode & source
+    mode = models.CharField(max_length=10, choices=MODE_CHOICES, default=MODE_AMOUNT)
+
+    # amount-based fields
+    amount_source = models.CharField(max_length=10, choices=AMOUNT_SOURCE_CHOICES, default=SRC_FOB_INR)
+    fob_inr = models.FloatField(default=0)  # optional
+    cif_inr = models.FloatField(default=0)  # optional
+    cif_usd = models.FloatField(default=0)  # optional
+    exchange_rate = models.FloatField(default=0)  # used with CIF_USD
+    markup_pct = models.FloatField(default=0)  # ❌ no discounts, only markup %
+
+    # quantity-based (single product)
+    product_name = models.CharField(max_length=255, null=True, blank=True)
+    quantity_kg = models.FloatField(default=0)
+    rate_inr = models.FloatField(default=0)
+
+    # result
+    amount_inr = models.FloatField(default=0)
+
+    class Meta:
+        ordering = ["-created_on"]
+
+    def __str__(self):
+        base = f"{self.amount_source}" if self.mode == self.MODE_AMOUNT else f"{self.product_name or 'QTY'}"
+        return f"Purchase[{self.id}] L#{self.license_id} {base} ₹{self.amount_inr:.2f}"
+
+    # ---------- helpers ----------
+    def _source_amount(self) -> float:
+        """
+        The selected source amount for bill calculation (no FX on USD).
+        - FOB_INR  -> FOB (₹)
+        - CIF_INR  -> CIF (₹)
+        - CIF_USD  -> CIF ($)  [AS-IS, do NOT multiply by exchange rate]
+        """
+        try:
+            if self.amount_source == self.SRC_FOB_INR:
+                return float(self.fob_inr or 0)
+            if self.amount_source == self.SRC_CIF_INR:
+                return float(self.cif_inr or 0)
+            if self.amount_source == self.SRC_CIF_USD:
+                return float(self.cif_usd or 0)
+        except (TypeError, ValueError):
+            return 0.0
+        return 0.0
+
+    # Backwards compatibility for any old callers
+    def _amount_base_inr(self) -> float:
+        """
+        DEPRECATED: kept for compatibility. Previously did FX multiply and (1+%) logic.
+        Now just returns the same value as _source_amount().
+        """
+        return self._source_amount()
+
+    # ---------- computations ----------
+    def compute_amount_inr(self) -> float:
+        """
+        Amount mode  : bill = source × (markup_pct / 100)  (no “+1×base”)
+        Quantity mode: bill = qty × rate
+        Always returns a 2 d.p. rounded number.
+        """
+        try:
+            if self.mode == self.MODE_AMOUNT:
+                source = float(self._source_amount() or 0)
+                pct = float(self.markup_pct or 0)
+                bill = source * (pct / 100.0)
+                return round(bill, 2)
+
+            # MODE_QTY
+            q = float(self.quantity_kg or 0)
+            r = float(self.rate_inr or 0)
+            return round(q * r, 2)
+        except (TypeError, ValueError):
+            return 0.0
+
+    def save(self, *args, **kwargs):
+        # Snapshot PAN/GST from supplier if missing
+        if self.supplier and not self.supplier_pan:
+            try:
+                self.supplier_pan = self.supplier.pan or self.supplier_pan
+            except Exception:
+                pass
+        if self.supplier and not self.supplier_gst:
+            try:
+                self.supplier_gst = getattr(self.supplier, "gst_number", None) or self.supplier_gst
+            except Exception:
+                pass
+
+        # Auto-calc exchange rate only for convenience (not used in bill math)
+        # If absent/zero and both CIF ₹ and CIF $ present -> ER = round(CIF_INR / CIF_USD, 3)
+        try:
+            er = float(self.exchange_rate or 0)
+        except (TypeError, ValueError):
+            er = 0.0
+
+        try:
+            usd = float(self.cif_usd or 0)
+            inr = float(self.cif_inr or 0)
+        except (TypeError, ValueError):
+            usd = inr = 0.0
+
+        if (er <= 0.0) and (usd > 0.0) and (inr > 0.0):
+            self.exchange_rate = round(inr / usd, 3)
+
+        # Clamp markup % to max 3 decimals
+        try:
+            if self.markup_pct not in (None, ""):
+                self.markup_pct = round(float(self.markup_pct), 3)
+        except (TypeError, ValueError):
+            self.markup_pct = 0.0
+
+        # Final amount (bill) always computed server-side
+        self.amount_inr = self.compute_amount_inr()
+        super().save(*args, **kwargs)

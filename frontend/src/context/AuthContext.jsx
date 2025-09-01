@@ -1,4 +1,3 @@
-// src/context/AuthContext.jsx
 import React, {createContext, useCallback, useEffect, useMemo, useRef, useState,} from 'react';
 import {useLocation, useNavigate} from 'react-router-dom';
 import {jwtDecode} from 'jwt-decode';
@@ -12,12 +11,12 @@ const STORAGE_KEY = 'authTokens';
 const LAST_ACTIVE_KEY = 'lastActiveAt';
 
 /** Refresh timing */
-const SKEW_MS = 30 * 1000;             // refresh a little before expiry
-const MIN_REFRESH_MS = 5 * 1000;       // lower bound on refresh delay
-const MAX_REFRESH_MS = 10 * 60 * 1000; // upper bound on refresh delay
+const SKEW_MS = 30 * 1000;
+const MIN_REFRESH_MS = 5 * 1000;
+const MAX_REFRESH_MS = 10 * 60 * 1000;
 
 /** Activity-driven refresh threshold */
-const ACTIVITY_REFRESH_WINDOW_MS = 60 * 1000; // if token expires within 60s (+ skew), refresh on activity
+const ACTIVITY_REFRESH_WINDOW_MS = 60 * 1000;
 
 /** Inactivity (must match axiosInstance’s limit) */
 const INACTIVITY_MS = 15 * 60 * 1000;
@@ -72,7 +71,6 @@ export const AuthProvider = ({children}) => {
         }
     }, []);
 
-    // scheduleRefresh no longer closes over updateToken; it calls the ref instead
     const scheduleRefresh = useCallback((accessToken) => {
         clearRefreshTimer();
 
@@ -83,10 +81,11 @@ export const AuthProvider = ({children}) => {
         const delay = Math.max(MIN_REFRESH_MS, Math.min(MAX_REFRESH_MS, msUntil));
 
         refreshTimerRef.current = setTimeout(() => {
-            // Call the latest updateToken via ref (no ReferenceError / stale closure)
             const fn = updateTokenRef.current;
             if (typeof fn === 'function') {
-                void fn();
+                // Avoid unhandled promise rejections in console
+                void fn().catch(() => {
+                });
             }
         }, delay);
     }, [clearRefreshTimer]);
@@ -104,9 +103,7 @@ export const AuthProvider = ({children}) => {
         setUser(null);
         setUserProfile(null);
         localStorage.removeItem(STORAGE_KEY);
-
         clearRefreshTimer();
-
         if (inactivityTimerRef.current) {
             clearTimeout(inactivityTimerRef.current);
             inactivityTimerRef.current = null;
@@ -118,7 +115,7 @@ export const AuthProvider = ({children}) => {
             const {data} = await api.get('users/me/');
             setUserProfile(data);
         } catch {
-            // ignore
+            // ignore profile fetch errors
         }
     }, []);
 
@@ -139,7 +136,7 @@ export const AuthProvider = ({children}) => {
             try {
                 await refreshInFlightRef.current;
             } catch {
-                // ignore; downstream handlers will respond
+                // the global handlers handle logout; just stop here
             }
             return;
         }
@@ -152,7 +149,7 @@ export const AuthProvider = ({children}) => {
                 await fetchUserProfile();
                 return newTokens;
             } catch (err) {
-                logoutUser(); // ensures redirect to login
+                logoutUser();
                 throw err;
             } finally {
                 refreshInFlightRef.current = null;
@@ -179,7 +176,8 @@ export const AuthProvider = ({children}) => {
                 scheduleRefresh(tokens.access);
                 void fetchUserProfile();
             } else if (tokens?.refresh) {
-                void updateTokenRef.current?.();
+                void updateTokenRef.current?.().catch(() => {
+                });
             } else {
                 clearTokens();
             }
@@ -224,7 +222,7 @@ export const AuthProvider = ({children}) => {
         } catch {
             try {
                 localStorage.setItem(LAST_ACTIVE_KEY, String(lastActivityRef.current));
-            } catch { /* ignore */
+            } catch {
             }
         }
         armInactivityTimer();
@@ -233,7 +231,8 @@ export const AuthProvider = ({children}) => {
         if (shouldRefreshSoon()) {
             if (!activityRefreshLockRef.current) {
                 activityRefreshLockRef.current = true;
-                void updateTokenRef.current?.();
+                void updateTokenRef.current?.().catch(() => {
+                });
                 // unlock after ~30s to avoid spamming refresh on rapid activity
                 const unlock = setTimeout(() => {
                     activityRefreshLockRef.current = false;
@@ -250,7 +249,6 @@ export const AuthProvider = ({children}) => {
             const last = Number(localStorage.getItem(LAST_ACTIVE_KEY) || 0);
             const now = Date.now();
             if (!last) localStorage.setItem(LAST_ACTIVE_KEY, String(now));
-            // Immediate logout if already idle
             if (now - last >= INACTIVITY_MS && isAuthenticated) {
                 toast.info('You were logged out due to inactivity.');
                 logoutUser();
@@ -263,9 +261,7 @@ export const AuthProvider = ({children}) => {
         }
 
         // Local activity
-        const events = [
-            'mousemove', 'mousedown', 'keydown', 'scroll', 'touchstart', 'visibilitychange',
-        ];
+        const events = ['mousemove', 'mousedown', 'keydown', 'scroll', 'touchstart', 'visibilitychange'];
         const handler = () => recordActivity();
         events.forEach((e) => window.addEventListener(e, handler, {passive: true}));
 
@@ -274,8 +270,6 @@ export const AuthProvider = ({children}) => {
             if (e.key === LAST_ACTIVE_KEY && !document.hidden) {
                 lastActivityRef.current = Number(e.newValue || Date.now());
                 armInactivityTimer();
-                // Note: cross-tab activity does not trigger token refresh here;
-                // the active tab will refresh on its own activity.
             }
         };
         window.addEventListener('storage', onStorage);
@@ -301,12 +295,15 @@ export const AuthProvider = ({children}) => {
             if (reason === 'idle') toast.info('You were logged out due to inactivity.');
             logoutUser();
         };
+
         const onUnhandled = (e) => {
-            if (e?.reason?.code === 'ERR_SESSION_EXPIRED') {
-                toast.info('You were logged out due to inactivity.');
-                logoutUser();
+            // Suppress console noise for our intentional idle rejection.
+            if (e?.reason?.code === 'ERR_SESSION_EXPIRED' || e?.reason?.__idle) {
+                e?.preventDefault?.();
+                // session:logout event already handled logout/toast
             }
         };
+
         window.addEventListener('session:logout', onSessionLogout);
         window.addEventListener('unhandledrejection', onUnhandled);
         return () => {
@@ -329,7 +326,7 @@ export const AuthProvider = ({children}) => {
             } catch {
                 try {
                     localStorage.setItem(LAST_ACTIVE_KEY, String(Date.now()));
-                } catch { /* ignore */
+                } catch {
                 }
             }
             const from = location.state?.from?.pathname || '/dashboard';
@@ -356,20 +353,11 @@ export const AuthProvider = ({children}) => {
         loading,
         loginUser,
         logoutUser,
-        refresh: updateTokenRef.current, // expose latest refresher
+        refresh: updateTokenRef.current,
 
-        // Expose session expiry info for timer component
         inactivityMs: INACTIVITY_MS,
         lastActiveKey: LAST_ACTIVE_KEY,
-    }), [
-        user,
-        userProfile,
-        authTokens,
-        isAuthenticated,
-        loading,
-        loginUser,
-        logoutUser,
-    ]);
+    }), [user, userProfile, authTokens, isAuthenticated, loading, loginUser, logoutUser]);
 
     return (
         <AuthContext.Provider value={value}>{children}</AuthContext.Provider>

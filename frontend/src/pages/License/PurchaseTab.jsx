@@ -1,314 +1,173 @@
-// src/pages/License/PurchaseTab.jsx
-import React, {useMemo, useState} from 'react';
-import {Badge, Button, Col, Form, InputGroup, Row, Table} from 'react-bootstrap';
-import axios from '../../api/axiosInstance';
-import {toast} from 'react-toastify';
+import React, {useEffect, useMemo, useState} from "react";
+import {Badge, Button, Table} from "react-bootstrap";
+import axios from "../../api/axiosInstance";
+import {toast} from "react-toastify";
+import PurchaseForm from "./components/PurchaseForm";
 
-const toNum = (v) => {
-    const n = parseFloat(v);
-    return Number.isFinite(n) ? n : 0;
+const fmt = (n) =>
+    Number.isFinite(Number(n))
+        ? Number(n).toLocaleString("en-IN", {maximumFractionDigits: 2})
+        : "-";
+
+const basisText = (p) => {
+    if (p.mode === "QTY") {
+        const left = p.product_name ? `${p.product_name} • ` : "";
+        return `${left}${p.quantity_kg || 0} kg @ ₹${p.rate_inr || 0}`;
+    }
+    const srcLabel =
+        p.amount_source === "CIF_USD" ? "CIF $"
+            : p.amount_source === "CIF_INR" ? "CIF ₹"
+                : "FOB ₹";
+    let base = "";
+    if (p.amount_source === "CIF_USD") {
+        base = `${p.cif_usd || 0} × ${p.exchange_rate || 0}`;
+    } else if (p.amount_source === "CIF_INR") {
+        base = `${p.cif_inr || 0}`;
+    } else {
+        base = `${p.fob_inr || 0}`;
+    }
+    const rate = Number(p.markup_pct || 0);
+    const add = rate ? `, +${rate}%` : "";
+    return `Amount • ${srcLabel}: ${base}${add}`;
 };
 
-const formatIN = (n) =>
-    Number.isFinite(n) ? n.toLocaleString('en-IN', {maximumFractionDigits: 2}) : '-';
+export default function PurchaseTab({entry}) {
+    const licenseId = entry?.id;
+    const [rows, setRows] = useState([]);
+    const [loading, setLoading] = useState(true);
 
-const TotalChip = ({label, value, onClick}) => (
-    <Badge
-        bg="light"
-        text="dark"
-        role="button"
-        className="border me-2 mb-2"
-        onClick={() => onClick?.(value)}
-        title={`Click to use ${label}`}
-    >
-        {label}: <span className="fw-semibold ms-1">{formatIN(value)}</span>
-    </Badge>
-);
+    const [showNew, setShowNew] = useState(false);
+    const [editingId, setEditingId] = useState(null);
 
-/**
- * Props:
- * - entry: license object (must include export_license array if available)
- * - onSaved: (id) => void
- */
-export default function PurchaseTab({entry, onSaved}) {
-    const [purchaseType, setPurchaseType] = useState('full'); // 'full' | 'partial'
-    const [purchaseAmount, setPurchaseAmount] = useState('');
-    const [cifFc, setCifFc] = useState('');
-    const [fobInr, setFobInr] = useState('');
-    const [cifInr, setCifInr] = useState('');
-
-    const [licenseCopy, setLicenseCopy] = useState(null);
-    const [transferLetter, setTransferLetter] = useState(null);
-
-    const [saving, setSaving] = useState(false);
-    const [uploading, setUploading] = useState(false);
-
-    // Totals from export rows (fallback-safe)
-    const totals = useMemo(() => {
-        const exp = Array.isArray(entry?.export_license) ? entry.export_license : [];
-        const sum = (k) => exp.reduce((s, x) => s + (parseFloat(x?.[k]) || 0), 0);
-        return {
-            cif_fc: sum('cif_fc'),     // CIF $
-            cif_inr: sum('cif_inr'),   // CIF INR
-            fob_inr: sum('fob_inr'),   // FOB INR
-        };
-    }, [entry?.export_license]);
-
-    const handlePasteTotal = (field, val) => {
-        const v = (val ?? 0).toFixed(2);
-        if (field === 'purchaseAmount') setPurchaseAmount(v);
-        if (field === 'cif_fc') setCifFc(v);
-        if (field === 'fob_inr') setFobInr(v);
-        if (field === 'cif_inr') setCifInr(v);
-    };
-
-    const handleSavePurchase = async () => {
-        if (!purchaseAmount && purchaseType === 'full') {
-            toast.error('Please enter a Purchase Amount.');
-            return;
-        }
-        setSaving(true);
+    const fetchRows = async () => {
+        if (!licenseId) return;
+        setLoading(true);
         try {
-            const payload =
-                purchaseType === 'full'
-                    ? {
-                        purchase_type: 'full',
-                        purchase_amount: toNum(purchaseAmount),
-                    }
-                    : {
-                        purchase_type: 'partial',
-                        purchase_amount: toNum(purchaseAmount) || undefined,
-                        cif_fc: cifFc !== '' ? toNum(cifFc) : undefined,
-                        fob_inr: fobInr !== '' ? toNum(fobInr) : undefined,
-                        cif_inr: cifInr !== '' ? toNum(cifInr) : undefined,
-                    };
-
-            await axios.post(`licenses/${entry.id}/purchase/`, payload);
-            toast.success('Purchase saved');
-            onSaved?.(entry.id);
-        } catch (err) {
-            console.error(err);
-            const msg =
-                err?.response?.data?.detail ||
-                err?.response?.data?.error ||
-                'Failed to save purchase';
-            toast.error(msg);
+            const {data} = await axios.get(`/license-purchases/?license=${licenseId}`);
+            setRows(Array.isArray(data?.results) ? data.results : data);
+        } catch (e) {
+            console.error(e);
+            setRows([]);
+            toast.error("Failed to load purchases");
         } finally {
-            setSaving(false);
+            setLoading(false);
         }
     };
 
-    const handleUploadDocs = async () => {
-        if (!licenseCopy && !transferLetter) {
-            toast.warn('Please select a License Copy and/or Transfer Letter.');
-            return;
-        }
-        setUploading(true);
-        try {
-            const fd = new FormData();
-            if (licenseCopy) fd.append('license_copy', licenseCopy);
-            if (transferLetter) fd.append('transfer_letter', transferLetter);
+    useEffect(() => {
+        fetchRows(); /* eslint-disable-next-line */
+    }, [licenseId]);
 
-            await axios.post(`licenses/${entry.id}/documents/`, fd, {
-                headers: {'Content-Type': 'multipart/form-data'},
-            });
-            toast.success('Documents uploaded');
-            setLicenseCopy(null);
-            setTransferLetter(null);
-            onSaved?.(entry.id);
-        } catch (err) {
-            console.error(err);
-            toast.error('Failed to upload documents');
-        } finally {
-            setUploading(false);
-        }
-    };
+    const total = useMemo(
+        () => (rows || []).reduce((s, r) => s + (Number(r.amount_inr) || 0), 0),
+        [rows]
+    );
 
     return (
         <div>
-            <Row className="g-3">
-                <Col md={7}>
-                    <h6 className="mb-2">Purchase</h6>
+            <div className="d-flex justify-content-between align-items-center mb-2">
+                <h6 className="mb-0">Purchases</h6>
+                <div className="d-flex align-items-center gap-3">
+                    <Badge bg="success">Total ₹ {fmt(total)}</Badge>
+                    <Button size="sm" onClick={() => {
+                        setShowNew((v) => !v);
+                        setEditingId(null);
+                    }}>
+                        {showNew ? "Close" : "Add New"}
+                    </Button>
+                </div>
+            </div>
 
-                    <div className="mb-2">
-                        <TotalChip label="Total CIF $" value={totals.cif_fc}
-                                   onClick={(v) => handlePasteTotal('cif_fc', v)}/>
-                        <TotalChip label="Total CIF INR" value={totals.cif_inr}
-                                   onClick={(v) => handlePasteTotal('cif_inr', v)}/>
-                        <TotalChip label="Total FOB INR" value={totals.fob_inr}
-                                   onClick={(v) => handlePasteTotal('fob_inr', v)}/>
-                    </div>
+            {showNew && (
+                <div className="mb-3">
+                    <PurchaseForm
+                        licenseId={licenseId}
+                        onSaved={() => {
+                            setShowNew(false);
+                            fetchRows();
+                        }}
+                    />
+                </div>
+            )}
 
-                    <Form>
-                        <Row className="g-2 align-items-end">
-                            <Col sm={6} md={5}>
-                                <Form.Label className="mb-1">Purchase Amount</Form.Label>
-                                <InputGroup size="sm">
-                                    <InputGroup.Text>₹/$</InputGroup.Text>
-                                    <Form.Control
-                                        inputMode="decimal"
-                                        value={purchaseAmount}
-                                        onChange={(e) => setPurchaseAmount(e.target.value)}
-                                        placeholder="Amount"
-                                    />
-                                </InputGroup>
-                            </Col>
+            <Table bordered size="sm" responsive className="align-middle">
+                <thead className="table-light">
+                <tr>
+                    <th style={{width: 60}}>#</th>
+                    <th>Supplier</th>
+                    <th>Invoice</th>
+                    <th>Basis</th>
+                    <th className="text-end" style={{width: 160}}>Amount (₹)</th>
+                    <th style={{width: 100}}>Copy</th>
+                    <th style={{width: 90}}/>
+                </tr>
+                </thead>
+                <tbody>
+                {!loading && rows?.length === 0 && (
+                    <tr>
+                        <td colSpan={7} className="text-center text-muted">No purchases yet</td>
+                    </tr>
+                )}
 
-                            <Col sm={6} md={7}>
-                                <Form.Label className="mb-1">Type</Form.Label>
-                                <div className="d-flex gap-3">
-                                    <Form.Check
-                                        type="radio"
-                                        id={`purchase-full-${entry.id}`}
-                                        label="Full"
-                                        checked={purchaseType === 'full'}
-                                        onChange={() => setPurchaseType('full')}
-                                    />
-                                    <Form.Check
-                                        type="radio"
-                                        id={`purchase-partial-${entry.id}`}
-                                        label="Partial"
-                                        checked={purchaseType === 'partial'}
-                                        onChange={() => setPurchaseType('partial')}
-                                    />
-                                </div>
-                            </Col>
-                        </Row>
-
-                        {purchaseType === 'partial' && (
-                            <Row className="g-2 mt-2">
-                                <Col md={4}>
-                                    <Form.Label className="mb-1">CIF $ (optional)</Form.Label>
-                                    <InputGroup size="sm">
-                                        <InputGroup.Text>$</InputGroup.Text>
-                                        <Form.Control
-                                            inputMode="decimal"
-                                            value={cifFc}
-                                            onChange={(e) => setCifFc(e.target.value)}
-                                            placeholder="e.g. 1200.50"
-                                        />
-                                        <Button
-                                            variant="outline-secondary"
-                                            size="sm"
-                                            onClick={() => handlePasteTotal('cif_fc', totals.cif_fc)}
-                                        >
-                                            Use Total
-                                        </Button>
-                                    </InputGroup>
-                                </Col>
-
-                                <Col md={4}>
-                                    <Form.Label className="mb-1">FOB INR (optional)</Form.Label>
-                                    <InputGroup size="sm">
-                                        <InputGroup.Text>₹</InputGroup.Text>
-                                        <Form.Control
-                                            inputMode="decimal"
-                                            value={fobInr}
-                                            onChange={(e) => setFobInr(e.target.value)}
-                                            placeholder="e.g. 250000"
-                                        />
-                                        <Button
-                                            variant="outline-secondary"
-                                            size="sm"
-                                            onClick={() => handlePasteTotal('fob_inr', totals.fob_inr)}
-                                        >
-                                            Use Total
-                                        </Button>
-                                    </InputGroup>
-                                </Col>
-
-                                <Col md={4}>
-                                    <Form.Label className="mb-1">CIF INR (optional)</Form.Label>
-                                    <InputGroup size="sm">
-                                        <InputGroup.Text>₹</InputGroup.Text>
-                                        <Form.Control
-                                            inputMode="decimal"
-                                            value={cifInr}
-                                            onChange={(e) => setCifInr(e.target.value)}
-                                            placeholder="e.g. 175000"
-                                        />
-                                        <Button
-                                            variant="outline-secondary"
-                                            size="sm"
-                                            onClick={() => handlePasteTotal('cif_inr', totals.cif_inr)}
-                                        >
-                                            Use Total
-                                        </Button>
-                                    </InputGroup>
-                                </Col>
-                            </Row>
-                        )}
-
-                        <div className="mt-3 d-flex gap-2">
-                            <Button size="sm" onClick={handleSavePurchase} disabled={saving}>
-                                {saving ? 'Saving…' : 'Save Purchase'}
-                            </Button>
-                            <Button
-                                size="sm"
-                                variant="outline-secondary"
-                                onClick={() => {
-                                    setPurchaseType('full');
-                                    setPurchaseAmount('');
-                                    setCifFc('');
-                                    setFobInr('');
-                                    setCifInr('');
-                                }}
-                                disabled={saving}
-                            >
-                                Reset
-                            </Button>
-                        </div>
-                    </Form>
-                </Col>
-
-                <Col md={5}>
-                    <h6 className="mb-2">Documents</h6>
-                    <Table bordered size="sm" className="align-middle">
-                        <tbody>
+                {rows.map((r, idx) => (
+                    <React.Fragment key={r.id}>
                         <tr>
-                            <td style={{width: 180}}>License Copy (PDF/IMG)</td>
+                            <td>{idx + 1}</td>
+                            <td>{r.supplier_name || "-"}</td>
                             <td>
-                                <Form.Control
-                                    type="file"
+                                {r.invoice_number || "-"}
+                                {r.invoice_date ? (
+                                    <Badge bg="secondary" className="ms-2">{r.invoice_date}</Badge>
+                                ) : null}
+                            </td>
+                            <td className="text-muted">{basisText(r)}</td>
+                            <td className="text-end">{fmt(r.amount_inr)}</td>
+                            <td>
+                                {r.invoice_copy_url ? (
+                                    <a href={r.invoice_copy_url} target="_blank" rel="noreferrer">Open</a>
+                                ) : "—"}
+                            </td>
+                            <td className="text-center">
+                                <Button
                                     size="sm"
-                                    accept=".pdf,.png,.jpg,.jpeg,.webp"
-                                    onChange={(e) => setLicenseCopy(e.target.files?.[0] || null)}
-                                />
+                                    variant={editingId === r.id ? "outline-secondary" : "outline-primary"}
+                                    onClick={() => setEditingId((cur) => cur === r.id ? null : r.id)}
+                                >
+                                    {editingId === r.id ? "Close" : "Edit"}
+                                </Button>
                             </td>
                         </tr>
                         <tr>
-                            <td>Transfer Letter (PDF/IMG)</td>
-                            <td>
-                                <Form.Control
-                                    type="file"
-                                    size="sm"
-                                    accept=".pdf,.png,.jpg,.jpeg,.webp"
-                                    onChange={(e) => setTransferLetter(e.target.files?.[0] || null)}
-                                />
-                            </td>
+                            <hr/>
                         </tr>
-                        </tbody>
-                    </Table>
-                    <div className="d-flex gap-2">
-                        <Button variant="secondary" size="sm" onClick={handleUploadDocs} disabled={uploading}>
-                            {uploading ? 'Uploading…' : 'Upload Documents'}
-                        </Button>
-                        {(licenseCopy || transferLetter) && (
-                            <Button
-                                variant="outline-secondary"
-                                size="sm"
-                                onClick={() => {
-                                    setLicenseCopy(null);
-                                    setTransferLetter(null);
-                                }}
-                                disabled={uploading}
-                            >
-                                Clear
-                            </Button>
+
+                        {editingId === r.id && (
+                            <tr>
+                                <td colSpan={7}>
+                                    <PurchaseForm
+                                        licenseId={licenseId}
+                                        initial={r}
+                                        purchaseId={r.id}
+                                        compact
+                                        onCancel={() => setEditingId(null)}
+                                        onSaved={() => {
+                                            setEditingId(null);
+                                            fetchRows();
+                                        }}
+                                    />
+                                </td>
+                            </tr>
                         )}
-                    </div>
-                </Col>
-            </Row>
+                    </React.Fragment>
+                ))}
+
+                {loading && (
+                    <tr>
+                        <td colSpan={7} className="text-center text-muted">Loading…</td>
+                    </tr>
+                )}
+                </tbody>
+            </Table>
         </div>
     );
 }

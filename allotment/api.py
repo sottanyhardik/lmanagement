@@ -7,9 +7,12 @@ from django.db import transaction
 from django.db.models import F, Value, FloatField, Q
 from django.db.models import Sum
 from django.db.models.functions import Coalesce
+from django.http import HttpResponse
 from django.utils.timezone import now
+from django.views.generic import DetailView
 from django_filters import rest_framework as dj_filters
 from django_filters.rest_framework import DjangoFilterBackend
+from easy_pdf.views import PDFTemplateResponseMixin
 from rest_framework import permissions, viewsets
 from rest_framework import status
 from rest_framework.decorators import action
@@ -19,6 +22,7 @@ from rest_framework.response import Response
 from rest_framework.views import APIView
 
 from core.models import TransferLetterModel
+from core.utils import render_to_pdf
 from license.models import LicenseImportItemsModel
 from .models import AllotmentModel, AllotmentItems
 from .scripts.aro import generate_tl_software
@@ -598,3 +602,55 @@ class GenerateTransferLetterForAllotmentAPI(APIView):
             return Response({'error': 'Transfer Letter not found'}, status=status.HTTP_404_NOT_FOUND)
         except Exception as e:
             return Response({'error': str(e)}, status=status.HTTP_500_INTERNAL_SERVER_ERROR)
+
+
+class SendAllotmentView(PDFTemplateResponseMixin, DetailView):
+    model = AllotmentModel
+    template_name = "allotment/send.html"
+
+    def get(self, request, *args, **kwargs):
+        obj = self.get_object()
+        exrt = float(obj.exchange_rate or 0)
+
+        details = []
+        t_qty = t_fc = t_inr = 0.0
+
+        for d in obj.allotment_details.all():
+            qty = float(d.qty or 0)
+            fc = float(d.cif_fc or 0)
+            inr = float(d.cif_inr or 0)
+            if inr == 0 and exrt and fc:
+                inr = round(fc * exrt, 2)
+
+            details.append({
+                "license_number": d.license_number or "",
+                "license_date": d.license_date,
+                "registration_number": d.registration_number or "",
+                "registration_date": d.registration_date,
+                "port_code": (getattr(d.port_code, "code", d.port_code) or ""),  # supports Port or str
+                "serial_number": d.serial_number or "",
+                "qty": qty,
+                "cif_fc": fc,
+                "cif_inr": inr,
+                "notification_number": d.notification_number or "",
+            })
+
+            t_qty += qty
+            t_fc += fc
+            t_inr += inr
+
+        context = {
+            "object": obj,
+            "exchange_rate": exrt if exrt else None,
+            "details": details,
+            "totals": {"qty": t_qty, "fc": t_fc, "inr": t_inr},
+        }
+
+        pdf = render_to_pdf("allotment/send.html", context)
+        if pdf:
+            resp = HttpResponse(pdf, content_type="application/pdf")
+            fname = f"Allotment_{obj.id}.pdf"
+            disposition = "attachment" if request.GET.get("download") else "inline"
+            resp["Content-Disposition"] = f'{disposition}; filename="{fname}"'
+            return resp
+        return HttpResponse("Not found")

@@ -84,6 +84,12 @@ class AllotmentModel(AuditModel):
         else:
             return 0
 
+    @cached_property
+    def port_code(self):
+        p = getattr(self.item.license, "port", None)
+        # If FK -> PortModel, return its code; if it’s already a string, return it.
+        return (getattr(p, "code", p) or "")
+
 
 class AllotmentItems(AuditModel):
     item = models.ForeignKey('license.LicenseImportItemsModel', on_delete=models.CASCADE,

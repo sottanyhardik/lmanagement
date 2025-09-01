@@ -4,9 +4,11 @@ from datetime import date
 
 from dateutil.relativedelta import relativedelta
 from django.db.models import Q
+from django.db.models import Sum
 from django_filters.rest_framework import DjangoFilterBackend
-from rest_framework import filters, viewsets
+from rest_framework import filters
 from rest_framework import status
+from rest_framework import viewsets, permissions, parsers, decorators, response
 from rest_framework.generics import ListAPIView
 from rest_framework.pagination import PageNumberPagination
 from rest_framework.response import Response
@@ -16,8 +18,10 @@ from license.utils import apply_license_filters  # <-- import
 from .filters import LicenseDetailsFilterSet
 from .models import LicenseDetailsModel, GE, MI, SM, OT, CO, RA, LM
 from .models import LicenseImportItemsModel
+from .models import LicensePurchase
 from .serializers import BiscuitReportSerializer
 from .serializers import LicenseDetailsSerializer, LicenseImportItemsSelectSerializer
+from .serializers import LicensePurchaseSerializer
 
 
 # ---------------- Pagination ----------------
@@ -269,3 +273,23 @@ class BiscuitReportAPIView(APIView):
 
         serializer = BiscuitReportSerializer(qs, many=True)
         return Response(serializer.data, status=status.HTTP_200_OK)
+
+
+class LicensePurchaseViewSet(viewsets.ModelViewSet):
+    queryset = LicensePurchase.objects.select_related("license", "supplier", "purchasing_entity")
+    serializer_class = LicensePurchaseSerializer
+    permission_classes = [permissions.IsAuthenticated]
+    parser_classes = [parsers.MultiPartParser, parsers.FormParser, parsers.JSONParser]
+
+    def get_queryset(self):
+        qs = super().get_queryset()
+        lic = self.request.query_params.get("license")
+        if lic:
+            qs = qs.filter(license_id=lic)
+        return qs
+
+    @decorators.action(detail=False, methods=["get"], url_path="summary")
+    def summary(self, request, *args, **kwargs):
+        qs = self.get_queryset()
+        total = qs.aggregate(s=Sum("amount_inr"))["s"] or 0
+        return response.Response({"total_amount_inr": round(total, 2)})

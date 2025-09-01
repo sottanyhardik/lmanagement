@@ -1,6 +1,6 @@
 import React, {useEffect, useState} from 'react';
 import {Button, Col, Form, Row, Spinner, Table} from 'react-bootstrap';
-import EntitySelect from './EntitySelect';
+import EntitySelect from '../../components/EntitySelect.jsx';
 import {toast} from 'react-toastify';
 import axios from '../../api/axiosInstance';
 import ValidatedInput from '../../components/ValidatedInput';

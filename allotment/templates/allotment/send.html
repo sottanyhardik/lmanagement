@@ -1,3 +1,4 @@
+{# templates/allotment/send.html #}
 {% extends "allotment/pdf_base.html" %}
 
 {% block extra_style %}
@@ -7,163 +8,152 @@
             font-family: "Trebuchet MS", Arial, Helvetica, sans-serif;
         }
 
-        #license {
+        #license, #items {
             font-size: 12px;
             font-family: "Trebuchet MS", Arial, Helvetica, sans-serif;
             border-collapse: collapse;
             width: 100%;
         }
 
-        #license td {
-            border: 1px solid #000000;
+        #license td, #items td {
+            border: 1px solid #000;
             padding: 5px;
+            vertical-align: top;
+            white-space: normal;
+            word-break: break-word;
         }
 
-        #license tr:nth-child(even) {
-            background-color: #f2f2f2;
+        #license tr:nth-child(even), #items tr:nth-child(even) {
+            background: #f2f2f2;
         }
 
-        #license tr:hover {
-            background-color: #ddd;
-        }
-
-        #license th {
-            padding-top: 5px;
-            padding-bottom: 5px;
+        #license th, #items th {
+            padding: 5px 0;
             text-align: center;
-            background-color: #f2f2f2;
-            color: #000000;
+            background: #f2f2f2;
+            color: #000;
             font-size: 14px;
-            border: 1px solid #000000;
+            border: 1px solid #000;
         }
 
-
-        #items {
-            margin-top: 20px;
-            font-size: 12px;
-            font-family: "Trebuchet MS", Arial, Helvetica, sans-serif;
-            border-collapse: collapse;
-            width: 100%;
-        }
-
-        #items td {
-            border: 1px solid #000000;
-            padding: 5px;
-        }
-
-        #items tr:nth-child(even) {
-            background-color: #f2f2f2;
-        }
-
-        #items tr:hover {
-            background-color: #ddd;
-        }
-
-        #items th {
-            padding-top: 5px;
-            padding-bottom: 5px;
-            text-align: center;
-            background-color: #f2f2f2;
-            color: #000000;
-            font-size: 14px;
-            border: 1px solid #000000;
+        .text-right {
+            text-align: right;
         }
 
         #highlight {
-            background-color: yellow;
-        }
-
-        #foot-top{
-            float: right;
-            margin-top: 30px;
+            background: yellow;
         }
     </style>
-
 {% endblock %}
-{% block content %}
 
+{% block content %}
     <b>Allotment Time</b> {% now "jS F Y H:i" %}
 
     <p>To,</p>
     <h3>{{ object.company }}</h3>
-    {% if object.company.address %}
-        <h5>{{ object.company.address }}</h5>
-    {% endif %}
+    {% if object.company.full_address %}<h5>{{ object.company.full_address }}</h5>{% endif %}
 
-    <p>Subject: <span
-            id="highlight">License Allotment for <b>{{ object.item_name|title }}</b> {% if object.invoice %}Invoice No. {{ object.invoice|title }}{% endif %} for <b>{{ object.required_quantity }} Kg</b></span>
+    <p>
+        Subject:
+        <span id="highlight">
+    License Allotment for <b>{{ object.item_name|default:"-"|title }}</b>
+            {% if object.invoice %} Invoice No. {{ object.invoice|title }}{% endif %}
+            for <b>{{ object.required_quantity|default_if_none:0 }}</b> Kg
+  </span>
     </p>
 
     <p>Dear Sir,</p>
-    <p>We thank you for your DFIA License request </p>
-    <p>Please find the attached details of the Licenses alloted for your requests.</p>
+    <p>We thank you for your DFIA License request.</p>
+    <p>Please find the attached details of the Licenses allotted for your request.</p>
 
     <table id="license">
         <thead>
-        <th>Date</th>
-        <th>Customer</th>
-        <th>CHA</th>
-        <th>Item</th>
-        <th>Port Of Discharge</th>
+        <tr>
+            <th>Date</th>
+            <th>Customer</th>
+            <th>CHA</th>
+            <th>Item</th>
+            <th>Port Of Discharge</th>
+        </tr>
         </thead>
         <tbody>
         <tr>
             <td>{{ object.modified_on }}</td>
-            <td>{{ object.company|title }}</td>
-
-                {% if object.cha %}
-                    <td>
-                    {{ object.cha|title }}
-                        </td>
-                {% else %}
-                <td style="text-align: center">-</td>
-                {% endif %}
-            <td>{{ object.item_name|title }}</td>
-            <td>{{ object.port|title }}</td>
+            <td>{{ object.company|default:"-"|title }}</td>
+            <td>{% if object.cha %}{{ object.cha|title }}{% else %}-{% endif %}</td>
+            <td>{{ object.item_name|default:"-"|title }}</td>
+            <td>{{ object.port|default:"-"|title }}</td>
         </tr>
         </tbody>
     </table>
+
+    {% if exchange_rate %}
+        <p style="margin:10px 0 0 0;"><i>Exchange Rate used for INR = {{ exchange_rate|floatformat:2 }} per USD</i></p>
+    {% endif %}
+
     <h1></h1>
     <table id="items">
         <thead>
-        <th>DFIA No</th>
-        <th>Reg No</th>
-        <th>Port Code</th>
-        <th>Duty Type</th>
-        <th>Item Sr.No</th>
-        <th>Qty</th>
-        <th>CIF $</th>
-        <th>NTF No</th>
+        <tr>
+            <th>DFIA No</th>
+            <th>Reg No</th>
+            <th>Port Code</th>
+            <th>Duty Type</th>
+            <th>Item Sr.No</th>
+            <th class="text-right">Qty</th>
+            <th class="text-right">CIF $</th>
+            <th class="text-right">CIF ₹</th>
+            <th>NTF No</th>
+        </tr>
         </thead>
         <tbody>
-        {% for data in object.allotment_details.all %}
+        {% for d in rows %}
             <tr>
-                <td>{{ data.license_number }} {{ data.license_date }}</td>
-                <td>{{ data.registration_number }} {{ data.registration_date }}</td>
-                <td>{{ data.port_code|upper }}</td>
+                <td>{{ d.license_number|default:"-" }}<br/>{% if d.license_date %}
+                    {{ d.license_date }}{% else %}-{% endif %}</td>
+                <td>{{ d.registration_number|default:"-" }}<br/>{% if d.registration_date %}
+                    {{ d.registration_date }}{% else %}-{% endif %}</td>
+                <td>{{ d.port_code|default:"-" }}</td>
                 <td>Basic</td>
-                <td>{{ data.serial_number }}</td>
-                <td style="text-align: right">{{ data.qty|floatformat:2 }}</td>
-                <td style="text-align: right">
-                    {% if not data.cif_fc == 0 %}
-                        {{ data.cif_fc|floatformat:2 }}
-                    {% else %}
-                         As Per Invoice
-                    {% endif %}
+                <td>{{ d.serial_number|default:"-" }}</td>
+
+                <td class="text-right">{{ d.qty|default_if_none:0|floatformat:2 }}</td>
+
+                <td class="text-right">
+                    {% if d.cif_fc is not None and d.cif_fc != 0 %}
+                        {{ d.cif_fc|floatformat:2 }}
+                    {% elif d.cif_fc == 0 %}
+                        As Per Invoice
+                    {% else %}-{% endif %}
                 </td>
-                <td>{{ data.notification_number }}</td>
+
+                <td class="text-right">
+                    {% if d.cif_inr %}
+                        {{ d.cif_inr|floatformat:2 }}
+                    {% elif d.cif_fc and exchange_rate %}
+                        {{ d.cif_fc|floatformat:2 }} × {{ exchange_rate|floatformat:2 }}
+                    {% else %}-{% endif %}
+                </td>
+
+                <td>{{ d.notification_number|default:"-" }}</td>
+            </tr>
+        {% empty %}
+            <tr>
+                <td colspan="9" class="text-right">- No items -</td>
             </tr>
         {% endfor %}
-           <tr>
-               <td> </td>
-                <td> </td>
-               <td> </td>
-               <td> </td>
-               <td> </td>
-               <td style="text-align: right"><b>{{ object.alloted_quantity|floatformat:2 }}</b></td>
-               <td style="text-align: right"><b>{{ object.allotted_value|floatformat:2 }}</b> </td>
-               <td> </td>
-           </tr>
+
+        <tr>
+            <td>-</td>
+            <td>-</td>
+            <td>-</td>
+            <td>-</td>
+            <td class="text-right"><b>Totals</b></td>
+            <td class="text-right"><b>{{ totals.qty|default_if_none:0|floatformat:2 }}</b></td>
+            <td class="text-right"><b>{{ totals.fc|default_if_none:0|floatformat:2 }}</b></td>
+            <td class="text-right"><b>{{ totals.inr|default_if_none:0|floatformat:2 }}</b></td>
+            <td>-</td>
+        </tr>
         </tbody>
     </table>
 {% endblock %}

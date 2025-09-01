@@ -128,14 +128,3 @@ def generate_tl_software(data, tl_path, path='', transfer_letter_name=""):
                 os.remove(docx_file)  # remove docx after successful conversion
         except subprocess.CalledProcessError as e:
             print(f"Error converting to PDF: {e}")
-
-
-def generate_sugar():
-    input_file = csv.DictReader(open("aro_details.csv"))
-    for context in input_file:
-        doc = DocxTemplate("SUGAR.docx")
-        doc.render(context)
-        doc.save(context['sr_no'] + ' ' + context['license'] + "_SUGAR.docx")
-        doc = DocxTemplate("KS.docx")
-        doc.render(context)
-        doc.save(context['sr_no'] + ' ' + context['license'] + "_KS.docx")

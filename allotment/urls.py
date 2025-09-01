@@ -13,6 +13,8 @@ router.register(r"allotments", AllotmentViewSet, basename="allotments")
 urlpatterns = [
     path('allotments/<int:pk>/generate-tl/', GenerateTransferLetterForAllotmentAPI.as_view(),
          name='allotments-tl'),
+    path('allotments/<int:pk>/download-pdf/', login_required(views.SendAllotmentView.as_view()),
+         name='allotment-download'),
     path('', include(router.urls)),
     # ex: /polls/
     path('add/', login_required(views.AllotmentCreateView.as_view()), name='allotment-add'),
@@ -25,7 +27,6 @@ urlpatterns = [
     #      name='allotment-item-delete'),
     # path('<int:pk>/verify', login_required(views.AllotmentVerifyView.as_view()), name='allotment-verify'),
     # path('<int:pk>/data/', login_required(views.allotment_data), name='allotment-data'),
-    # path('<int:pk>/download/', login_required(views.SendAllotmentView.as_view()), name='allotment-download'),
     # path('download/', login_required(views.DownloadPendingAllotmentView.as_view()), name='allotment-pending'),
     # path('<int:pk>/generate/', login_required(views.ARODocumentGenerateView.as_view()), name='allotment-generate-aro'),
     # path('<int:pk>/tl/', login_required(views.GenerateTransferLetterView.as_view()), name='allotment-tl'),

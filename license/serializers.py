@@ -1,10 +1,14 @@
+from django.db import transaction
+from django.db.models.deletion import ProtectedError
 from rest_framework import serializers
+from rest_framework.exceptions import ValidationError
 
 from core.models import HSCodeModel, ItemNameModel, CompanyModel, PortModel, SionNormClassModel
 from core.serializers import HSCodeSerializer, ItemNameSerializer, CompanySerializer, PortSerializer, \
     SionNormClassSerializer
 from license.models import LicenseExportItemModel, LicenseImportItemsModel
 from .models import LicenseDetailsModel
+from .models import LicensePurchase
 from .utils import safe_get
 
 
@@ -71,12 +75,6 @@ class LicenseImportItemSerializer(serializers.ModelSerializer):
             'items', 'items_ids', 'debited_quantity', 'debited_value', 'allotted_quantity', 'allotted_value',
             'available_quantity'
         ]
-
-
-from django.db import transaction
-from django.db.models.deletion import ProtectedError
-from rest_framework import serializers
-from rest_framework.exceptions import ValidationError
 
 
 class LicenseDetailsSerializer(serializers.ModelSerializer):
@@ -530,3 +528,165 @@ class BiscuitReportSerializer(serializers.ModelSerializer):
     # --- Balance ---
     def get_balance_cif_value(self, obj):
         return safe_get(obj.cif_value_balance_biscuits, "available_value", 0)
+
+
+ROUND2 = lambda x: round(float(x), 2)
+ROUND3 = lambda x: round(float(x), 3)
+
+
+class LicensePurchaseSerializer(serializers.ModelSerializer):
+    # FE may send bill; BE derives markup_pct OR vice-versa
+    bill_amount = serializers.FloatField(write_only=True, required=False)
+
+    supplier_name = serializers.CharField(source="supplier.name", read_only=True)
+    purchasing_entity_name = serializers.CharField(source="purchasing_entity.name", read_only=True)
+    invoice_copy_url = serializers.SerializerMethodField()
+
+    class Meta:
+        model = LicensePurchase
+        fields = [
+            "id", "license",
+            "purchasing_entity", "purchasing_entity_name",
+            "supplier", "supplier_name",
+            "supplier_pan", "supplier_gst",
+            "invoice_number", "invoice_date", "invoice_copy", "invoice_copy_url",
+            "mode", "amount_source",
+            "fob_inr", "cif_inr", "cif_usd", "exchange_rate",
+            "markup_pct", "bill_amount",  # write: bill_amount; read: markup_pct
+            "product_name", "quantity_kg", "rate_inr",
+            "amount_inr",  # computed, read-only to clients
+            "created_on", "modified_on",
+        ]
+        read_only_fields = [
+            "id", "amount_inr", "created_on", "modified_on",
+            "supplier_name", "purchasing_entity_name", "invoice_copy_url"
+        ]
+
+    # ---------- helpers ----------
+    def get_invoice_copy_url(self, obj):
+        f = obj.invoice_copy
+        if not f:
+            return None
+        try:
+            url = f.url
+        except Exception:
+            return None
+        request = self.context.get("request")
+        return request.build_absolute_uri(url) if request else url
+
+    @staticmethod
+    def _to_float(val, default=0.0):
+        try:
+            if val in (None, ""):
+                return default
+            return float(val)
+        except (TypeError, ValueError):
+            return default
+
+    def _pick(self, data, name, default=0.0):
+        """Pick from incoming data or fall back to instance on PATCH."""
+        if name in data:
+            return self._to_float(data.get(name), default)
+        if getattr(self, "instance", None) is not None:
+            return self._to_float(getattr(self.instance, name, default), default)
+        return default
+
+    # ---------- core derivation ----------
+    def _apply_derived_fields(self, data):
+        """
+        Rules (Amount mode):
+          - bill_amount = source_amt * (markup_pct / 100)      # NO additional base
+          - source ∈ {FOB_INR, CIF_INR, CIF_USD} (USD is taken as-is; no FX multiply)
+          - If bill provided -> derive markup_pct (3 d.p.)
+          - If markup_pct provided -> derive bill (2 d.p.)
+          - exchange_rate auto = round(CIF_INR / CIF_USD, 3) when both are present & ER not supplied
+
+        Qty mode:
+          - amount_inr = quantity_kg * rate_inr  (2 d.p.)
+        """
+        mode = data.get("mode") or getattr(self.instance, "mode", LicensePurchase.MODE_AMOUNT)
+
+        # Normalize/auto exchange rate if possible (helps UI; not used for bill math)
+        cif_inr = self._pick(data, "cif_inr")
+        cif_usd = self._pick(data, "cif_usd")
+        ex_raw = data.get("exchange_rate", getattr(self.instance, "exchange_rate", None))
+        if (ex_raw in (None, "", 0, 0.0)) and cif_inr > 0 and cif_usd > 0:
+            data["exchange_rate"] = ROUND3(cif_inr / cif_usd)
+        elif ex_raw not in (None, ""):
+            data["exchange_rate"] = ROUND3(self._to_float(ex_raw))
+
+        # Prepare a computed bucket to carry server-calculated amount to create/update
+        data["_computed_amount_inr"] = None
+
+        if mode == LicensePurchase.MODE_AMOUNT:
+            amount_source = data.get("amount_source") or getattr(
+                self.instance, "amount_source", LicensePurchase.SRC_FOB_INR
+            )
+
+            # choose the source (NO FX for USD)
+            if amount_source == LicensePurchase.SRC_FOB_INR:
+                source_amt = self._pick(data, "fob_inr")
+            elif amount_source == LicensePurchase.SRC_CIF_INR:
+                source_amt = self._pick(data, "cif_inr")
+            else:  # LicensePurchase.SRC_CIF_USD
+                source_amt = self._pick(data, "cif_usd")
+
+            # normalize incoming
+            bill_in = data.get("bill_amount", None)
+            pct_in = data.get("markup_pct", None)
+            bill = self._to_float(bill_in, None) if bill_in not in (None, "") else None
+            pct = self._to_float(pct_in, None) if pct_in not in (None, "") else None
+
+            if source_amt > 0:
+                if bill is not None:
+                    # back-solve rate%
+                    pct = (bill / source_amt) * 100.0
+                    data["markup_pct"] = ROUND3(pct)
+                    data["bill_amount"] = ROUND2(bill)
+                    data["_computed_amount_inr"] = ROUND2(bill)
+                elif pct is not None:
+                    # forward-solve bill
+                    bill = source_amt * (pct / 100.0)
+                    data["bill_amount"] = ROUND2(bill)
+                    data["markup_pct"] = ROUND3(pct)
+                    data["_computed_amount_inr"] = ROUND2(bill)
+                # else: neither bill nor pct — leave as-is (could be updated later)
+            # If source is zero/missing, nothing derivable; leave fields untouched.
+
+        else:  # LicensePurchase.MODE_QTY
+            qty = self._pick(data, "quantity_kg")
+            rate = self._pick(data, "rate_inr")
+            if qty > 0 and rate > 0:
+                data["_computed_amount_inr"] = ROUND2(qty * rate)
+
+        return data
+
+    # ---------- DRF hooks ----------
+    def validate(self, attrs):
+        attrs = self._apply_derived_fields(attrs)
+        return attrs
+
+    def _persist_computed_amount(self, instance, validated_data):
+        """
+        amount_inr is computed server-side, not client-writable.
+        Persist it whenever we have a fresh computed value.
+        """
+        computed = validated_data.pop("_computed_amount_inr", None)
+        # purge write-only helper if present
+        validated_data.pop("bill_amount", None)
+
+        # Save instance via standard flow first (so file fields, FKs, etc. are handled)
+        instance = super().update(instance, validated_data) if instance.pk else super().create(validated_data)
+
+        if computed is not None:
+            instance.amount_inr = ROUND2(computed)
+            instance.save(update_fields=["amount_inr"])
+        return instance
+
+    def create(self, validated_data):
+        # create with computed amount (if any)
+        empty = self.Meta.model()  # dummy instance to use the shared helper
+        return self._persist_computed_amount(empty, validated_data)
+
+    def update(self, instance, validated_data):
+        return self._persist_computed_amount(instance, validated_data)
