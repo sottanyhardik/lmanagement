@@ -85,6 +85,8 @@ const ExportLicenseTable = ({
                     <th>Currency</th>
                     <th className="text-end">CIF FC</th>
                     <th className="text-end">CIF INR</th>
+                    <th className="text-end">FOB INR</th>
+                    {/* NEW */}
                     <th style={{minWidth: 320}}>SION Norm & Prefill</th>
                 </tr>
                 </thead>
@@ -96,6 +98,7 @@ const ExportLicenseTable = ({
                     const errCurr = getErr(i, 'currency');
                     const errFc = getErr(i, 'cif_fc');
                     const errInr = getErr(i, 'cif_inr');
+                    const errFobInr = getErr(i, 'fob_inr'); // NEW
                     const errNorm = getErr(i, 'norm_class_id') || getErr(i, 'norm_class');
 
                     return (
@@ -191,6 +194,30 @@ const ExportLicenseTable = ({
                                     id={`err-exp-cifinr-${i}`}
                                 >
                                     {errInr}
+                                </Form.Control.Feedback>
+                            </td>
+
+                            {/* NEW FOB INR FIELD */}
+                            <td>
+                                <Form.Control
+                                    type="number"
+                                    size="sm"
+                                    className="text-end"
+                                    value={item.fob_inr ?? ''}
+                                    onChange={e => handleFieldChange(i, 'fob_inr', e.target.value)}
+                                    isInvalid={!!errFobInr}
+                                    disabled={disabled}
+                                    placeholder="0.00"
+                                    step="0.01"
+                                    min="0"
+                                    aria-describedby={`err-exp-fobinr-${i}`}
+                                />
+                                <Form.Control.Feedback
+                                    type="invalid"
+                                    className="text-end d-block"
+                                    id={`err-exp-fobinr-${i}`}
+                                >
+                                    {errFobInr}
                                 </Form.Control.Feedback>
                             </td>
 

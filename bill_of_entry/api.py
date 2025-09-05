@@ -1,3 +1,4 @@
+from django.db import transaction
 from django_filters.rest_framework import DjangoFilterBackend
 from easy_pdf.views import PDFTemplateView
 from rest_framework import filters, viewsets
@@ -7,9 +8,11 @@ from rest_framework.generics import get_object_or_404
 from rest_framework.response import Response
 from rest_framework.views import APIView
 
+from license.models import Invoice
+from license.serializers import InvoiceSerializer
 from .filters import BillOfEntryFilter
-from .models import BillOfEntryModel, Invoice
-from .serializers import BillOfEntrySerializer, BillOfEntryWriteSerializer, InvoiceSerializer
+from .models import BillOfEntryModel
+from .serializers import BillOfEntrySerializer, BillOfEntryWriteSerializer
 
 
 class BillOfEntryViewSet(viewsets.ModelViewSet):
@@ -48,10 +51,22 @@ class InvoiceViewSet(viewsets.ModelViewSet):
     filter_backends = [DjangoFilterBackend]
     filterset_fields = ['bills_of_entry']
 
+    @transaction.atomic
     def perform_destroy(self, instance):
-        bills_of_entry = instance.bills_of_entry
-        bills_of_entry.invoice_no = None
-        bills_of_entry.save()
+        """
+        When deleting an invoice, if it is linked to a Bill of Entry, clear the
+        Bill of Entry's cached `invoice_no` field. Safely handle the case where
+        there is no linked BoE.
+        """
+        boe = getattr(instance, "bills_of_entry", None)
+        if boe is not None:
+            # Optional: only clear if it matches this invoice number
+            inv_no = getattr(instance, "invoice_number", None)
+            if hasattr(boe, "invoice_no"):
+                if inv_no is None or boe.invoice_no == inv_no:
+                    boe.invoice_no = None
+                    boe.save(update_fields=["invoice_no"])
+        # finally delete the invoice
         instance.delete()
 
 

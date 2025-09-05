@@ -16,6 +16,7 @@ import {getLicenseNormLabel, licenseEntryTotals, licenseTotals,} from "../../uti
 
 const LicenseForm = lazy(() => import("./LicenseForm"));
 const PurchaseTab = lazy(() => import("./PurchaseTab"));
+const SaleTab = lazy(() => import("./SaleTab"));
 
 const Fallback = () => (
     <div className="py-3 text-center text-muted">
@@ -175,6 +176,11 @@ export default function LicenseList() {
                             <Tab eventKey="purchase" title="🧾 Purchase">
                                 <Suspense fallback={<Fallback/>}>
                                     <PurchaseTab entry={entry} onSaved={() => updateSingleEntry(entry.id)}/>
+                                </Suspense>
+                            </Tab>
+                            <Tab eventKey="sale" title="💸 Sale">
+                                <Suspense fallback={<Fallback/>}>
+                                    <SaleTab entry={entry} onSaved={() => updateSingleEntry(entry.id)}/>
                                 </Suspense>
                             </Tab>
                         </Tabs>

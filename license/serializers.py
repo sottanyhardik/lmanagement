@@ -1,3 +1,7 @@
+from datetime import date
+from decimal import Decimal
+from typing import Optional
+
 from django.db import transaction
 from django.db.models.deletion import ProtectedError
 from rest_framework import serializers
@@ -6,10 +10,276 @@ from rest_framework.exceptions import ValidationError
 from core.models import HSCodeModel, ItemNameModel, CompanyModel, PortModel, SionNormClassModel
 from core.serializers import HSCodeSerializer, ItemNameSerializer, CompanySerializer, PortSerializer, \
     SionNormClassSerializer
+from core.utils import get_entity_prefix, number_to_words
 from license.models import LicenseExportItemModel, LicenseImportItemsModel
+from .models import Invoice, InvoiceItem, InvoiceEntity  # adjust if needed
 from .models import LicenseDetailsModel
 from .models import LicensePurchase
 from .utils import safe_get
+
+
+# -------------------- Optional nested "to_company" payload --------------------
+class ToCompanySerializer(serializers.Serializer):
+    name = serializers.CharField()
+    pan = serializers.CharField(required=False, allow_blank=True, allow_null=True)
+    gst_number = serializers.CharField(required=False, allow_blank=True, allow_null=True)
+    address_line_1 = serializers.CharField()
+    address_line_2 = serializers.CharField(required=False, allow_blank=True, allow_null=True)
+
+
+# ---------------------------------- Items ------------------------------------
+class InvoiceItemSerializer(serializers.ModelSerializer):
+    class Meta:
+        model = InvoiceItem
+        fields = (
+            'id',
+            'sr_number',  # may be instance or pk (int/str)
+            'license_no',
+            'hsn_code',
+            'qty',
+            'cif_fc',
+            'cif_inr',
+            'fob_inr',
+            'rate',
+            'amount',
+        )
+
+
+# --------------------------------- Invoice -----------------------------------
+class InvoiceSerializer(serializers.ModelSerializer):
+    items = InvoiceItemSerializer(many=True)
+
+    # Make invoice_number optional; allow auto-generation when blank
+    invoice_number = serializers.CharField(required=False, allow_blank=True)
+    invoice_date = serializers.DateField(required=False)
+    # Use PK fields for FKs (lets DRF resolve them to instances)
+    from_entity = serializers.PrimaryKeyRelatedField(queryset=InvoiceEntity.objects.all())
+    bills_of_entry = serializers.PrimaryKeyRelatedField(
+        required=False, allow_null=True,
+        queryset=Invoice._meta.get_field('bills_of_entry').remote_field.model.objects.all()
+    )
+
+    # Optional nested write-only convenience block
+    to_company = ToCompanySerializer(required=False, write_only=True)
+
+    class Meta:
+        model = Invoice
+        fields = (
+            'id',
+            'bills_of_entry',
+            'from_entity',
+            'to_company',  # write-only helper to fill the fields below
+            'to_company_name',
+            'to_company_pan',
+            'to_company_gst_number',
+            'to_company_address_line_1',
+            'to_company_address_line_2',
+            'invoice_number',
+            'invoice_date',
+            'billing_mode',  # 'kg' | 'cif' | 'fob'
+            'sale_type',  # 'item' | 'full'
+            'total_qty',
+            'total_cif_fc',
+            'total_cif_inr',
+            'total_fob_inr',
+            'total_amount',
+            'total_amount_in_words',
+            'items',
+        )
+        read_only_fields = (
+            'invoice_date',
+            'total_qty', 'total_cif_fc', 'total_cif_inr', 'total_fob_inr',
+            'total_amount', 'total_amount_in_words',
+        )
+        extra_kwargs = {
+            # Disable DRF's auto-UniqueValidator so blank values don't fail is_valid()
+            'invoice_number': {'validators': []},
+        }
+
+    # ------------------------------ Helpers -----------------------------------
+    def _generate_invoice_number(self, entity_name: str) -> str:
+        today = date.today()
+        fy_start = today.year if today.month >= 4 else today.year - 1
+        fy_end = fy_start + 1
+        fy = f"{fy_start}-{str(fy_end)[-2:]}"
+        prefix = get_entity_prefix(entity_name)
+
+        last = (Invoice.objects
+                .filter(invoice_number__startswith=f"{prefix}/{fy}")
+                .order_by('-invoice_number')
+                .first())
+        if last and last.invoice_number:
+            try:
+                last_serial = int((last.invoice_number or '').split('/')[-1])
+            except Exception:
+                last_serial = 0
+        else:
+            last_serial = 0
+        return f"{prefix}/{fy}/{last_serial + 1:03d}"
+
+    def _apply_to_company(self, data: dict, to_company: Optional[dict], *, partial: bool = False):
+        """
+        Flatten nested 'to_company' safely (trim, uppercase PAN/GST).
+        If partial=True, only overwrite fields explicitly present in payload.
+        """
+        if not to_company:
+            return
+
+        def _norm(s: Optional[str]) -> str:
+            if s is None:
+                return ''
+            s = str(s).strip()
+            return ' '.join(s.split())
+
+        def _upper(s: Optional[str]) -> str:
+            return _norm(s).upper()
+
+        MAX_NAME = 255
+        MAX_PAN = 15
+        MAX_GST = 15
+
+        def _maybe_set(field, key, transform=_norm, limit=None):
+            if partial and key not in to_company:
+                return
+            v = transform(to_company.get(key))
+            if limit is not None:
+                v = v[:limit]
+            data[field] = v
+
+        _maybe_set('to_company_name', 'name', transform=lambda v: _norm(v)[:MAX_NAME])
+        _maybe_set('to_company_pan', 'pan', transform=lambda v: _upper(v)[:MAX_PAN])
+        _maybe_set('to_company_gst_number', 'gst_number', transform=lambda v: _upper(v)[:MAX_GST])
+        _maybe_set('to_company_address_line_1', 'address_line_1', transform=_norm)
+        _maybe_set('to_company_address_line_2', 'address_line_2', transform=_norm)
+
+    def _normalize_items(self, items_data):
+        """
+        Ensure sr_number is set correctly for model init:
+        - instance -> keep `sr_number`
+        - pk (int/str) -> write to `sr_number_id`
+        """
+        normalized = []
+        for it in items_data:
+            data = {k: v for k, v in it.items() if k != 'id'}
+            sr = data.pop('sr_number', None)
+            if hasattr(sr, 'pk'):
+                data['sr_number'] = sr
+            elif sr is not None:
+                try:
+                    data['sr_number_id'] = int(sr)
+                except (TypeError, ValueError):
+                    raise serializers.ValidationError(
+                        {'items': 'sr_number must be a valid integer id or instance.'}
+                    )
+            normalized.append(InvoiceItem(**data))
+        return normalized
+
+    def _recompute_totals(self, invoice: Invoice):
+        z = Decimal('0')
+        qs = invoice.items.all()
+        invoice.total_qty = sum((it.qty or z) for it in qs) or z
+        invoice.total_cif_fc = sum((it.cif_fc or z) for it in qs) or z
+        invoice.total_cif_inr = sum((it.cif_inr or z) for it in qs) or z
+        invoice.total_fob_inr = sum((it.fob_inr or z) for it in qs) or z
+        invoice.total_amount = sum((it.amount or z) for it in qs) or z
+        try:
+            invoice.total_amount_in_words = number_to_words(round(invoice.total_amount, 0))
+        except Exception:
+            invoice.total_amount_in_words = None
+        invoice.save(update_fields=[
+            'total_qty', 'total_cif_fc', 'total_cif_inr', 'total_fob_inr',
+            'total_amount', 'total_amount_in_words'
+        ])
+
+    # --------------------------- Create / Update -------------------------------
+    @transaction.atomic
+    def create(self, validated_data):
+        items_data = validated_data.pop('items', [])
+        to_company = validated_data.pop('to_company', None)
+
+        # Auto-generate invoice_number when blank/missing; otherwise accept it (unique check)
+        inv_no = (validated_data.get('invoice_number') or '').strip()
+        if not inv_no:
+            entity = validated_data['from_entity']  # already PK-related instance
+            validated_data['invoice_number'] = self._generate_invoice_number(entity.name)
+        else:
+            if Invoice.objects.filter(invoice_number=inv_no).exists():
+                raise serializers.ValidationError({'invoice_number': 'This invoice number already exists.'})
+
+        self._apply_to_company(validated_data, to_company, partial=False)
+
+        invoice = super().create(validated_data)
+
+        objs = self._normalize_items(items_data)
+        for obj in objs:
+            obj.invoice = invoice
+        InvoiceItem.objects.bulk_create(objs)
+
+        self._recompute_totals(invoice)
+        return invoice
+
+    @transaction.atomic
+    def update(self, instance, validated_data):
+        items_data = validated_data.pop('items', None)
+        to_company = validated_data.pop('to_company', None)
+
+        self._apply_to_company(validated_data, to_company, partial=True)
+
+        # If client sends invoice_number: "" -> regenerate; if non-empty -> ensure unique
+        if 'invoice_number' in validated_data:
+            inv_no = (validated_data.get('invoice_number') or '').strip()
+            if not inv_no:
+                source_entity = validated_data.get('from_entity') or instance.from_entity
+                validated_data['invoice_number'] = self._generate_invoice_number(source_entity.name)
+            else:
+                if (Invoice.objects
+                        .exclude(pk=instance.pk)
+                        .filter(invoice_number=inv_no)
+                        .exists()):
+                    raise serializers.ValidationError({'invoice_number': 'This invoice number already exists.'})
+
+        invoice = super().update(instance, validated_data)
+
+        if items_data is not None:
+            invoice.items.all().delete()
+            objs = self._normalize_items(items_data)
+            for obj in objs:
+                obj.invoice = invoice
+            InvoiceItem.objects.bulk_create(objs)
+
+        self._recompute_totals(invoice)
+        return invoice
+
+
+# --------- Read-only nested invoices for a license (Sales tab) ----------
+class InvoiceNestedItemSerializer(serializers.ModelSerializer):
+    class Meta:
+        model = InvoiceItem
+        fields = (
+            'id', 'sr_number', 'license_no',
+            'qty', 'cif_fc', 'cif_inr', 'fob_inr',
+            'rate', 'amount',
+        )
+        read_only_fields = fields
+
+
+class InvoiceNestedSerializer(serializers.ModelSerializer):
+    items = InvoiceNestedItemSerializer(many=True, read_only=True)
+
+    class Meta:
+        model = Invoice
+        fields = (
+            'id',
+            'invoice_number', 'invoice_date',
+            'billing_mode', 'sale_type',
+            'to_company_name', 'to_company_pan', 'to_company_gst_number',
+            'to_company_address_line_1', 'to_company_address_line_2',
+            'from_entity',  # PK is fine; add a nested entity serializer if you want
+            'total_qty', 'total_cif_fc', 'total_cif_inr', 'total_fob_inr',
+            'total_amount',
+            'items',
+        )
+        read_only_fields = fields
 
 
 class LicenseImportItemsSelectSerializer(serializers.ModelSerializer):
@@ -48,7 +318,7 @@ class LicenseExportItemSerializer(serializers.ModelSerializer):
         model = LicenseExportItemModel
         fields = [
             'id', 'description', 'net_quantity', 'unit', 'currency',
-            'cif_fc', 'cif_inr', 'norm_class', 'norm_class_id',
+            'cif_fc', 'cif_inr', 'norm_class', 'norm_class_id', 'fob_inr'
         ]
 
 
@@ -89,6 +359,7 @@ class LicenseDetailsSerializer(serializers.ModelSerializer):
         queryset=PortModel.objects.all(), write_only=True
     )
     port = PortSerializer(read_only=True)
+    invoices = serializers.SerializerMethodField(read_only=True)
 
     class Meta:
         model = LicenseDetailsModel
@@ -98,10 +369,21 @@ class LicenseDetailsSerializer(serializers.ModelSerializer):
             'is_expired', 'is_incomplete', 'is_not_registered', 'is_au', 'is_audit',
             'balance_cif', 'get_balance_cif', 'modified_on', 'scheme_code',
             'notification_number', 'exporter', 'exporter_id', 'port', 'port_id',
-            'export_license', 'import_license'
+            'export_license', 'import_license', 'invoices'
         ]
 
     # ---------- helpers ----------
+
+    def get_invoices(self, obj):
+        qs = (
+            Invoice.objects
+            .filter(items__sr_number__license=obj)
+            .distinct()
+            .prefetch_related('items')
+            .select_related('from_entity')
+        )
+        return InvoiceNestedSerializer(qs, many=True, context=self.context).data
+
     def _is_linked(self, obj, ignore_relations=('license', 'items')):
         """
         Return True if `obj` has any non-empty reverse relations other than the
