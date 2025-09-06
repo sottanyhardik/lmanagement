@@ -9,7 +9,7 @@ import useUrlSync from "./useUrlSync";
  * Factory to build a list manager hook for any resource.
  */
 export default function createListManager({
-                                              resource,                 // e.g. "bill-of-entries/"
+                                              resource,                 // e.g. "licenses/"
                                               buildParams,              // (state) => axios params
                                               defaultFilters,           // object
                                               defaultSortField,         // string
@@ -20,7 +20,7 @@ export default function createListManager({
     return function useGenericListManager() {
         // data
         const [entries, setEntries] = useState([]);
-        const [expanded, setExpanded] = useState({});
+        const [expanded, setExpanded] = useState({});   // <- map of entryKey -> boolean (controlled by page)
         const [allExpanded, setAllExpanded] = useState(true);
 
         // selection
@@ -57,7 +57,7 @@ export default function createListManager({
             sortField,
             sortOrder,
             setSortField: (v) => setSortField(v, {resetPage: true, clearUrlPage: true}),
-            setSortOrder: (v) => setSortOrder(v, {resetPage: true, clearUrlPage: true})
+            setSortOrder: (v) => setSortOrder(v, {resetPage: true, clearUrlPage: true}),
         });
 
         // request guards
@@ -74,7 +74,7 @@ export default function createListManager({
                     url.searchParams.delete("page");
                     window.history.replaceState(null, "", url.toString());
                 }
-            } catch {/* no-op */
+            } catch { /* noop */
             }
         };
 
@@ -148,6 +148,7 @@ export default function createListManager({
                     setEntries((prev) => {
                         if (!append || pageOverride === 1) return results;
                         const combined = [...prev, ...results];
+                        // de-dup by id
                         return Array.from(new Map(combined.map((e) => [e.id, e])).values());
                     });
 
@@ -167,9 +168,7 @@ export default function createListManager({
 
         // reset when inputs change (search/sort/filters)
         useEffect(() => {
-            // Clear page param in the URL so url-sync can’t re-apply page>1
             clearPageFromUrl();
-
             setEntries([]);
             setPage(1);
             setHasMore(true);
@@ -238,6 +237,8 @@ export default function createListManager({
             setSelectedIds([]);
             lastRequestedPageRef.current = 0;
             pagingLockRef.current = false;
+            setExpanded({});
+            setAllExpanded(true);
         };
 
         // exports
@@ -296,7 +297,10 @@ export default function createListManager({
 
         return {
             // data
-            entries, expanded, setExpanded, loading, hasMore, allExpanded, setAllExpanded,
+            entries, loading, hasMore, nextUrl,
+
+            // expansion (controlled by page using GroupedAccordion)
+            expanded, setExpanded, allExpanded, setAllExpanded,
 
             // selection
             selectedIds, toggleSelect, toggleSelectAll, clearSelection,
@@ -308,8 +312,8 @@ export default function createListManager({
             searchQuery,
             setSearchQuery: (v) => setSearchQuery(v, {resetPage: true, clearUrlPage: true}),
             filters,
-            setFilters: (u, opts) => setFilters(u, {...{resetPage: true, clearUrlPage: true}, ...(opts || {})}),
-            setPage,
+            setFilters: (u, opts) => setFilters(u, {...(opts || {}), resetPage: true, clearUrlPage: true}),
+            page, setPage,
 
             // add-new
             newEntry, setNewEntry,

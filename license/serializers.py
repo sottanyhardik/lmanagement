@@ -1,5 +1,4 @@
 from datetime import date
-from decimal import Decimal
 from typing import Optional
 
 from django.db import transaction
@@ -16,6 +15,22 @@ from .models import Invoice, InvoiceItem, InvoiceEntity  # adjust if needed
 from .models import LicenseDetailsModel
 from .models import LicensePurchase
 from .utils import safe_get
+
+
+class DecimalZeroIfNullField(serializers.DecimalField):
+    """
+    Like DecimalField, but treats None / "" as 0.
+    Also tolerates surrounding whitespace.
+    """
+
+    def to_internal_value(self, value):
+        if value in (None, ""):
+            value = "0"
+        if isinstance(value, str):
+            value = value.strip()
+            if value == "":
+                value = "0"
+        return super().to_internal_value(value)
 
 
 # -------------------- Optional nested "to_company" payload --------------------
@@ -307,18 +322,53 @@ class LicenseImportItemsSelectSerializer(serializers.ModelSerializer):
         return " • ".join(parts)
 
 
+# inside your serializers.py
+
+from decimal import Decimal
+
+
 class LicenseExportItemSerializer(serializers.ModelSerializer):
     id = serializers.IntegerField(required=False)
+
+    # read-only nested
     norm_class = SionNormClassSerializer(read_only=True)
+
+    # write using pk
     norm_class_id = serializers.PrimaryKeyRelatedField(
-        queryset=SionNormClassModel.objects.all(), source='norm_class', write_only=True
+        queryset=SionNormClassModel.objects.all(),
+        source='norm_class',
+        write_only=True,
+        required=False,
+        allow_null=True,
+    )
+
+    # ✅ Decimal-safe numeric fields (""/None -> 0)
+    net_quantity = DecimalZeroIfNullField(
+        max_digits=20, decimal_places=4, required=False, allow_null=True
+    )
+    cif_fc = DecimalZeroIfNullField(
+        max_digits=20, decimal_places=2, required=False, allow_null=True
+    )
+    cif_inr = DecimalZeroIfNullField(
+        max_digits=20, decimal_places=2, required=False, allow_null=True
+    )
+    fob_inr = DecimalZeroIfNullField(
+        max_digits=20, decimal_places=2, required=False, allow_null=True
     )
 
     class Meta:
         model = LicenseExportItemModel
         fields = [
-            'id', 'description', 'net_quantity', 'unit', 'currency',
-            'cif_fc', 'cif_inr', 'norm_class', 'norm_class_id', 'fob_inr'
+            'id',
+            'description',
+            'net_quantity',
+            'unit',
+            'currency',
+            'cif_fc',
+            'cif_inr',
+            'fob_inr',  # keep explicit so DRF includes it in validated_data
+            'norm_class',  # read-only
+            'norm_class_id',  # write-only
         ]
 
 

@@ -1,6 +1,6 @@
 // src/components/generic/StatsBar.jsx
 import React from "react";
-import {Button} from "react-bootstrap";
+import {Form} from "react-bootstrap";
 
 const StatsBar = ({
                       totalLoaded = 0,
@@ -15,14 +15,16 @@ const StatsBar = ({
             <strong>{totalLoaded}</strong> loaded · <strong>{groupCount}</strong> groups ·{" "}
             <strong>{selectedCount}</strong> selected
         </div>
-        <Button
-            size="sm"
-            variant="outline-primary"
-            onClick={onToggleExpand}
-            aria-label="Toggle expand all"
-        >
-            {allExpanded ? "Collapse All" : "Expand All"}
-        </Button>
+
+        <Form.Check
+            type="switch"
+            id="expand-collapse-switch"
+            label={allExpanded ? "Collapse All" : "Expand All"}
+            checked={allExpanded}
+            onChange={onToggleExpand}
+            disabled={groupCount === 0 || totalLoaded === 0}
+            className="small"
+        />
     </div>
 );
 

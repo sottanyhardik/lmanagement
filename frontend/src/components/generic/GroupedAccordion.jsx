@@ -89,7 +89,7 @@ const normalizeGroups = (groups) => {
                     }))
                     : toPairs(g.ports).map((p) => ({
                         label: p.label,
-                        entries: Array.isArray(p.entries) ? p.entries : Array.isArray(p) ? p : [],
+                        entries: Array.isArray(p.entries) ? p.entries : [],
                         summary: p.summary,
                     }));
             }
@@ -121,7 +121,7 @@ const normalizeGroups = (groups) => {
                 }))
                 : toPairs(c.ports).map((p) => ({
                     label: p.label,
-                    entries: Array.isArray(p.entries) ? p.entries : Array.isArray(p) ? p : [],
+                    entries: Array.isArray(p.entries) ? p.entries : [],
                     summary: p.summary,
                 }));
         }
@@ -131,9 +131,7 @@ const normalizeGroups = (groups) => {
 
 /** ---------- default headers if you don't pass custom renderers ---------- */
 const DefaultCompanyHeader = ({company, fields}) => {
-    const ports = company.items
-        ? company.items.flatMap((it) => it.ports || [])
-        : company.ports || [];
+    const ports = company.items ? company.items.flatMap((it) => it.ports || []) : company.ports || [];
     const entries = ports.flatMap((p) => p.entries || []);
     const s = sumEntries(entries);
 
@@ -180,19 +178,14 @@ const PortSelectAll = ({entries = [], selection}) => {
     }, [someSel, allSel]);
 
     const handleToggle = () => {
-        // Behave like: if all selected -> clear; else -> select all
+        // if all selected -> clear; else -> select all
         toggleSelectAll(ids);
-    };
-
-    const handleAll = () => {
-        if (!allSel) toggleSelectAll(ids);
     };
 
     const handleNone = () => {
         if (allSel) {
             toggleSelectAll(ids); // toggles all off
         } else if (someSel && typeof toggleSelect === "function") {
-            // explicitly clear only the ones that are selected
             ids.forEach((id) => {
                 if (selectedIds.includes(id)) toggleSelect(id);
             });
@@ -209,17 +202,57 @@ const PortSelectAll = ({entries = [], selection}) => {
                 checked={allSel}
                 onChange={handleToggle}
             />
-            <span className="text-muted small">
-        {selectedCount} / {total} selected
-      </span>
+            <span className="text-muted small">{selectedCount} / {total} selected</span>
+            {/* Optional quick none/all actions: */}
+            {/* <Button size="sm" variant="link" className="p-0" onClick={handleNone}>None</Button> */}
         </div>
     );
 };
 
-/** ---------- main component ---------- */
+/**
+ * Build a full expanded map for the provided `groups`.
+ * Use this from your page to implement "Expand All / Collapse All".
+ */
+export const buildExpandedMap = (groups, expand = true) => {
+    const map = {};
+    const safeStr = (x) => (x == null ? "" : String(x));
+
+    const visitCompanyArray = (arr) => {
+        (arr || []).forEach((company, ci) => {
+            const items = company.items || null;
+            if (items && items.length) {
+                items.forEach((it, ii) => {
+                    (it.ports || []).forEach((port, pi) => {
+                        (port.entries || []).forEach((e, ei) => {
+                            const key = e?.id != null ? String(e.id) : `${safeStr(company.label)}|${safeStr(it.label)}|${safeStr(port.label)}|${ci}:${ii}:${pi}:${ei}`;
+                            map[key] = !!expand;
+                        });
+                    });
+                });
+            } else {
+                (company.ports || []).forEach((port, pi) => {
+                    (port.entries || []).forEach((e, ei) => {
+                        const key = e?.id != null ? String(e.id) : `${safeStr(company.label)}|${safeStr(port.label)}|${ci}:${pi}:${ei}`;
+                        map[key] = !!expand;
+                    });
+                });
+            }
+        });
+    };
+
+    if (Array.isArray(groups)) visitCompanyArray(groups);
+    else visitCompanyArray(normalizeGroups(groups));
+
+    return map;
+};
+
+/**
+ * If `expanded` and `toggle` are provided, this component is **controlled**.
+ * Otherwise, it manages local expansion and only reads `allExpanded` to seed initial state.
+ */
 export default function GroupedAccordion({
                                              groups,
-                                             allExpanded = false, // affects entry-level cards (not company accordions)
+                                             allExpanded = false, // affects uncontrolled initial seed only
 
                                              // Controlled expansion (optional). If omitted, uses internal state.
                                              expanded,
@@ -263,21 +296,10 @@ export default function GroupedAccordion({
         ? (key) => toggle(key)
         : (key) => setLocalExpanded((prev) => ({...prev, [key]: !prev[key]}));
 
-    // Seed local expansion when groups change or allExpanded flips
+    // Seed local expansion when groups change or allExpanded flips (uncontrolled only)
     useEffect(() => {
         if (isControlled) return;
-        const next = {};
-        companies.forEach((c, ci) => {
-            const items = c.items || [{label: "__flat__", ports: c.ports || []}];
-            items.forEach((it, ii) => {
-                (it.ports || []).forEach((p, pi) => {
-                    (p.entries || []).forEach((e, ei) => {
-                        const key = String(e?.id ?? `${ci}:${ii}:${pi}:${ei}`);
-                        next[key] = !!allExpanded;
-                    });
-                });
-            });
-        });
+        const next = buildExpandedMap(companies, allExpanded);
         setLocalExpanded(next);
     }, [companies, allExpanded, isControlled]);
 
@@ -292,10 +314,12 @@ export default function GroupedAccordion({
         setOpenCompanies((prev) => (prev.includes(ek) ? prev.filter((k) => k !== ek) : [...prev, ek]));
     };
 
+    const entryKeyOf = (entry, fallback) => (entry?.id != null ? String(entry.id) : String(fallback));
+
     return (
         <Accordion alwaysOpen activeKey={openCompanies} onSelect={handleCompanyToggle}>
             {companies.map((company, cIdx) => (
-                <Accordion.Item key={company.label ?? cIdx} eventKey={`cmp-${cIdx}`}
+                <Accordion.Item key={`${company.label}-${cIdx}`} eventKey={`cmp-${cIdx}`}
                                 className="border border-primary mb-3">
                     <Accordion.Header className="bg-light text-primary">
                         {renderCompanyHeader ? (
@@ -337,7 +361,7 @@ export default function GroupedAccordion({
                                                     <div className="text-muted small">{emptyText}</div>}
 
                                                 {entries.map((entry, eIdx) => {
-                                                    const entryKey = String(entry?.id ?? `${cIdx}:${iIdx}:${pIdx}:${eIdx}`);
+                                                    const entryKey = entryKeyOf(entry, `${cIdx}:${iIdx}:${pIdx}:${eIdx}`);
                                                     const isOpen = !!expandedMap[entryKey];
                                                     const toggleEntry = () => doToggle(entryKey);
 
@@ -398,7 +422,7 @@ export default function GroupedAccordion({
                                                 <div className="text-muted small">{emptyText}</div>}
 
                                             {entries.map((entry, eIdx) => {
-                                                const entryKey = String(entry?.id ?? `${cIdx}:${pIdx}:${eIdx}`);
+                                                const entryKey = entryKeyOf(entry, `${cIdx}:${pIdx}:${eIdx}`);
                                                 const isOpen = !!expandedMap[entryKey];
                                                 const toggleEntry = () => doToggle(entryKey);
 
