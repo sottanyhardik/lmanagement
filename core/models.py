@@ -157,6 +157,13 @@ class SIONExportModel(models.Model):
 class SIONImportModel(models.Model):
     sr_no = models.IntegerField(default=0)
     norm_class = models.ForeignKey('core.SionNormClassModel', on_delete=models.CASCADE, related_name='import_norm')
+    hsn_code = models.ForeignKey(
+        HSCodeModel,
+        on_delete=models.SET_NULL,
+        related_name='sion_imports',
+        null=True,
+        blank=True
+    )
     description = models.CharField(max_length=255)
     quantity = models.FloatField(default=0.0)
     unit = models.CharField(max_length=255, null=True, blank=True)
