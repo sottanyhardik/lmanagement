@@ -96,12 +96,16 @@ echo "[server] Node version: \$(node -v)"
 echo "[server] npm version:  \$(npm -v)"
 
 # --- Backend deps ---
-REQ_FILE="\$REMOTE_ROOT/requirenment.txt"
-if [[ -f "\$REQ_FILE" ]]; then
+REQ_A="\$REMOTE_ROOT/requirements.txt"
+REQ_B="\$REMOTE_ROOT/requirenment.txt"   # fallback for misspelling
+if [[ -f "\$REQ_A" ]]; then
+  echo "[server] Installing Python requirements from requirements.txt"
+  "\$PIP" install -r "\$REQ_A"
+elif [[ -f "\$REQ_B" ]]; then
   echo "[server] Installing Python requirements from requirenment.txt"
-  "\$PIP" install -r "\$REQ_FILE"
+  "\$PIP" install -r "\$REQ_B"
 else
-  echo "[server][warn] requirenment.txt not found at \$REQ_FILE (skipping Python deps)"
+  echo "[server][warn] No requirements file found (skipping Python deps)"
 fi
 
 # --- Frontend build ---
@@ -134,11 +138,28 @@ echo "[server] Running Django migrations & collectstatic"
 "\$PY" manage.py migrate
 "\$PY" manage.py collectstatic --noinput
 
-# --- Restart services ---
-echo "[server] Restarting services..."
-echo "\$SUDO_PASS" | sudo -S systemctl restart gunicorn || echo "[server][warn] gunicorn service not found"
-echo "\$SUDO_PASS" | sudo -S systemctl restart gunicorn_lmanagement || true
-echo "\$SUDO_PASS" | sudo -S systemctl reload nginx || echo "[server][warn] nginx reload failed (check config/service name)"
+# --- Supervisor: restart services + show status ---
+echo "[server] Restarting services via supervisor..."
+SUPV="sudo -S supervisorctl"
+
+# Make supervisor pick up any new/changed program configs
+echo "\$SUDO_PASS" | \$SUPV reread || echo "[server][warn] supervisorctl reread failed"
+echo "\$SUDO_PASS" | \$SUPV update || echo "[server][warn] supervisorctl update failed"
+
+# Restart app & workers (adjust names if yours differ)
+for svc in lmanagement celery celery_beat; do
+  echo "[server] Restarting: \$svc"
+  echo "\$SUDO_PASS" | \$SUPV restart "\$svc" || echo "[server][warn] restart failed for \$svc (check program name/config)"
+done
+
+# Show status
+echo "[server] Supervisor status:"
+echo "\$SUDO_PASS" | \$SUPV status lmanagement || true
+echo "\$SUDO_PASS" | \$SUPV status celery || true
+
+# --- Nginx reload (if you use it as reverse proxy) ---
+echo "[server] Reloading nginx (if present)..."
+echo "\$SUDO_PASS" | sudo -S nginx -t && echo "\$SUDO_PASS" | sudo -S systemctl reload nginx || echo "[server][warn] nginx reload failed (check config/service name)"
 
 echo "[server] Deploy done."
 REMOTE_EOF
