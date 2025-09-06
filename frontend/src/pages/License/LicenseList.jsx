@@ -10,6 +10,7 @@ import LoadMoreSection from "../../components/generic/LoadMoreSection";
 import GroupedAccordion from "../../components/generic/GroupedAccordion";
 
 import LicenseFilters from "./LicenseFilters";
+import LicenseTableView from "./LicenseHtmlView";
 import useLicenseListManager from "../../hooks/License/useLicenseListManager";
 import {groupEntries} from "../../utils/groupEntries";
 import {getLicenseNormLabel, licenseEntryTotals, licenseTotals,} from "../../utils/groupingHelpers";
@@ -159,14 +160,7 @@ export default function LicenseList() {
                     <Card.Body className="bg-white border-top-0">
                         <Tabs defaultActiveKey="view" className="mb-3" justify mountOnEnter unmountOnExit={false}>
                             <Tab eventKey="view" title="📄 View">
-                                <div className="small">
-                                    <div><strong>Exporter:</strong> {entry.exporter?.name || entry.exporter_name || "-"}
-                                    </div>
-                                    <div>
-                                        <strong>Port:</strong> {entry.port?.name || entry.port?.code || entry.port_name || "-"}
-                                    </div>
-                                    <div><strong>Validity:</strong> {entry.license_expiry_date || "-"}</div>
-                                </div>
+                                <LicenseTableView entry={entry}/>
                             </Tab>
                             <Tab eventKey="edit" title="✏️ Edit">
                                 <Suspense fallback={<Fallback/>}>
