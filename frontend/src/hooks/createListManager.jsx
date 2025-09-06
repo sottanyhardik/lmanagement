@@ -29,10 +29,10 @@ export default function createListManager({
         // query state
         const [loading, setLoading] = useState(false);
         const [page, setPage] = useState(1);
-        const [sortField, setSortField] = useState(defaultSortField);
-        const [sortOrder, setSortOrder] = useState(defaultSortOrder);
-        const [searchQuery, setSearchQuery] = useState("");
-        const [filters, setFilters] = useState(defaultFilters);
+        const [sortField, _setSortField] = useState(defaultSortField);
+        const [sortOrder, _setSortOrder] = useState(defaultSortOrder);
+        const [searchQuery, _setSearchQuery] = useState("");
+        const [filters, _setFilters] = useState(defaultFilters);
 
         // paging
         const [hasMore, setHasMore] = useState(true);
@@ -53,11 +53,11 @@ export default function createListManager({
             page,
             setPage,
             search: searchQuery,
-            setSearch: setSearchQuery,
+            setSearch: (v) => setSearchQuery(v, {resetPage: true, clearUrlPage: true}),
             sortField,
             sortOrder,
-            setSortField,
-            setSortOrder
+            setSortField: (v) => setSortField(v, {resetPage: true, clearUrlPage: true}),
+            setSortOrder: (v) => setSortOrder(v, {resetPage: true, clearUrlPage: true})
         });
 
         // request guards
@@ -65,6 +65,46 @@ export default function createListManager({
         const seqRef = useRef(0);
         const lastRequestedPageRef = useRef(0);
         const pagingLockRef = useRef(false);
+
+        // --- helpers to normalize page reset & URL cleanup ---
+        const clearPageFromUrl = () => {
+            try {
+                const url = new URL(window.location.href);
+                if (url.searchParams.has("page")) {
+                    url.searchParams.delete("page");
+                    window.history.replaceState(null, "", url.toString());
+                }
+            } catch {/* no-op */
+            }
+        };
+
+        const setSearchQuery = (value, opts = {}) => {
+            if (opts.resetPage) setPage(1);
+            if (opts.clearUrlPage) clearPageFromUrl();
+            _setSearchQuery(value);
+        };
+
+        const setSortField = (value, opts = {}) => {
+            if (opts.resetPage) setPage(1);
+            if (opts.clearUrlPage) clearPageFromUrl();
+            _setSortField(value);
+        };
+
+        const setSortOrder = (value, opts = {}) => {
+            if (opts.resetPage) setPage(1);
+            if (opts.clearUrlPage) clearPageFromUrl();
+            _setSortOrder(value);
+        };
+
+        const setFilters = (updater, opts = {resetPage: true, clearUrlPage: true}) => {
+            if (opts?.resetPage) setPage(1);
+            if (opts?.clearUrlPage) clearPageFromUrl();
+            if (typeof updater === "function") {
+                _setFilters((prev) => updater(prev));
+            } else {
+                _setFilters(updater);
+            }
+        };
 
         const getNextPageFromUrl = (nextUrl) => {
             if (!nextUrl) return null;
@@ -94,10 +134,8 @@ export default function createListManager({
 
                 setLoading(true);
                 try {
-                    const params = pageOverride ? {
-                            ...buildParams({page, searchQuery, sortField, sortOrder, filters}),
-                            page: pageOverride
-                        }
+                    const params = pageOverride
+                        ? {...buildParams({page, searchQuery, sortField, sortOrder, filters}), page: pageOverride}
                         : buildParams({page, searchQuery, sortField, sortOrder, filters});
 
                     const res = await axios.get(resource, {params, signal: controller.signal});
@@ -127,8 +165,11 @@ export default function createListManager({
             [resource, buildParams, loading, page, searchQuery, sortField, sortOrder, filters]
         );
 
-        // reset when inputs change
+        // reset when inputs change (search/sort/filters)
         useEffect(() => {
+            // Clear page param in the URL so url-sync can’t re-apply page>1
+            clearPageFromUrl();
+
             setEntries([]);
             setPage(1);
             setHasMore(true);
@@ -185,10 +226,11 @@ export default function createListManager({
 
         // reset button
         const handleReset = () => {
-            setSearchQuery("");
-            setSortField(defaultSortField);
-            setSortOrder(defaultSortOrder);
-            setFilters(defaultFilters);
+            clearPageFromUrl();
+            _setSearchQuery("");
+            _setSortField(defaultSortField);
+            _setSortOrder(defaultSortOrder);
+            _setFilters(defaultFilters);
             setPage(1);
             setEntries([]);
             setHasMore(true);
@@ -260,8 +302,14 @@ export default function createListManager({
             selectedIds, toggleSelect, toggleSelectAll, clearSelection,
 
             // query state
-            sortField, sortOrder, sortOptions, setSortField, setSortOrder,
-            searchQuery, setSearchQuery, filters, setFilters, setPage,
+            sortField, sortOrder, sortOptions,
+            setSortField: (v) => setSortField(v, {resetPage: true, clearUrlPage: true}),
+            setSortOrder: (v) => setSortOrder(v, {resetPage: true, clearUrlPage: true}),
+            searchQuery,
+            setSearchQuery: (v) => setSearchQuery(v, {resetPage: true, clearUrlPage: true}),
+            filters,
+            setFilters: (u, opts) => setFilters(u, {...{resetPage: true, clearUrlPage: true}, ...(opts || {})}),
+            setPage,
 
             // add-new
             newEntry, setNewEntry,

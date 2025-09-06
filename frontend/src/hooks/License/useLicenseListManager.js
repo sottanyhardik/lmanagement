@@ -7,7 +7,9 @@ export const DEFAULT_FILTERS = {
     license_number: "",
     from_date: "",
     to_date: "",
-    // optional balance filter could live here if your API supports it
+    // NEW: Balance filter defaults
+    balance_cmp: "gte", // "gte" | "lte"
+    balance_val: "",    // numeric string or ""
 };
 
 export const sortOptions = [
@@ -21,13 +23,28 @@ const buildParams = ({page, searchQuery, sortField, sortOrder, filters}) => {
     const params = {
         page,
         search: searchQuery || undefined,
-        ordering: sortField && sortOrder ? `${sortOrder === "desc" ? "-" : ""}${sortField}` : "",
+        ordering:
+            sortField && sortOrder
+                ? `${sortOrder === "desc" ? "-" : ""}${sortField}`
+                : "",
     };
-    if (filters.exporter_objs?.length) params.exporter__in = filters.exporter_objs.map((x) => x.id).join(",");
-    if (filters.port_objs?.length) params.port__in = filters.port_objs.map((p) => p.id).join(",");
+
+    if (filters.exporter_objs?.length)
+        params.exporter__in = filters.exporter_objs.map((x) => x.id).join(",");
+    if (filters.port_objs?.length)
+        params.port__in = filters.port_objs.map((p) => p.id).join(",");
     if (filters.license_number) params.license_number = filters.license_number;
     if (filters.from_date) params.from_date = filters.from_date;
     if (filters.to_date) params.to_date = filters.to_date;
+
+    // NEW: send balance filter when a value is present
+    const hasBalanceVal =
+        filters.balance_val !== undefined && String(filters.balance_val).trim() !== "";
+    if (hasBalanceVal) {
+        params.balance_val = filters.balance_val;
+        params.balance_cmp = filters.balance_cmp || "gte";
+    }
+
     return params;
 };
 
