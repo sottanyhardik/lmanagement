@@ -108,3 +108,11 @@ class BillOfEntryWriteSerializer(serializers.ModelSerializer):
             ])
 
         return instance
+
+
+class BOEOptionSerializer(serializers.ModelSerializer):
+    company = CompanyOptionSerializer()
+
+    class Meta:
+        model = BillOfEntryModel
+        fields = ["id", "bill_of_entry_number", "bill_of_entry_date", "company"]

@@ -62,6 +62,7 @@ INSTALLED_APPS = [
     'report.apps.ReportConfig',
     'ebrc.apps.EbrcConfig',
     'shipping_bill.apps.ShippingBillConfig',
+    'trade.apps.TradeConfig',
 ]
 
 # -----------------------------------------------------------

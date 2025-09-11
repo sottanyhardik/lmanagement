@@ -1,4 +1,5 @@
 from django.db import transaction
+from django.db.models import Q
 from django_filters.rest_framework import DjangoFilterBackend
 from easy_pdf.views import PDFTemplateView
 from rest_framework import filters, viewsets
@@ -12,7 +13,7 @@ from license.models import Invoice
 from license.serializers import InvoiceSerializer
 from .filters import BillOfEntryFilter
 from .models import BillOfEntryModel
-from .serializers import BillOfEntrySerializer, BillOfEntryWriteSerializer
+from .serializers import BillOfEntrySerializer, BillOfEntryWriteSerializer, BOEOptionSerializer
 
 
 class BillOfEntryViewSet(viewsets.ModelViewSet):
@@ -116,3 +117,16 @@ class InvoicePDFView(PDFTemplateView):
 
     def get_download_filename(self):
         return f"{self.invoice.invoice_number}.pdf"
+
+
+class BOEOptionViewSet(viewsets.ReadOnlyModelViewSet):
+    queryset = BillOfEntryModel.objects.select_related("company").all()
+    serializer_class = BOEOptionSerializer
+    filter_backends = [filters.SearchFilter]
+    search_fields = ["bill_of_entry_number", "company__name"]
+
+    def get_queryset(self):
+        qs = super().get_queryset()
+        # ✅ Only show BOEs that do NOT yet have an invoice number
+        # (treat both NULL and empty-string as "no invoice")
+        return qs.filter(Q(invoice_no__isnull=True) | Q(invoice_no=""))

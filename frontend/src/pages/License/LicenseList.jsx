@@ -10,14 +10,13 @@ import LoadMoreSection from "../../components/generic/LoadMoreSection";
 import GroupedAccordion from "../../components/generic/GroupedAccordion";
 
 import LicenseFilters from "./LicenseFilters";
-import LicenseTableView from "./LicenseHtmlView";
+import LicenseHtmlView from "./LicenseHtmlView";
 import useLicenseListManager from "../../hooks/License/useLicenseListManager";
 import {groupEntries} from "../../utils/groupEntries";
-import {getLicenseNormLabel, licenseEntryTotals, licenseTotals,} from "../../utils/groupingHelpers";
+import {getLicenseNormLabel, licenseEntryTotals, licenseTotals} from "../../utils/groupingHelpers";
 
+// Forms / tabs
 const LicenseForm = lazy(() => import("./LicenseForm"));
-const PurchaseTab = lazy(() => import("./PurchaseTab"));
-const SaleTab = lazy(() => import("./SaleTab"));
 
 const Fallback = () => (
     <div className="py-3 text-center text-muted">
@@ -25,6 +24,7 @@ const Fallback = () => (
         Loading…
     </div>
 );
+
 const fmt2 = (v) => {
     const n = Number(v);
     if (!Number.isFinite(n)) return "0.00";
@@ -151,7 +151,7 @@ export default function LicenseList() {
                         <div className="text-end">
                             <Badge bg="info" className="me-2">CIF $: {fmt2(fc)}</Badge>
                             <Badge bg="success">INR ₹ {fmt2(inr)}</Badge>
-                            <Badge bg="danger" className="me-2">Balance $: {entry.get_balance_cif || "-"}</Badge>
+                            <Badge bg="danger" className="ms-2">Balance $: {entry.get_balance_cif || "-"}</Badge>
                         </div>
                     </div>
                 </Card.Header>
@@ -160,21 +160,11 @@ export default function LicenseList() {
                     <Card.Body className="bg-white border-top-0">
                         <Tabs defaultActiveKey="view" className="mb-3" justify mountOnEnter unmountOnExit={false}>
                             <Tab eventKey="view" title="📄 View">
-                                <LicenseTableView entry={entry}/>
+                                <LicenseHtmlView entry={entry}/>
                             </Tab>
                             <Tab eventKey="edit" title="✏️ Edit">
                                 <Suspense fallback={<Fallback/>}>
                                     <LicenseForm entry={entry} onSaved={() => updateSingleEntry(entry.id)}/>
-                                </Suspense>
-                            </Tab>
-                            <Tab eventKey="purchase" title="🧾 Purchase">
-                                <Suspense fallback={<Fallback/>}>
-                                    <PurchaseTab entry={entry} onSaved={() => updateSingleEntry(entry.id)}/>
-                                </Suspense>
-                            </Tab>
-                            <Tab eventKey="sale" title="💸 Sale">
-                                <Suspense fallback={<Fallback/>}>
-                                    <SaleTab entry={entry} onSaved={() => updateSingleEntry(entry.id)}/>
                                 </Suspense>
                             </Tab>
                         </Tabs>
@@ -255,10 +245,16 @@ export default function LicenseList() {
                 emptyText="No licenses in this port."
             />
 
-            <LoadMoreSection loading={loading} hasMore={hasMore} onManualLoadMore={() => setPage((p) => p + 1)}
-                             loadMoreRef={loadMoreRef}/>
+            <LoadMoreSection
+                loading={loading}
+                hasMore={hasMore}
+                onManualLoadMore={() => setPage((p) => p + 1)}
+                loadMoreRef={loadMoreRef}
+            />
 
-            {!loading && !entries.length && <div className="text-center text-muted my-4">No licenses found.</div>}
+            {!loading && !entries.length && (
+                <div className="text-center text-muted my-4">No licenses found.</div>
+            )}
         </Container>
     );
 }

@@ -5,7 +5,8 @@ from datetime import date
 from dateutil.relativedelta import relativedelta
 from django.db.models import Q, Sum
 from django_filters.rest_framework import DjangoFilterBackend
-from rest_framework import filters, status, viewsets, permissions, parsers, decorators, response
+from rest_framework import filters, status, permissions, parsers, decorators, response
+from rest_framework import viewsets
 from rest_framework.generics import ListAPIView
 from rest_framework.pagination import PageNumberPagination
 from rest_framework.response import Response
@@ -199,36 +200,6 @@ class LicenseImportItemsSelectView(ListAPIView):
             "license__license_number",
             "serial_number",
         )
-
-
-class LicenseImportItemsViewSet(viewsets.ReadOnlyModelViewSet):
-    queryset = (
-        LicenseImportItemsModel.objects
-        .select_related('license')
-        .all()
-        .order_by('-license__license_expiry_date')
-        .distinct()
-    )
-    serializer_class = LicenseImportItemsSelectSerializer
-    filter_backends = [filters.SearchFilter]
-
-    def get_queryset(self):
-        queryset = super().get_queryset()
-        search = self.request.query_params.get('display_name')
-
-        if search and ' - ' in search:
-            license_part, sr_part = search.split(' - ', 1)
-            queryset = queryset.filter(
-                license__license_number__icontains=license_part.strip(),
-                serial_number__icontains=sr_part.strip()
-            )
-        elif search:
-            queryset = queryset.filter(
-                Q(license__license_number__istartswith=search) |
-                Q(license__license_number__iendswith=search)
-            )
-
-        return queryset.distinct()
 
 
 class BiscuitReportAPIView(APIView):

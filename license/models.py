@@ -10,7 +10,7 @@ from typing import Dict, Any, Optional
 
 from django.core.validators import RegexValidator
 from django.db import models
-from django.db.models import Sum, IntegerField, Count
+from django.db.models import IntegerField, Count, Sum
 from django.db.models.functions import Coalesce
 from django.db.models.signals import post_save
 from django.dispatch import receiver

@@ -2,9 +2,10 @@ from django.urls import path, include
 from rest_framework.routers import DefaultRouter
 
 from . import views
-from .api import BillOfEntryViewSet, BillOfEntryBulkDeleteView, InvoiceViewSet, InvoicePDFView
+from .api import BillOfEntryViewSet, BillOfEntryBulkDeleteView, InvoiceViewSet, InvoicePDFView, BOEOptionViewSet
 
 router = DefaultRouter()
+router.register("option-boes", BOEOptionViewSet, basename="option-boe")
 router.register(r'bill-of-entries', BillOfEntryViewSet, basename='bill-of-entry')
 router.register(r'invoices', InvoiceViewSet, basename='invoice')
 

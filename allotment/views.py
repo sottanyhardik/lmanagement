@@ -197,7 +197,7 @@ class AllotmentDeleteItemsView(TemplateResponseMixin, ContextMixin, View):
         return context
 
 
-# views.py
+# old_views.py
 
 
 def _to_float(v, default=0.0):
@@ -207,7 +207,7 @@ def _to_float(v, default=0.0):
         return default
 
 
-# views.py
+# old_views.py
 from django.http import HttpResponse
 from django.views.generic import DetailView
 from allotment import models as allotments

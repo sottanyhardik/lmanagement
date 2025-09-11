@@ -1,7 +1,8 @@
 # serializers.py
 
 from datetime import date
-from decimal import Decimal, ROUND_HALF_UP, InvalidOperation
+from decimal import Decimal
+from decimal import ROUND_HALF_UP, InvalidOperation
 from typing import Optional
 
 from django.db import transaction
@@ -9,10 +10,10 @@ from django.db.models.deletion import ProtectedError
 from rest_framework import serializers
 from rest_framework.exceptions import ValidationError
 
+from core.models import CompanyModel
 from core.models import (
     HSCodeModel,
     ItemNameModel,
-    CompanyModel,
     PortModel,
     SionNormClassModel,
 )
@@ -24,7 +25,8 @@ from core.serializers import (
     SionNormClassSerializer,
 )
 from core.utils import get_entity_prefix, number_to_words
-from license.models import LicenseExportItemModel, LicenseImportItemsModel
+from license.models import LicenseExportItemModel
+from license.models import LicenseImportItemsModel
 from .models import Invoice, InvoiceItem, InvoiceEntity
 from .models import LicenseDetailsModel
 from .models import LicensePurchase
@@ -359,11 +361,20 @@ class InvoiceNestedSerializer(serializers.ModelSerializer):
 
 
 # --------- Select list for import items ----------
+
+
 class LicenseImportItemsSelectSerializer(serializers.ModelSerializer):
     display_name = serializers.SerializerMethodField()
     hs_code = serializers.CharField(source="hs_code.hs_code", read_only=True)
     license_number = serializers.CharField(source="license.license_number", read_only=True)
     notification_number = serializers.CharField(source="license.notification_number", read_only=True)
+
+    # ---- License-level aggregates for FULL mode ----
+    license_cif_fc_total = serializers.SerializerMethodField()  # ∑ CIF $
+    license_cif_inr_total = serializers.SerializerMethodField()  # ∑ CIF ₹
+    license_fob_inr_total = serializers.SerializerMethodField()  # ∑ FOB ₹
+    license_cif_fc_balance = serializers.SerializerMethodField()  # live CIF $ balance (remaining)
+    exchange_rate_hint = serializers.SerializerMethodField()  # CIF ₹ / CIF $ (if both > 0)
 
     class Meta:
         model = LicenseImportItemsModel
@@ -377,11 +388,63 @@ class LicenseImportItemsSelectSerializer(serializers.ModelSerializer):
             "hs_code",
             "license_number",
             "notification_number",
+            # aggregates
+            "license_cif_fc_total",
+            "license_cif_inr_total",
+            "license_fob_inr_total",
+            "license_cif_fc_balance",
+            "exchange_rate_hint",
         )
 
     def get_display_name(self, obj):
-        parts = [f"LIC {obj.license.license_number}", f"SR {obj.serial_number}"]
+        parts = [f"LIC {getattr(obj.license, 'license_number', '-')}", f"SR {obj.serial_number}"]
         return " • ".join(parts)
+
+    # ---------- license aggregates ----------
+    def get_license_cif_fc_total(self, obj):
+        # Sum of export CIF $ on the license (opening)
+        try:
+            return float(getattr(obj.license, "opening_balance", 0) or 0)
+        except Exception:
+            return 0.0
+
+    def get_license_cif_inr_total(self, obj):
+        # Sum of export CIF ₹ on the license (opening)
+        try:
+            opening_cif_inr = getattr(obj.license, "opening_cif_inr", None)
+            if callable(opening_cif_inr):
+                return float(opening_cif_inr() or 0)
+            return float(opening_cif_inr or 0)
+        except Exception:
+            return 0.0
+
+    def get_license_fob_inr_total(self, obj):
+        # Sum of export FOB ₹ on the license (opening)
+        try:
+            return float(getattr(obj.license, "opening_fob", 0) or 0)
+        except Exception:
+            return 0.0
+
+    def get_license_cif_fc_balance(self, obj):
+        # Live CIF $ balance (credit - debits - allotments)
+        try:
+            bal = getattr(obj.license, "get_balance_cif", None)
+            if callable(bal):
+                return float(bal() or 0)
+            return float(bal or 0)
+        except Exception:
+            return 0.0
+
+    def get_exchange_rate_hint(self, obj):
+        # Helpful ER for UI = CIF ₹ / CIF $ (from totals). Only if both present.
+        try:
+            cif_inr = self.get_license_cif_inr_total(obj) or 0.0
+            cif_fc = self.get_license_cif_fc_total(obj) or 0.0
+            if cif_fc > 0 and cif_inr > 0:
+                return round(cif_inr / cif_fc, 4)
+        except Exception:
+            pass
+        return None
 
 
 # --------- License Export / Import item serializers ----------
