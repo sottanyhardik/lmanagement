@@ -1,15 +1,16 @@
 # Create your views here.
-import datetime
 from datetime import date
-from datetime import datetime
 from decimal import Decimal
+from pathlib import Path
 from shutil import make_archive
 
+from django.conf import settings
 from django.db.models import Prefetch
 from django.db.models import Q
 from django.http import HttpResponse
 from django.http import HttpResponseRedirect
 from django.urls import reverse, reverse_lazy
+from django.utils.timezone import now
 from django.views.generic import DetailView, FormView, DeleteView, UpdateView, CreateView
 from django_filters.views import FilterView
 from django_tables2 import SingleTableView
@@ -207,59 +208,112 @@ class DownloadPendingBillView(PDFTemplateResponseMixin, FilterView):
 
 
 class GenerateTransferLetterAPI(APIView):
+    """
+    POST /api/boe/<pk>/generate-transfer-letter/
+
+    Body (JSON):
+    {
+      "company": "...",
+      "company_address_line1": "...",
+      "company_address_line2": "...",
+      "tl_choice": 123,              # TransferLetterModel pk
+      "modified_items": [            # must align with boe.item_details order
+        {"cif_fc": 123.45},          # optional override; if null/absent, use item.cif_fc
+        ...
+      ]
+    }
+    """
+
     def post(self, request, pk):
         try:
-            boe = BillOfEntryModel.objects.get(id=pk)
-
-            # Required form fields
-            company = request.data.get('company')
-            address_1 = request.data.get('company_address_line1')
-            address_2 = request.data.get('company_address_line2')
-            tl_id = request.data.get('tl_choice')
-
-            if not (company and address_1 and address_2 and tl_id):
-                return Response({'error': 'Missing required fields'}, status=status.HTTP_400_BAD_REQUEST)
-            items_data = request.data.get('modified_items', [])
-
-            # Build TL data
-            data = []
-            for item, item_data in zip(boe.item_details.all(), items_data):
-                override_fc = item_data.get('cif_fc')
-                cif_fc = float(override_fc) if override_fc is not None else item.cif_fc
-                data.append({
-                    'status': item.sr_number.license.purchase_status,
-                    'company': company,
-                    'company_address_1': address_1,
-                    'company_address_2': address_2,
-                    'today': str(datetime.now().date()),
-                    'license': item.sr_number.license.license_number,
-                    'license_date': item.sr_number.license_date.strftime("%d/%m/%Y"),
-                    'file_number': item.sr_number.license.file_number,
-                    'quantity': item.qty,
-                    'v_allotment_inr': round(item.cif_inr, 2),
-                    'v_allotment_usd': cif_fc,
-                    'exporter_name': item.sr_number.license.exporter.name,
-                    'boe': "BE NUMBER :- " + item.bill_of_entry.bill_of_entry_number
-                })
-
-            transfer_letter = TransferLetterModel.objects.get(pk=tl_id)
-            tl_path = transfer_letter.tl.path
-            file_name_prefix = f"TL_{boe.bill_of_entry_number}_{transfer_letter.name.replace(' ', '_')}"
-            file_dir = f"media/{file_name_prefix}/"
-
-            generate_tl_software(data=data, tl_path=tl_path, path=file_dir,
-                                 transfer_letter_name=transfer_letter.name.replace(' ', '_'))
-            zip_path = make_archive(file_dir.rstrip('/'), 'zip', file_dir.rstrip('/'))
-
-            url = request.build_absolute_uri('/media/' + zip_path.split('media/')[-1])
-            return Response({'url': url, 'message': 'Success'})
-
+            boe = BillOfEntryModel.objects.select_related().prefetch_related("item_details").get(id=pk)
         except BillOfEntryModel.DoesNotExist:
-            return Response({'error': 'BOE not found'}, status=status.HTTP_404_NOT_FOUND)
+            return Response({"error": "BOE not found"}, status=status.HTTP_404_NOT_FOUND)
+
+        company = request.data.get("company")
+        address_1 = request.data.get("company_address_line1")
+        address_2 = request.data.get("company_address_line2")
+        tl_id = request.data.get("tl_choice")
+
+        if not (company and address_1 and address_2 and tl_id):
+            return Response({"error": "Missing required fields"}, status=status.HTTP_400_BAD_REQUEST)
+
+        try:
+            transfer_letter = TransferLetterModel.objects.get(pk=tl_id)
         except TransferLetterModel.DoesNotExist:
-            return Response({'error': 'Transfer Letter not found'}, status=status.HTTP_404_NOT_FOUND)
-        except Exception as e:
-            return Response({'error': str(e)}, status=status.HTTP_500_INTERNAL_SERVER_ERROR)
+            return Response({"error": "Transfer Letter not found"}, status=status.HTTP_404_NOT_FOUND)
+
+        items_data = request.data.get("modified_items", [])
+        boe_items = list(boe.item_details.all())
+
+        # Optional sanity check: lengths should match to avoid silent truncation by zip()
+        if items_data and len(items_data) != len(boe_items):
+            return Response(
+                {"error": "modified_items length does not match BOE item count"},
+                status=status.HTTP_400_BAD_REQUEST,
+            )
+
+        today_str = now().date().isoformat()
+
+        data = []
+        for item, item_data in zip(boe_items, items_data or [{}] * len(boe_items)):
+            override_fc = item_data.get("cif_fc", None)
+            cif_fc = float(override_fc) if override_fc not in (None, "") else float(item.cif_fc or 0.0)
+
+            lic = item.sr_number.license  # assuming relations exist
+            # Handle possibly missing license_date on sr_number; fall back to license.license_issue_date if present
+            try:
+                license_date_dt = item.sr_number.license_date
+            except AttributeError:
+                license_date_dt = getattr(lic, "license_issue_date", None)
+            license_date = license_date_dt.strftime("%d/%m/%Y") if license_date_dt else ""
+
+            data.append({
+                "status": getattr(lic, "purchase_status", "") or "",
+                "company": company,
+                "company_address_1": address_1,
+                "company_address_2": address_2,
+                "today": today_str,
+                "license": lic.license_number,
+                "license_date": license_date,
+                "file_number": lic.file_number or "",
+                "quantity": item.qty,
+                "v_allotment_inr": round(float(item.cif_inr or 0.0), 2),
+                "v_allotment_usd": cif_fc,
+                "exporter_name": lic.exporter.name if getattr(lic, "exporter", None) else "",
+                "boe": f"BE NUMBER :- {item.bill_of_entry.bill_of_entry_number}",
+            })
+
+        # Paths
+        file_name_prefix = f"TL_{boe.bill_of_entry_number}_{transfer_letter.name.replace(' ', '_')}"
+        # Store under MEDIA_ROOT
+        output_dir = Path(settings.MEDIA_ROOT) / file_name_prefix
+        output_dir.mkdir(parents=True, exist_ok=True)
+
+        # Generate PDFs (or DOCX if converter missing)
+        tl_path = transfer_letter.tl.path  # should be a real file path
+        result = generate_tl_software(
+            data=data,
+            tl_path=tl_path,
+            path=str(output_dir),
+            transfer_letter_name=transfer_letter.name.replace(" ", "_"),
+        )
+
+        # Zip the folder
+        base_name = str(output_dir)  # without .zip
+        zip_file = make_archive(base_name, "zip", root_dir=str(output_dir))
+
+        # Build URL from MEDIA_URL
+        rel_zip_path = Path(zip_file).relative_to(settings.MEDIA_ROOT).as_posix()
+        url = request.build_absolute_uri(f"{settings.MEDIA_URL}{rel_zip_path}")
+
+        payload = {"url": url, "message": "Success"}
+        if result.get("converter") is None:
+            payload["warning"] = (
+                "PDF converter not found; generated DOCX files instead. "
+                "Install LibreOffice or set LIBREOFFICE_PATH to enable PDF output."
+            )
+        return Response(payload, status=status.HTTP_200_OK)
 
 
 class BillOfEntryExportView(APIView):
