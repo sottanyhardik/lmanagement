@@ -92,15 +92,34 @@ const TradeLinesTable = ({
         const prefillFromBOE = async () => {
             if (!boeId) return;
             try {
+                // fetch the BOE ONCE; use its exchange_rate as a robust fallback
                 const {data} = await axios.get(`bill-of-entries/${boeId}/`);
                 console.log("BOE prefill:", data);
+                const exHint = num(data?.exchange_rate); // may be 0/NaN if not present
                 const items = data?.item_details || [];
                 if (!Array.isArray(items) || !items.length) return;
 
                 const mapped = items.map((it) => {
-                    const cif_fc = num(it.cif_fc);
-                    const cif_inr = num(it.cif_inr);
-                    const exch = cif_fc > 0 ? cif_inr / cif_fc : "";
+                    // Prefer item values; fill the missing one via exchange rate
+                    let cif_fc = num(it.cif_fc);
+                    let cif_inr = num(it.cif_inr);
+
+                    // Decide exchange rate:
+                    // 1) Use BOE.exchange_rate if positive
+                    // 2) Else derive from item values (if both present)
+                    // 3) Else leave blank
+                    let exch =
+                        exHint > 0
+                            ? exHint
+                            : cif_fc > 0 && cif_inr > 0
+                                ? cif_inr / cif_fc
+                                : 0;
+
+                    // If exHint known, fill the missing side from the other:
+                    if (exch > 0) {
+                        if (cif_fc > 0 && cif_inr <= 0) cif_inr = cif_fc * exch;
+                        if (cif_inr > 0 && cif_fc <= 0) cif_fc = cif_inr / exch;
+                    }
 
                     return {
                         id: undefined,
@@ -109,9 +128,12 @@ const TradeLinesTable = ({
                         description: "",
                         qty_kg: num(it.qty).toString(),
                         rate_inr_per_kg: "0",
-                        cif_fc: cif_fc.toString(),
-                        exch_rate: exch ? exch.toFixed(4) : "",
-                        cif_inr: cif_inr.toString(),
+
+                        // Value triad (strings for inputs)
+                        cif_fc: cif_fc ? cif_fc.toString() : "0",
+                        exch_rate: exch > 0 ? exch.toFixed(4) : "", // show blank if unknown
+                        cif_inr: cif_inr ? cif_inr.toString() : "0",
+
                         fob_inr: "0",
                         pct: "0",
                         amount_inr: 0,
@@ -188,7 +210,7 @@ const TradeLinesTable = ({
             const normalized = normalizeSrOption(option);
             updateRow(i, {sr_number: normalized});
 
-            if (boeId) return; // if BOE-linked, do not override
+            if (boeId) return; // if BOE-linked, do not override (prefilled already)
 
             const id = asId(normalized);
             if (!id) return;
@@ -238,7 +260,8 @@ const TradeLinesTable = ({
     }, [rows]);
 
     const showQtyCols = (r) => (r.mode || "QTY") === "QTY";
-    const showValueCols = (r) => ["CIF_INR", "FOB_INR"].includes(r.mode || "QTY");
+    const showValueCols = (r) =>
+        ["CIF_INR", "FOB_INR"].includes(r.mode || "QTY");
 
     return (
         <>
@@ -287,7 +310,9 @@ const TradeLinesTable = ({
                                 <Form.Control
                                     size="sm"
                                     value={r.description || ""}
-                                    onChange={(e) => updateRow(i, {description: e.target.value})}
+                                    onChange={(e) =>
+                                        updateRow(i, {description: e.target.value})
+                                    }
                                 />
                             </td>
 
@@ -404,9 +429,7 @@ const TradeLinesTable = ({
                             </td>
 
                             {/* Bill amount */}
-                            <td className="text-end">
-                                {computeBillAmount(r).toFixed(2)}
-                            </td>
+                            <td className="text-end">{computeBillAmount(r).toFixed(2)}</td>
 
                             {/* Actions */}
                             <td className="text-center">
@@ -442,8 +465,7 @@ const TradeLinesTable = ({
 
                 <div className="text-end small">
                     <div>
-                        <strong>Totals</strong> — Qty:{" "}
-                        <strong>{totals.qty.toFixed(4)}</strong>
+                        <strong>Totals</strong> — Qty: <strong>{totals.qty.toFixed(4)}</strong>
                         {"  "} | CIF $: <strong>{totals.cif_fc.toFixed(4)}</strong>
                         {"  "} | CIF ₹: <strong>{totals.cif_inr.toFixed(2)}</strong>
                         {"  "} | FOB ₹: <strong>{totals.fob_inr.toFixed(2)}</strong>

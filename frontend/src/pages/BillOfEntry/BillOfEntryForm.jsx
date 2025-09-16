@@ -1,3 +1,4 @@
+// src/pages/BOE/BillOfEntryForm.jsx
 import React, {useCallback, useEffect, useMemo, useRef, useState} from 'react';
 import {Button, Col, Form, Row} from 'react-bootstrap';
 import AsyncCompanySelect from '../../components/AsyncSelect/AsyncCompanySelect';
@@ -15,7 +16,6 @@ const emptyRow = () => ({
     cif_inr: '',
 });
 
-/** Normalize any SR shape into {value, label} */
 function toSrOption(sr) {
     if (!sr) return null;
     if (typeof sr === 'number') return {value: sr, label: String(sr)};
@@ -33,7 +33,6 @@ const BillOfEntryForm = ({entry, isNew = false, onClose, onSaved}) => {
     const exchangeRateRef = useRef();
     const lastRowRef = useRef();
 
-    // Normalize initial entry
     const [data, setData] = useState(() => {
         const e = entry ?? {};
         const items = Array.isArray(e.item_details) ? e.item_details : [];
@@ -212,7 +211,7 @@ const BillOfEntryForm = ({entry, isNew = false, onClose, onSaved}) => {
         setData((prev) => ({...prev, item_details: updated}));
     };
 
-    // When rate changes, only back-fill the missing counterpart; don't overwrite existing values.
+    // When rate changes, back-fill only missing counterpart (do not overwrite existing values).
     useEffect(() => {
         const rate = parseFloat(data.exchange_rate);
         if (!rate || rate <= 0) return;
@@ -227,7 +226,7 @@ const BillOfEntryForm = ({entry, isNew = false, onClose, onSaved}) => {
                 const inrNum = parseFloat(row.cif_inr);
                 if (Number.isFinite(inrNum)) return {...row, cif_fc: (inrNum / rate).toFixed(4)};
             }
-            return row; // both blank or both filled -> leave as-is
+            return row;
         });
         setData((prev) => ({...prev, item_details: updated}));
         // eslint-disable-next-line react-hooks/exhaustive-deps
@@ -273,7 +272,6 @@ const BillOfEntryForm = ({entry, isNew = false, onClose, onSaved}) => {
 
         setSaving(true);
         try {
-            // Build clean payload (PKs + numbers only)
             const payload = {
                 company: data.company?.id ?? data.company,
                 bill_of_entry_number: data.bill_of_entry_number,
@@ -284,7 +282,7 @@ const BillOfEntryForm = ({entry, isNew = false, onClose, onSaved}) => {
                 allotment: (data.allotment || []).map((a) => a?.id ?? a).filter(Boolean),
                 invoice_no: data.invoice_no || '',
                 item_details: (data.item_details || []).map((row) => ({
-                    sr_number: row.sr_number?.value ?? row.sr_number?.id ?? null, // PK
+                    sr_number: row.sr_number?.value ?? row.sr_number?.id ?? null,
                     qty: row.qty === '' ? null : Number(row.qty),
                     cif_fc: row.cif_fc === '' ? null : Number(row.cif_fc),
                     cif_inr: row.cif_inr === '' ? null : Number(row.cif_inr),
@@ -308,7 +306,11 @@ const BillOfEntryForm = ({entry, isNew = false, onClose, onSaved}) => {
                 toast.error(
                     typeof detail === 'string'
                         ? detail
-                        : `${firstKey}: ${Array.isArray(detail[firstKey]) ? detail[firstKey][0] : JSON.stringify(detail[firstKey])}`
+                        : `${firstKey}: ${
+                            Array.isArray(detail[firstKey])
+                                ? detail[firstKey][0]
+                                : JSON.stringify(detail[firstKey])
+                        }`
                 );
             } else {
                 toast.error('Failed to save entry');
@@ -324,7 +326,9 @@ const BillOfEntryForm = ({entry, isNew = false, onClose, onSaved}) => {
                 <>
                     {console.log(errors)}
                     <div className="alert alert-danger py-2 small">
-                        <strong className="d-block mb-1">Please resolve the following validation issues:</strong>
+                        <strong className="d-block mb-1">
+                            Please resolve the following validation issues:
+                        </strong>
                         <ul className="mb-0 ps-3">
                             {Object.entries(errors).map(([field, msg], i) => (
                                 <li key={i}>
@@ -347,7 +351,9 @@ const BillOfEntryForm = ({entry, isNew = false, onClose, onSaved}) => {
                         isInvalid={!!errors.bill_of_entry_number}
                         onChange={(e) => handleChange('bill_of_entry_number', e.target.value)}
                     />
-                    <Form.Control.Feedback type="invalid">{errors.bill_of_entry_number}</Form.Control.Feedback>
+                    <Form.Control.Feedback type="invalid">
+                        {errors.bill_of_entry_number}
+                    </Form.Control.Feedback>
                 </Col>
                 <Col md={3}>
                     <Form.Label htmlFor="boe_date">Date</Form.Label>
@@ -360,7 +366,9 @@ const BillOfEntryForm = ({entry, isNew = false, onClose, onSaved}) => {
                         isInvalid={!!errors.bill_of_entry_date}
                         onChange={(e) => handleChange('bill_of_entry_date', e.target.value)}
                     />
-                    <Form.Control.Feedback type="invalid">{errors.bill_of_entry_date}</Form.Control.Feedback>
+                    <Form.Control.Feedback type="invalid">
+                        {errors.bill_of_entry_date}
+                    </Form.Control.Feedback>
                 </Col>
                 <Col md={3}>
                     <Form.Label>Company</Form.Label>
@@ -397,7 +405,9 @@ const BillOfEntryForm = ({entry, isNew = false, onClose, onSaved}) => {
                         isInvalid={!!errors.invoice_no}
                         onChange={(e) => handleChange('invoice_no', e.target.value)}
                     />
-                    <Form.Control.Feedback type="invalid">{errors.invoice_no}</Form.Control.Feedback>
+                    <Form.Control.Feedback type="invalid">
+                        {errors.invoice_no}
+                    </Form.Control.Feedback>
                 </Col>
                 <Col md={4}>
                     <Form.Label htmlFor="product_name">Product Name</Form.Label>
@@ -409,7 +419,9 @@ const BillOfEntryForm = ({entry, isNew = false, onClose, onSaved}) => {
                         isInvalid={!!errors.product_name}
                         onChange={(e) => handleChange('product_name', e.target.value)}
                     />
-                    <Form.Control.Feedback type="invalid">{errors.product_name}</Form.Control.Feedback>
+                    <Form.Control.Feedback type="invalid">
+                        {errors.product_name}
+                    </Form.Control.Feedback>
                 </Col>
                 <Col md={4}>
                     <Form.Label htmlFor="exchange_rate">Exchange Rate</Form.Label>

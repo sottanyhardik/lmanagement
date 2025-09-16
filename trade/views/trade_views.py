@@ -1,4 +1,5 @@
 # trade/views/trade_views.py
+import re
 from datetime import date as date_cls
 
 from django.db.models import Sum, Value as V, DecimalField, F
@@ -97,35 +98,84 @@ class LicenseTradeViewSet(viewsets.ModelViewSet):
         resp["Content-Disposition"] = f'inline; filename="{fname}"'
         return resp
 
+    from rest_framework import decorators
+
     @decorators.action(detail=False, methods=["GET"], url_path="next-invoice")
     def next_invoice(self, request):
         """
         Utility endpoint:
         GET /api/trades/next-invoice/?seller=<company_id>&date=YYYY-MM-DD
-        Uses seller as FROM company (preferred). If not found, tries as Company pk anyway.
+        Builds prefix from seller name and auto-resets serial when FY changes.
         """
         seller_id = request.query_params.get("seller")
         date_str = request.query_params.get("date")
         if not seller_id:
             return response.Response({"detail": "seller is required (Company ID)."}, status=400)
 
+        # Resolve seller
         try:
             seller = CompanyModel.objects.get(pk=seller_id)
         except CompanyModel.DoesNotExist:
             return response.Response({"detail": "Seller company not found."}, status=404)
 
+        # Resolve target date (for FY)
         if date_str:
             try:
                 y, m, d = [int(x) for x in date_str.split("-")]
                 dval = date_cls(y, m, d)
             except Exception:
-                dval = None
+                dval = date_cls.today()
         else:
-            dval = None
+            dval = date_cls.today()
 
-        inv = LicenseTrade.next_invoice_number(seller_company=seller, invoice_date=dval)
-        return response.Response({
-            "invoice_number": inv,
-            "prefix": inv.split("/")[0] if inv else "",
-            "fy": inv.split("/")[1] if inv and inv.count("/") >= 2 else "",
-        })
+        # ---- Build prefix from company name ----
+        name = (seller.name or "").strip()
+        if name:
+            words = [w for w in re.split(r"\s+", name) if w]
+            if len(words) > 1:
+                # Take first letter of each word
+                prefix = "".join(w[0] for w in words).upper()
+            else:
+                # Single word → first 3 letters
+                prefix = words[0][:3].upper()
+        else:
+            prefix = "INV"
+
+        # ---- Compute FY (Apr–Mar) as "YY-YY" ----
+        # Example: for 2025-04-01 to 2026-03-31 → "25-26"
+        start_year = dval.year if dval.month >= 4 else (dval.year - 1)
+        fy = f"{str(start_year)[-2:]}-{str(start_year + 1)[-2:]}"
+
+        # ---- Find next serial for this seller/prefix/FY (resets per FY) ----
+        prefix_fy = f"{prefix}/{fy}/"
+        qs = LicenseTrade.objects.filter(
+            direction=LicenseTrade.DIR_SALE,  # numbering per seller's sales
+            # from_company is the seller
+            from_company=seller,
+            invoice_number__startswith=prefix_fy,
+        )
+
+        # Extract max serial suffix
+        max_serial = 0
+        for inv in qs.values_list("invoice_number", flat=True):
+            # Expect formats like "ABC/24-25/12" (be lenient on extra slashes)
+            parts = str(inv or "").split("/")
+            if len(parts) >= 3 and parts[0] == prefix and parts[1] == fy:
+                try:
+                    serial = int(parts[2])
+                    if serial > max_serial:
+                        max_serial = serial
+                except (ValueError, TypeError):
+                    pass
+
+        next_serial = max_serial + 1
+        inv = f"{prefix}/{fy}/{next_serial:04d}"
+
+        return response.Response(
+            {
+                "invoice_number": inv,
+                "prefix": prefix,
+                "fy": fy,
+            },
+            status=status.HTTP_200_OK,
+        )

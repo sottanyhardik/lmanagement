@@ -3,6 +3,8 @@ from django.db import transaction
 from django.db.models import Sum
 from rest_framework import serializers
 
+from bill_of_entry.models import BillOfEntryModel
+from bill_of_entry.serializers import BOEOptionSerializer
 from core.models import CompanyModel
 from core.serializers import CompanySerializer
 from license.models import LicenseImportItemsModel
@@ -55,12 +57,31 @@ class LicenseTradeSerializer(serializers.ModelSerializer):
     from_company = CompanySerializer(read_only=True)
     to_company = CompanySerializer(read_only=True)
 
+    # Read-only BOE (display only)
+    boe = BOEOptionSerializer(read_only=True)
+
     # Write-only IDs mapped to model fields using `source=*`
     from_company_id = serializers.PrimaryKeyRelatedField(
-        queryset=CompanyModel.objects.all(), write_only=True, required=False, allow_null=True, source="from_company"
+        queryset=CompanyModel.objects.all(),
+        write_only=True,
+        required=False,
+        allow_null=True,
+        source="from_company",
     )
     to_company_id = serializers.PrimaryKeyRelatedField(
-        queryset=CompanyModel.objects.all(), write_only=True, required=False, allow_null=True, source="to_company"
+        queryset=CompanyModel.objects.all(),
+        write_only=True,
+        required=False,
+        allow_null=True,
+        source="to_company",
+    )
+    # 👉 NEW: write-only BOE id (create/update with this)
+    boe_id = serializers.PrimaryKeyRelatedField(
+        queryset=BillOfEntryModel.objects.all(),
+        write_only=True,
+        required=False,
+        allow_null=True,
+        source="boe",
     )
 
     lines = LicenseTradeLineSerializer(many=True)
@@ -77,9 +98,12 @@ class LicenseTradeSerializer(serializers.ModelSerializer):
         fields = [
             "id",
             "direction",
-            "boe",
 
-            # companies
+            # BOE
+            "boe",  # read-only nested
+            "boe_id",  # write-only id
+
+            # companies (read-only nested + write-only ids)
             "from_company", "from_company_id",
             "to_company", "to_company_id",
 
@@ -130,6 +154,7 @@ class LicenseTradeSerializer(serializers.ModelSerializer):
             "sale_pdf_url",
             "created_on",
             "modified_on",
+            "boe",  # keep boe read-only nested
         ]
 
     # --------- derived getters ---------
@@ -250,6 +275,7 @@ class LicenseTradeSerializer(serializers.ModelSerializer):
 
         # Roll-up totals
         trade.recompute_totals()
+
         # ✅ If SALE + BOE present, sync invoice_no to BOE
         if trade.direction == LicenseTrade.DIR_SALE and trade.boe_id and trade.invoice_number:
             try:
@@ -294,6 +320,8 @@ class LicenseTradeSerializer(serializers.ModelSerializer):
 
         # Recompute totals
         instance.recompute_totals()
+
+        # Keep BOE invoice_no in sync for SALE
         if instance.direction == LicenseTrade.DIR_SALE and instance.boe_id and instance.invoice_number:
             try:
                 instance.boe.invoice_no = instance.invoice_number
