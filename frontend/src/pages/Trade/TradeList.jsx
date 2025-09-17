@@ -10,13 +10,13 @@ import LoadMoreSection from "../../components/generic/LoadMoreSection";
 import GroupedAccordion from "../../components/generic/GroupedAccordion";
 
 import TradeFilters from "./TradeFilters";
-import TradeHtmlView from "./TradeHtmlView";
 import TradePaymentsTable from "./TradePaymentsTable";
 import TotalsInline from "./components/TotalsInline";
 import useTradeListManager from "../../hooks/Trade/useTradeListManager";
 import {tradeEntryTotals, tradeTotals} from "./helpers/groupingHelpers";
 
-const TradeForm = lazy(() => import("./TradeForm"));
+// 👉 use the new unified core editor/viewer
+const TradeInvoiceCore = lazy(() => import("../../components/trade/TradeInvoiceCore"));
 
 const Fallback = () => (
     <div className="py-3 text-center text-muted">
@@ -63,7 +63,7 @@ export default function TradeList({initialFilters}) {
 
     const [showNew, setShowNew] = useState(false);
     const onAddNewClick = () => {
-        setNewEntry({direction: "PURCHASE", lines: []});
+        setNewEntry({direction: "PURCHASE"}); // minimal seed; the core will start blank
         setShowNew(true);
     };
 
@@ -80,8 +80,12 @@ export default function TradeList({initialFilters}) {
             if (!acc[direction].items[party]) acc[direction].items[party] = {label: party, ports: {}};
 
             if (e?.direction === "SALE") {
-                // If your API returns `boe` as ID, this will be "-" unless you pass a label
-                const boeLabel = e?.boe?.boe_number || e?.boe_no || "-";
+                // Prefer BOE bill_of_entry_number if available
+                const boeLabel =
+                    e?.boe?.bill_of_entry_number ||
+                    e?.boe?.boe_number ||
+                    e?.boe_no ||
+                    "-";
                 if (!acc[direction].items[party].ports[boeLabel]) {
                     acc[direction].items[party].ports[boeLabel] = {
                         label: boeLabel,
@@ -91,11 +95,11 @@ export default function TradeList({initialFilters}) {
                 }
                 acc[direction].items[party].ports[boeLabel].entries.push(e);
             } else {
-                // PURCHASE: don't show a BOE layer — keep in a hidden bucket
+                // PURCHASE: keep in a hidden bucket (no BOE layer)
                 const key = "__purchase_bucket__";
                 if (!acc[direction].items[party].ports[key]) {
                     acc[direction].items[party].ports[key] = {
-                        label: null, // important: no label = we won't render "BOE: -"
+                        label: null,
                         direction: "PURCHASE",
                         entries: [],
                     };
@@ -109,10 +113,9 @@ export default function TradeList({initialFilters}) {
 
     const totalLoaded = entries.length;
     const groupCount = useMemo(() => Object.keys(groups || {}).length, [groups]);
-    const selectedCount = selectedIds.length;
 
     useEffect(() => {
-        // Expand all loaded entries by default
+        // expand all loaded entries by default
         const all = {};
         (entries || []).forEach((e) => {
             if (e?.id != null) all[e.id] = true;
@@ -222,15 +225,19 @@ export default function TradeList({initialFilters}) {
 
                 <Collapse in={!!expanded[entry.id]} mountOnEnter unmountOnExit>
                     <Card.Body className="bg-white border-top-0">
-                        <Tabs defaultActiveKey="view" className="mb-3" justify mountOnEnter unmountOnExit={false}>
-                            <Tab eventKey="view" title="📄 View">
-                                <TradeHtmlView entry={entry}/>
-                            </Tab>
-                            <Tab eventKey="edit" title="✏️ Edit">
+                        <Tabs defaultActiveKey="trade" className="mb-3" justify mountOnEnter unmountOnExit={false}>
+                            <Tab eventKey="trade" title="📄 Trade">
                                 <Suspense fallback={<Fallback/>}>
-                                    <TradeForm entry={entry} onSaved={() => updateSingleEntry(entry.id)}/>
+                                    <TradeInvoiceCore
+                                        mode={entry.direction}
+                                        boe={entry.boe || null}
+                                        initialTrade={entry}
+                                        fetchByBoe={entry.direction === "SALE"}
+                                        onSaved={() => updateSingleEntry(entry.id)}
+                                    />
                                 </Suspense>
                             </Tab>
+
                             <Tab eventKey="payments" title="💸 Payments">
                                 <TradePaymentsTable
                                     tradeId={entry.id}
@@ -242,7 +249,6 @@ export default function TradeList({initialFilters}) {
                             <Tab eventKey="totals" title="🧮 Totals">
                                 <TotalsInline entry={entry}/>
                             </Tab>
-
                         </Tabs>
                     </Card.Body>
                 </Collapse>
@@ -269,7 +275,7 @@ export default function TradeList({initialFilters}) {
             />
 
             <StatsBar
-                totalLoaded={totalLoaded}
+                totalLoaded={entries.length}
                 groupCount={groupCount}
                 selectedCount={selectedIds.length}
                 allExpanded={allExpanded}
@@ -295,8 +301,13 @@ export default function TradeList({initialFilters}) {
                 <Suspense fallback={<Fallback/>}>
                     <NewEntryCard
                         title="New Trade"
-                        Editor={TradeForm}
-                        editorProps={{entry: newEntry, isNew: true}}
+                        Editor={TradeInvoiceCore}
+                        editorProps={{
+                            mode: newEntry.direction || "PURCHASE",
+                            boe: null,
+                            initialTrade: null,
+                            fetchByBoe: false,
+                        }}
                         onClose={() => {
                             setShowNew(false);
                             setNewEntry(null);

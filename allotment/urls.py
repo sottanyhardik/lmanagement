@@ -1,23 +1,17 @@
-from django.contrib.auth.decorators import login_required
 from django.urls import path, include
 # urls.py
 from rest_framework.routers import DefaultRouter
 
-from . import views
-from .api import AllotmentOptionViewSet, AllotmentViewSet, GenerateTransferLetterForAllotmentAPI
+from .api import AllotmentOptionViewSet, AllotmentViewSet
 
 router = DefaultRouter()
 router.register(r'option-allotments', AllotmentOptionViewSet, basename='allotment')
 router.register(r"allotments", AllotmentViewSet, basename="allotments")
 
 urlpatterns = [
-    path('allotments/<int:pk>/generate-tl/', GenerateTransferLetterForAllotmentAPI.as_view(),
-         name='allotments-tl'),
-    path('allotments/<int:pk>/download-pdf/', login_required(views.SendAllotmentView.as_view()),
-         name='allotment-download'),
     path('', include(router.urls)),
     # ex: /polls/
-    path('add/', login_required(views.AllotmentCreateView.as_view()), name='allotment-add'),
+    # path('add/', login_required(views.AllotmentCreateView.as_view()), name='allotment-add'),
     # path('card/<int:pk>/', login_required(views.CardView.as_view()), name='allotment-card'),
     # path('<int:pk>', login_required(views.StartAllotmentView.as_view()), name='allotment-details'),
     # path('', login_required(views.AllotmentView.as_view()), name='allotment-list'),

@@ -1,6 +1,6 @@
 # allotment/old_views.py
-from datetime import datetime
 from decimal import Decimal, ROUND_FLOOR, ROUND_CEILING
+from pathlib import Path
 from shutil import make_archive
 
 from django.db import transaction
@@ -8,6 +8,7 @@ from django.db.models import F, Value, FloatField, Q
 from django.db.models import Sum
 from django.db.models.functions import Coalesce
 from django.http import HttpResponse
+from django.utils.text import slugify
 from django.utils.timezone import now
 from django.views.generic import DetailView
 from django_filters import rest_framework as dj_filters
@@ -19,7 +20,6 @@ from rest_framework.decorators import action
 from rest_framework.filters import SearchFilter, OrderingFilter
 from rest_framework.pagination import PageNumberPagination
 from rest_framework.response import Response
-from rest_framework.views import APIView
 
 from core.models import TransferLetterModel
 from core.utils import render_to_pdf
@@ -202,6 +202,23 @@ class StandardResultsSetPagination(PageNumberPagination):
     max_page_size = 200
 
 
+from datetime import datetime
+
+
+def _to_float(v, default=0.0):
+    try:
+        return float(v if v is not None else default)
+    except (TypeError, ValueError):
+        return default
+
+
+def _fmt_date(d):
+    try:
+        return d.strftime("%d/%m/%Y")
+    except Exception:
+        return "" if d is None else str(d)
+
+
 # ---------- Main ViewSet ----------
 class AllotmentViewSet(viewsets.ModelViewSet):
     """
@@ -322,11 +339,196 @@ class AllotmentViewSet(viewsets.ModelViewSet):
             },
         })
 
+    def _to_float(v, default=0.0):
+        try:
+            return float(v if v is not None else default)
+        except (TypeError, ValueError):
+            return default
+
+    def _fmt_date(d):
+        try:
+            return d.strftime("%d/%m/%Y")
+        except Exception:
+            return "" if d is None else str(d)
+
+    @action(detail=True, methods=["get"], url_path="download-pdf")
+    def download_pdf(self, request, pk=None):
+        """
+        Render the allotment "send" PDF, inline by default.
+        Use ?download=1 to force attachment.
+        """
+        obj = self.get_object()
+        exr = _to_float(getattr(obj, "exchange_rate", 0.0), 0.0)
+
+        rows = []
+        t_qty = t_fc = t_inr = 0.0
+
+        details = obj.allotment_details.select_related("item__license__exporter").all()
+        for d in details:
+            qty = _to_float(d.qty, 0)
+            cif_fc = _to_float(d.cif_fc, 0)
+            cif_inr_saved = _to_float(d.cif_inr, 0)
+            cif_inr = cif_inr_saved if cif_inr_saved > 0 else (cif_fc * exr if cif_fc > 0 and exr > 0 else 0)
+
+            rows.append({
+                "license_number": getattr(d, "license_number", "") or "",
+                "license_date": _fmt_date(getattr(d, "license_date", None)),
+                "registration_number": getattr(d, "registration_number", "") or "",
+                "registration_date": _fmt_date(getattr(d, "registration_date", None)),
+                "port_code": getattr((getattr(d, "port_code", "") or ""), "code", "").upper(),
+                "serial_number": getattr(d, "serial_number", "") or "",
+                "qty": qty,
+                "cif_fc": cif_fc,
+                "cif_inr": cif_inr,
+                "notification_number": getattr(d, "notification_number", "") or "",
+                "as_per_invoice": (cif_fc == 0),
+            })
+
+            t_qty += qty
+            t_fc += cif_fc
+            t_inr += cif_inr
+
+        context = {
+            "rows": rows,
+            "exchange_rate": exr,
+            "totals": {"qty": t_qty, "fc": t_fc, "inr": t_inr},
+            # if your template needs `object` or `allotment`, include it:
+            "object": obj,
+            "allotment": obj,
+        }
+
+        pdf = render_to_pdf("allotment/send.html", context)
+        if not pdf:
+            return HttpResponse("Not found", status=404)
+
+        invoice_part = f"_{slugify(obj.invoice)}" if getattr(obj, "invoice", None) else ""
+        filename = f"Allotment_{obj.id}{invoice_part}.pdf"
+        disposition = "attachment" if request.GET.get("download") else "inline"
+
+        resp = HttpResponse(pdf, content_type="application/pdf")
+        resp["Content-Disposition"] = f"{disposition}; filename={filename}"
+        return resp
+
     # ---- Stub for TL generation ----
     @action(detail=True, methods=["post"], url_path="transfer-letter")
     def transfer_letter(self, request, pk=None):
-        # TODO: implement TL generator
-        return Response({"detail": "Generator not implemented"}, status=status.HTTP_501_NOT_IMPLEMENTED)
+        """
+        Alias of generate-tl: build TL from an allotment using a chosen template.
+        Accepts:
+          - company, company_address_line1, company_address_line2 (strings)
+          - tl_choice (template id)
+          - modified_items: [{id: <allotment_detail_id>, cif_fc: <number>}]
+        Returns: {"url": "<absolute .zip url>", "message": "Success"}
+        """
+        try:
+            allotment = self.get_object()
+
+            company = (request.data.get("company") or "").strip()
+            address_1 = (request.data.get("company_address_line1") or "").strip()
+            address_2 = (request.data.get("company_address_line2") or "").strip()
+            tl_id = request.data.get("tl_choice")
+            modified = {
+                int(it["id"]): float(it.get("cif_fc") or 0)
+                for it in (request.data.get("modified_items") or [])
+                if "id" in it
+            }
+
+            # ---------- build & GROUP rows by license_number ----------
+            grouped: dict[str, dict] = {}
+
+            for detail in allotment.allotment_details.select_related("item__license__exporter").all():
+                cif_fc = modified.get(detail.id, float(detail.cif_fc or 0))
+                qty = float(detail.qty or 0)
+                cif_inr = float(detail.cif_inr or 0)
+
+                lic_item = getattr(detail, "item", None)
+                lic = getattr(lic_item, "license", None) if lic_item else None
+
+                license_number = (
+                                     getattr(lic, "license_number", "") if lic else getattr(detail, "license_number",
+                                                                                            "")
+                                 ) or ""  # normalize to str
+
+                license_date = (
+                        getattr(detail, "license_date", None)
+                        or (getattr(lic, "license_date", None) if lic else None)
+                )
+                license_date_str = license_date.strftime("%d/%m/%Y") if license_date else ""
+
+                file_number = (
+                        getattr(detail, "file_number", None)
+                        or (getattr(lic, "file_number", None) if lic else "")
+                )
+
+                exporter_obj = getattr(lic, "exporter", None) if lic else getattr(detail, "exporter", None)
+                exporter_name = getattr(exporter_obj, "name", "") if exporter_obj else ""
+
+                purchase_status = getattr(lic, "purchase_status", "") if lic else ""
+
+                # choose grouping key: group only when license_number is present,
+                # otherwise keep lines independent using unique per-detail key
+                key = license_number or f"__detail_{detail.id}"
+
+                if key not in grouped:
+                    grouped[key] = {
+                        "status": purchase_status,
+                        "company": company,
+                        "company_address_1": address_1,
+                        "company_address_2": address_2,
+                        "today": str(datetime.now().date()),
+                        "license": license_number,
+                        "license_date": license_date_str,
+                        "file_number": file_number,
+                        "quantity": 0.0,
+                        "v_allotment_inr": 0.0,
+                        "v_allotment_usd": 0.0,
+                        "exporter_name": exporter_name,
+                        "boe": f"ALLOTMENT #{allotment.id}" + (
+                            f" • INVOICE :- {allotment.invoice}" if allotment.invoice else ""
+                        ),
+                    }
+
+                # accumulate totals
+                grouped[key]["quantity"] += qty
+                grouped[key]["v_allotment_usd"] += float(cif_fc)
+                grouped[key]["v_allotment_inr"] += cif_inr
+
+            # Final list for generator
+            data = list(grouped.values())
+            # round money fields to 2dp for neatness
+            for row in data:
+                row["v_allotment_usd"] = round(row["v_allotment_usd"], 2)
+                row["v_allotment_inr"] = round(row["v_allotment_inr"], 2)
+
+            transfer_letter = TransferLetterModel.objects.get(pk=tl_id)
+            tl_path = transfer_letter.tl.path
+            file_name_prefix = f"TL_ALLOT_{allotment.id}_{transfer_letter.name.replace(' ', '_')}"
+            file_dir = f"media/{file_name_prefix}/"
+
+            generate_tl_software(
+                data=data,
+                tl_path=tl_path,
+                path=file_dir,
+                transfer_letter_name=transfer_letter.name.replace(" ", "_"),
+            )
+
+            # delete old ZIP (if any) then re-create
+            base = Path(file_dir.rstrip("/"))
+            old_zip = base.with_suffix(".zip")
+            if old_zip.exists():
+                try:
+                    old_zip.unlink()
+                except Exception:
+                    pass
+
+            zip_path = make_archive(file_dir.rstrip("/"), "zip", file_dir.rstrip("/"))
+            url = request.build_absolute_uri("/media/" + zip_path.split("media/")[-1])
+            return Response({"url": url, "message": "Success"})
+
+        except TransferLetterModel.DoesNotExist:
+            return Response({"error": "Transfer Letter not found"}, status=status.HTTP_404_NOT_FOUND)
+        except Exception as e:
+            return Response({"error": str(e)}, status=status.HTTP_500_INTERNAL_SERVER_ERROR)
 
     # ---- Create a single detail (and update license item balances) ----
     @action(detail=True, methods=["post"], url_path="details")
@@ -486,122 +688,6 @@ class AllotmentViewSet(viewsets.ModelViewSet):
 
         detail.delete()
         return Response(status=status.HTTP_204_NO_CONTENT)
-
-
-class GenerateTransferLetterForAllotmentAPI(APIView):
-    """
-    POST /api/allotments/<pk>/generate-tl/
-
-    Body:
-    {
-      "company": "...",
-      "company_address_line1": "...",
-      "company_address_line2": "...",
-      "tl_choice": 123,                       # TransferLetterModel id
-      "modified_items": [                     # optional overrides; same length/order as details
-        {"id": <detail_id>, "cif_fc": 100.0},
-        ...
-      ]
-    }
-    """
-
-    def post(self, request, pk):
-        try:
-            allotment = (
-                AllotmentModel.objects
-                .select_related("company")
-                .get(id=pk)
-            )
-
-            # Required form fields
-            company = request.data.get('company')
-            address_1 = request.data.get('company_address_line1')
-            address_2 = request.data.get('company_address_line2')
-            tl_id = request.data.get('tl_choice')
-
-            if not (company and address_1 and address_2 and tl_id):
-                return Response({'error': 'Missing required fields'}, status=status.HTTP_400_BAD_REQUEST)
-
-            items_data = request.data.get('modified_items') or []
-
-            # Fetch details with useful relations
-            details_qs = (
-                allotment.allotment_details
-                .select_related('item__license', 'item__license__exporter')
-                .all()
-                .order_by('id')
-            )
-            details = list(details_qs)
-
-            # Build data payload for TL generator
-            data = []
-            for idx, detail in enumerate(details):
-                lic = getattr(detail.item, 'license', None)
-
-                # Allow overriding CIF FC from payload (by index or ignore if not present)
-                override = {}
-                if idx < len(items_data):
-                    override = items_data[idx] or {}
-                override_fc = override.get('cif_fc')
-
-                try:
-                    cif_fc = float(override_fc) if override_fc not in (None, '') else float(detail.cif_fc or 0)
-                except (TypeError, ValueError):
-                    cif_fc = float(detail.cif_fc or 0)
-
-                # Derive license fields safely
-                license_number = getattr(lic, 'license_number', '') if lic else getattr(detail, 'license_number', '')
-                license_date = getattr(detail, 'license_date', None) or (
-                    getattr(lic, 'license_date', None) if lic else None)
-                license_date_str = license_date.strftime("%d/%m/%Y") if license_date else ''
-                file_number = getattr(detail, 'file_number', None) or (getattr(lic, 'file_number', None) if lic else '')
-                exporter_obj = getattr(lic, 'exporter', None) if lic else getattr(detail, 'exporter', None)
-                exporter_name = getattr(exporter_obj, 'name', '') if exporter_obj else ''
-                purchase_status = getattr(lic, 'purchase_status', '') if lic else ''
-
-                # Keep key names identical to BOE version for template compatibility
-                data.append({
-                    'status': purchase_status,
-                    'company': company,
-                    'company_address_1': address_1,
-                    'company_address_2': address_2,
-                    'today': str(datetime.now().date()),
-                    'license': license_number,
-                    'license_date': license_date_str,
-                    'file_number': file_number,
-                    'quantity': float(detail.qty or 0),
-                    'v_allotment_inr': round(float(detail.cif_inr or 0), 2),
-                    'v_allotment_usd': round(float(cif_fc), 2),
-                    'exporter_name': exporter_name,
-                    # Reuse the same key your TL template expects ("boe"); feed something meaningful
-                    'boe': f"ALLOTMENT #{allotment.id}"
-                           + (f" • INVOICE :- {allotment.invoice}" if allotment.invoice else ""),
-                })
-
-            # Generate from chosen template
-            transfer_letter = TransferLetterModel.objects.get(pk=tl_id)
-            tl_path = transfer_letter.tl.path
-            file_name_prefix = f"TL_ALLOT_{allotment.id}_{transfer_letter.name.replace(' ', '_')}"
-            file_dir = f"media/{file_name_prefix}/"
-
-            generate_tl_software(
-                data=data,
-                tl_path=tl_path,
-                path=file_dir,
-                transfer_letter_name=transfer_letter.name.replace(' ', '_')
-            )
-
-            zip_path = make_archive(file_dir.rstrip('/'), 'zip', file_dir.rstrip('/'))
-            url = request.build_absolute_uri('/media/' + zip_path.split('media/')[-1])
-
-            return Response({'url': url, 'message': 'Success'})
-
-        except AllotmentModel.DoesNotExist:
-            return Response({'error': 'Allotment not found'}, status=status.HTTP_404_NOT_FOUND)
-        except TransferLetterModel.DoesNotExist:
-            return Response({'error': 'Transfer Letter not found'}, status=status.HTTP_404_NOT_FOUND)
-        except Exception as e:
-            return Response({'error': str(e)}, status=status.HTTP_500_INTERNAL_SERVER_ERROR)
 
 
 class SendAllotmentView(PDFTemplateResponseMixin, DetailView):

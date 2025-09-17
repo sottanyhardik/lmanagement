@@ -304,6 +304,8 @@ class LicenseTradeLine(models.Model):
     rate_inr_per_kg = models.DecimalField(max_digits=20, decimal_places=2, default=Decimal("0"))
 
     # Amount modes (base amounts)
+    cif_fc = models.DecimalField(max_digits=20, decimal_places=2, default=Decimal("0.00"))
+    exc_rate = models.DecimalField(max_digits=12, decimal_places=4, default=Decimal("0.0000"))
     cif_inr = models.DecimalField(max_digits=20, decimal_places=2, default=Decimal("0"))
     fob_inr = models.DecimalField(max_digits=20, decimal_places=2, default=Decimal("0"))
     pct = models.DecimalField(max_digits=9, decimal_places=3, default=Decimal("0"))

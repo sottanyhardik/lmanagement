@@ -84,6 +84,9 @@ def generate_tl_software(
         return {"converter": None}
 
     out_dir = Path(path) if path else Path.cwd()
+    if out_dir.exists():
+        # rmtree ensures stale files from previous run don't linger (old PDFs/DOCXs)
+        shutil.rmtree(out_dir)
     out_dir.mkdir(parents=True, exist_ok=True)
 
     soffice = find_office_executable()

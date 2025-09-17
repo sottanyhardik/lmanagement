@@ -6,7 +6,6 @@ from django.db.models import Sum, F
 from django.http import JsonResponse
 from django.shortcuts import get_object_or_404, redirect
 from django.urls import reverse
-from django.utils.text import slugify
 from django.views.generic import DetailView, CreateView, UpdateView, FormView
 from django.views.generic.base import TemplateResponseMixin, ContextMixin, View
 from django_filters.views import FilterView
@@ -14,7 +13,6 @@ from easy_pdf.views import PDFTemplateResponseMixin
 
 from allotment.scripts.aro import generate_tl_software
 from core.models import TransferLetterModel
-from core.scripts.script import render_to_pdf
 from core.utils import PagedFilteredTableView
 from license import models as license_models
 from . import forms, tables, filters
@@ -211,7 +209,6 @@ def _to_float(v, default=0.0):
 from django.http import HttpResponse
 from django.views.generic import DetailView
 from allotment import models as allotments
-from core.utils import render_to_pdf  # your existing helper
 
 
 def _to_float(v, default=0.0):
@@ -227,69 +224,6 @@ def _fmt_date(d):
         return d.strftime("%d/%m/%Y")
     except Exception:
         return "" if d is None else str(d)
-
-
-class SendAllotmentView(DetailView):
-    model = allotments.AllotmentModel
-    template_name = 'allotment/send.html'
-
-    def get_context_data(self, **kwargs):
-        # IMPORTANT: self.object is set in get()
-        ctx = super().get_context_data(**kwargs)
-        obj = self.object
-
-        exr = _to_float(getattr(obj, "exchange_rate", 0.0), 0.0)
-
-        rows = []
-        t_qty = t_fc = t_inr = 0.0
-
-        details = obj.allotment_details.select_related("item__license__exporter").all()
-        for d in details:
-            qty = _to_float(d.qty, 0)
-            cif_fc = _to_float(d.cif_fc, 0)
-            cif_inr_saved = _to_float(d.cif_inr, 0)
-            cif_inr = cif_inr_saved if cif_inr_saved > 0 else (cif_fc * exr if cif_fc > 0 and exr > 0 else 0)
-
-            rows.append({
-                "license_number": getattr(d, "license_number", "") or "",
-                "license_date": _fmt_date(getattr(d, "license_date", None)),
-                "registration_number": getattr(d, "registration_number", "") or "",
-                "registration_date": _fmt_date(getattr(d, "registration_date", None)),
-                "port_code": getattr((getattr(d, "port_code", "") or ""), "code", "").upper(),
-                "serial_number": getattr(d, "serial_number", "") or "",
-                "qty": qty,
-                "cif_fc": cif_fc,
-                "cif_inr": cif_inr,
-                "notification_number": getattr(d, "notification_number", "") or "",
-                "as_per_invoice": (cif_fc == 0),
-            })
-
-            t_qty += qty
-            t_fc += cif_fc
-            t_inr += cif_inr
-
-        ctx.update({
-            "rows": rows,  # if your template uses the new rows table
-            "exchange_rate": exr,
-            "totals": {"qty": t_qty, "fc": t_fc, "inr": t_inr},
-        })
-        return ctx
-
-    def get(self, request, *args, **kwargs):
-        # ✅ FIX: set self.object before building context
-        self.object = self.get_object()
-        context = self.get_context_data()
-
-        pdf = render_to_pdf(self.template_name, context)
-        if not pdf:
-            return HttpResponse("Not found")
-
-        invoice_part = f"_{slugify(self.object.invoice)}" if getattr(self.object, "invoice", None) else ""
-        filename = f"Allotment_{self.object.id}{invoice_part}.pdf"
-        disposition = "attachment" if request.GET.get("download") else "inline"
-        response = HttpResponse(pdf, content_type="application/pdf")
-        response["Content-Disposition"] = f"{disposition}; filename={filename}"
-        return response
 
 
 class CardView(DetailView):

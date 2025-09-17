@@ -1,12 +1,15 @@
 # license/api.py
 import datetime
+import io
 from datetime import date
 
 from dateutil.relativedelta import relativedelta
 from django.db.models import Q, Sum
+from django.http import HttpResponse
 from django_filters.rest_framework import DjangoFilterBackend
-from rest_framework import filters, status, permissions, parsers, decorators, response
-from rest_framework import viewsets
+from openpyxl import Workbook
+from openpyxl.utils import get_column_letter
+from rest_framework import filters, status, permissions, parsers, decorators, response, viewsets
 from rest_framework.generics import ListAPIView
 from rest_framework.pagination import PageNumberPagination
 from rest_framework.response import Response
@@ -16,14 +19,14 @@ from .filters import LicenseDetailsFilterSet
 from .models import (
     LicenseDetailsModel,
     LicenseImportItemsModel,
-    LicensePurchase,  # <-- ensure this import exists
+    LicensePurchase,
     GE, MI, SM, OT, CO, RA, LM,
 )
 from .serializers import (
     LicenseDetailsSerializer,
     LicenseImportItemsSelectSerializer,
     BiscuitReportSerializer,
-    LicensePurchaseSerializer,  # <-- and this
+    LicensePurchaseSerializer,
 )
 
 
@@ -81,12 +84,10 @@ class LicenseDetailsViewSet(viewsets.ModelViewSet):
     ordering = ['-modified_on']
 
     def get_queryset(self):
-        # If you have a shared helper like `apply_license_filters`, call it here
         qs = super().get_queryset()
         params = self.request.query_params
 
-        # --- Balance (CIF) comparator filter ---
-        # Accepts: balance_val (number), balance_cmp ('gte'|'lte'), default 'gte'
+        # Balance CIF comparator: ?balance_val=500&balance_cmp=gte|lte (default gte)
         balance_val = _get_num(params.get("balance_val"), float)
         if balance_val is not None:
             cmp_key = (params.get("balance_cmp") or "gte").strip().lower()
@@ -95,7 +96,7 @@ class LicenseDetailsViewSet(viewsets.ModelViewSet):
             else:
                 qs = qs.filter(balance_cif__gte=balance_val)
 
-        # Basic date & text filters commonly used (keep if you don’t already do this in a helper)
+        # Date filters
         from_date = (params.get("from_date") or "").strip()
         to_date = (params.get("to_date") or "").strip()
         if from_date:
@@ -103,6 +104,7 @@ class LicenseDetailsViewSet(viewsets.ModelViewSet):
         if to_date:
             qs = qs.filter(license_date__lte=to_date)
 
+        # Text filters
         lic_no = (params.get("license_number") or "").strip()
         if lic_no:
             qs = qs.filter(license_number__icontains=lic_no)
@@ -119,7 +121,7 @@ class LicenseDetailsViewSet(viewsets.ModelViewSet):
             if ids:
                 qs = qs.filter(port_id__in=ids)
 
-        # Default Active-only when not explicitly overridden
+        # Default active-only unless overridden
         if 'status' not in params and 'is_expired' not in params:
             qs = qs.filter(is_expired=False)
 
@@ -202,34 +204,130 @@ class LicenseImportItemsSelectView(ListAPIView):
         )
 
 
+# ---------------- Biscuit Report (JSON / XLSX) ----------------
 class BiscuitReportAPIView(APIView):
-    def get(self, request, party, status_flag):
+    def get(self, request, party, status_flag, format=None):
         since = datetime.datetime.now() - datetime.timedelta(days=30)
+        if 'xlsx' in status_flag:
+            format = "xlsx"
+            status_flag = status_flag.split(".")[0]
+        else:
+            format = None
         is_expired = status_flag == "expired"
 
         qs = LicenseDetailsModel.objects.filter(
             export_license__norm_class__norm_class="E5",
-            balance_cif__gte=500,
+            balance_cif__gte=100,
         )
 
         party_map = {
             "parle": GE, "mi": MI, "sm": SM, "ot": OT,
             "co": CO, "ra": RA, "lm": LM,
         }
+
         if is_expired:
             qs = qs.filter(license_expiry_date__lt=since)
         else:
             qs = qs.filter(license_expiry_date__gte=since)
 
-        if party.lower() in party_map:
-            qs = qs.filter(purchase_status=party_map[party.lower()])
-            if party.lower() == "parle":
+        party_key = (party or "").lower()
+        if party_key in party_map:
+            qs = qs.filter(purchase_status=party_map[party_key])
+            if party_key == "parle":
                 qs = qs.filter(exporter__name__icontains="parle")
         else:
             qs = qs.filter(purchase_status=GE).exclude(exporter__name__icontains="parle")
 
         serializer = BiscuitReportSerializer(qs, many=True)
-        return Response(serializer.data, status=status.HTTP_200_OK)
+
+        wants_xlsx = (format == "xlsx") or (request.query_params.get("format", "").lower() == "xlsx")
+        if not wants_xlsx:
+            return Response(serializer.data, status=status.HTTP_200_OK)
+
+        return self._as_xlsx_response(serializer.data, party=party_key, status_flag=status_flag)
+
+    def _as_xlsx_response(self, rows, party: str, status_flag: str):
+        wb = Workbook()
+        ws = wb.active
+        ws.title = "Biscuit Report"
+
+        columns = BiscuitReportSerializer.Meta.fields
+
+        header_map = {
+            "id": "ID",
+            "license_number": "License No",
+            "license_expiry_date": "Expiry Date",
+            "exporter_name": "Exporter",
+            "norm_class": "Norm Class",
+            "balance_cif": "Balance CIF",
+            "veg_oil_hsn": "Veg Oil HSN",
+            "veg_oil_pd": "Veg Oil Description",
+            "total_veg_qty": "Total Veg Qty",
+            "rbd_qty": "RBD Qty",
+            "rbd_cif": "RBD CIF",
+            "pko_qty": "PKO Qty",
+            "pko_cif": "PKO CIF",
+            "veg_qty": "Olive Oil Qty",
+            "veg_cif": "Olive Oil CIF",
+            "pomace_qty": "Pomace Qty",
+            "pomace_cif": "Pomace CIF",
+            "ten_restriction": "10% Restriction",
+            "juice_hsn": "Juice HSN",
+            "juice_pd": "Juice Description",
+            "juice_qty": "Juice Qty",
+            "juice_cif": "Juice CIF",
+            "ff_hsn": "Food Flavour HSN",
+            "ff_pd": "Food Flavour Desc",
+            "ff_qty": "Food Flavour Qty",
+            "df_qty": "Dietary Fibre Qty",
+            "f_f_qty": "Fruit Qty",
+            "f_f_cif": "Fruit CIF",
+            "la_qty": "Leavening Agent Qty",
+            "starch_1108": "Starch 1108 Qty",
+            "starch__1108_cif": "Starch 1108 CIF",
+            "starch_3505": "Starch 3505 Qty",
+            "mnm_pd": "Milk/Non-Milk Desc",
+            "mnm_qty": "Milk/Non-Milk Qty",
+            "cheese_qty": "Cheese Qty",
+            "cheese_cif": "Cheese CIF",
+            "swp_qty": "SWP Qty",
+            "swp_cif": "SWP CIF",
+            "wpc_qty": "WPC Qty",
+            "wpc_cif": "WPC CIF",
+            "pp_hsn": "PP HSN",
+            "pp_pd": "PP Description",
+            "pp_qty": "PP Qty",
+            "get_aluminium": "Aluminium Qty",
+            "balance_cif_value": "Balance CIF Value",
+        }
+
+        ws.append([header_map.get(col, col) for col in columns])
+
+        for r in rows:
+            ws.append([r.get(col, "") for col in columns])
+
+        for idx, col in enumerate(columns, start=1):
+            letter = get_column_letter(idx)
+            max_len = len(str(header_map.get(col, col)))
+            for cell in ws[letter]:
+                val = "" if cell.value is None else str(cell.value)
+                if len(val) > max_len:
+                    max_len = len(val)
+            ws.column_dimensions[letter].width = min(max_len + 2, 60)
+
+        buf = io.BytesIO()
+        wb.save(buf)
+        buf.seek(0)
+
+        today_str = datetime.datetime.now().strftime("%Y%m%d")
+        filename = f"biscuit_report_{party}_{status_flag}_{today_str}.xlsx"
+
+        resp = HttpResponse(
+            buf.getvalue(),
+            content_type="application/vnd.openxmlformats-officedocument.spreadsheetml.sheet",
+        )
+        resp["Content-Disposition"] = f'attachment; filename="{filename}"'
+        return resp
 
 
 # ---------------- License Purchases ----------------
@@ -237,13 +335,13 @@ class LicensePurchaseViewSet(viewsets.ModelViewSet):
     """
     CRUD for license purchases/payments with a quick summary endpoint.
 
-    Query params supported:
-      - license=<id>         filter by license FK
-      - from_date=YYYY-MM-DD purchase_date >= from_date
-      - to_date=YYYY-MM-DD   purchase_date <= to_date
-      - min_amount=<float>   amount_inr >= min_amount
-      - max_amount=<float>   amount_inr <= max_amount
-      - search=<text>        applies to reference/remarks and license number
+    Query params:
+      - license=<id>
+      - from_date=YYYY-MM-DD
+      - to_date=YYYY-MM-DD
+      - min_amount=<float>
+      - max_amount=<float>
+      - search=<text>
     """
     queryset = LicensePurchase.objects.select_related("license").all()
     serializer_class = LicensePurchaseSerializer
@@ -280,7 +378,6 @@ class LicensePurchaseViewSet(viewsets.ModelViewSet):
         if max_amount is not None:
             qs = qs.filter(amount_inr__lte=max_amount)
 
-        # free-text search is handled by SearchFilter, but allow ?search= as well
         search = (p.get("search") or "").strip()
         if search:
             qs = qs.filter(

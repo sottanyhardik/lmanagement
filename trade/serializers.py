@@ -29,6 +29,8 @@ class LicenseTradeLineSerializer(serializers.ModelSerializer):
             "mode",
             "qty_kg",
             "rate_inr_per_kg",
+            "cif_fc",
+            "exc_rate",
             "cif_inr",
             "fob_inr",
             "pct",

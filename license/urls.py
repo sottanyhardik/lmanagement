@@ -1,68 +1,27 @@
+# urls.py
 from django.urls import path, include
 from rest_framework.routers import DefaultRouter
 
 from .Export.item_excel import LicenseImportItemsXLSX
 from .Export.item_pdf import LicenseImportItemsUltraWidePDF
-from .api import LicenseDetailsViewSet, LicenseImportItemsSelectView, BiscuitReportAPIView, \
-    LicensePurchaseViewSet
+from .api import (
+    LicenseDetailsViewSet,
+    LicenseImportItemsSelectView,
+    BiscuitReportAPIView,
+    LicensePurchaseViewSet,
+)
 from .views.import_items_views import LicenseImportItemsViewSet
 
 router = DefaultRouter()
-router.register(r'license-import-items', LicenseImportItemsViewSet, basename='license-import-items')
-
+router.register(r"license-import-items", LicenseImportItemsViewSet, basename="license-import-items")
 router.register(r"license-purchases", LicensePurchaseViewSet, basename="license-purchase")
-router.register(r'licenses', LicenseDetailsViewSet)
+router.register(r"licenses", LicenseDetailsViewSet)
 
 urlpatterns = [
-    path("license-import-items/select/", LicenseImportItemsSelectView.as_view(),
-         name="license-import-items-select"),
-    path('licenses/export/pdf/', LicenseImportItemsUltraWidePDF.as_view(), name='license-details-pdf'),
-    path('licenses/export/excel/', LicenseImportItemsXLSX.as_view(), name="licenses-export-xlsx"),
-    path("licenses/biscuit-report/<str:party>/<str:status_flag>/", BiscuitReportAPIView.as_view()),
-    path('', include(router.urls)),
-
-    # path('license/report/biscuits/', login_required(views.PDFSummaryLicenseDetailView.as_view()),
-    #      name='license_report_biscuits_new'),
-    # path('analysis/', login_required(views.analysis), name='analysis'),
-    # path('add/', login_required(views.LicenseDetailCreateView.as_view()), name='license-add'),
-    # path('<slug:license>/new/', login_required(views.DFIADetailView.as_view()), name='dfia-details'),
-    # path('<slug:license>/card/', login_required(views.LicenseCardView.as_view()), name='license-card'),
-    # path('', login_required(views.LicenseListView.as_view()), name='license-list'),
-    # path('ajax/', login_required(views.LicenseAjaxListView.as_view()), name='license-ajax-list'),
-    # path('<slug:license>/update', login_required(views.LicenseDetailUpdateView.as_view()), name='license-update'),
-    # path('<slug:license>/', login_required(views.LicenseDetailView.as_view()), name='license-detail'),
-    # path('<slug:license>/item/update', login_required(views.LicenseItemListUpdateView.as_view()),
-    #      name='license-item-update'),
-    # # path('<int:pk>/verify', login_required(views.LicenseVerifyView.as_view()), name='license-verify'),
-    # path('license/<slug:license>.pdf', login_required(views.PDFLicenseDetailView.as_view()), name='license-pdf'),
-    # path('ledger/<slug:license>.pdf', login_required(views.PDFLedgerLicenseDetailView.as_view()),
-    #      name='license_ledger'),
-    # path('ledger/item/<slug:license>.pdf', login_required(views.PDFLedgerItemLicenseDetailView.as_view()),
-    #      name='license_item_ledger_pdf'),
-    # path('item/report', login_required(views.ItemReportView.as_view()),
-    #      name='item_report'),
-    # path('item/report/list/', login_required(views.ItemListReportView.as_view()),
-    #      name='item_report_list'),
-    # path('movement/list/', login_required(views.MovementListView.as_view()), name='movement-list'),
-    # path('movement/update/', login_required(views.MovementUpdateView.as_view()), name='movement-update'),
-    # path('summary/<slug:license>.pdf', login_required(views.PDFSummaryLicenseDetailView.as_view()),
-    #      name='license_summary'),
-    # path('report/confectionery/<slug:status>/<slug:party>/', login_required(views.ConfectioneryReportView.as_view()),
-    #      name='report_confectionery'),
-    # path('report/confectionery/milk/<slug:status>', login_required(views.ConfectioneryMilkReportView.as_view()),
-    #      name='report_confectionery_milk'),
-    # path('report/namkeen/<slug:status>', login_required(views.NamkeenReportView.as_view()),
-    #      name='report_namkeen'),
-    # path('report/tractor/<slug:status>', login_required(views.TractorReportView.as_view()),
-    #      name='report_tractor'),
-    # path('report/steel/<slug:status>', login_required(views.SteelReportView.as_view()),
-    #      name='report_steel'),
-    # path('report/glass/<slug:status>', login_required(views.GlassReportView.as_view()),
-    #      name='report_glass'),
-    # path('report/pickle/<slug:status>', login_required(views.PickleReportView.as_view()),
-    #      name='report_pickle'),
-    # path('refresh_items', login_required(views.RefreshItems.as_view()),
-    #      name='refresh_items'),
+    path("license-import-items/select/", LicenseImportItemsSelectView.as_view(), name="license-import-items-select"),
+    path("licenses/export/pdf/", LicenseImportItemsUltraWidePDF.as_view(), name="license-details-pdf"),
+    path("licenses/export/excel/", LicenseImportItemsXLSX.as_view(), name="licenses-export-xlsx"),
+    path("licenses/biscuit-report/<str:party>/<str:status_flag>/", BiscuitReportAPIView.as_view(),
+         name="biscuit-report"),
+    path("", include(router.urls)),
 ]
-
-urlpatterns += router.urls

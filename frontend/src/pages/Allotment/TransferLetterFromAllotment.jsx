@@ -14,7 +14,7 @@ import {fetchTransferLetterTemplates} from '../../Cache/templateCache';
 const TransferLetterFromAllotment = ({
                                          allotment,
                                          autoDownload = false,
-                                         generatePath = (a) => `allotments/${a?.id}/generate-tl/`,
+                                         generatePath = (a) => `allotments/${a?.id}/transfer-letter/`,
                                          onGenerated,
                                      }) => {
     const [templates, setTemplates] = useState([]);
