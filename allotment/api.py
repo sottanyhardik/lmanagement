@@ -571,7 +571,7 @@ class AllotmentViewSet(viewsets.ModelViewSet):
             req_val = ceil_int(req_qty * unit_price)
 
         rem_qty = max(Decimal("0"), req_qty - cur_qty)
-        rem_val = max(Decimal("0"), req_val - cur_val)
+        rem_val = max(Decimal("0"), req_val - cur_val) + 100
 
         # license caps
         avail_qty = floor_int(lic_item.available_quantity or 0)

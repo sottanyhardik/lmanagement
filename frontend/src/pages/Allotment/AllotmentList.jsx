@@ -17,7 +17,7 @@ import "./AllotmentList.css";
 
 // lazy forms/panels
 const AllotmentCreateForm = lazy(() => import("./forms/AllotmentWizard"));
-const AllotmentEditMainForm = lazy(() => import("./forms/AllotmentEditMainForm"));
+const AllotmentForm = lazy(() => import("./forms/AllotmentForm"));
 const AllotmentMakeForm = lazy(() => import("./forms/AllotmentMakeForm"));
 const AllotmentViewPane = lazy(() => import("./panels/AllotmentViewPane"));
 const AllotmentTLTab = lazy(() => import("./panels/AllotmentTLTab"));
@@ -245,7 +245,11 @@ export default function AllotmentList() {
                         </Tab>
                         <Tab eventKey="edit" title="✏️ Edit Main">
                             <Suspense fallback={<Fallback/>}>
-                                <AllotmentEditMainForm entry={entry} onSaved={() => updateSingleEntry(entry.id)}/>
+                                <AllotmentForm
+                                    mode="edit"
+                                    entry={entry}
+                                    onSaved={() => updateSingleEntry(entry.id)}
+                                />
                             </Suspense>
                         </Tab>
                         <Tab eventKey="make" title="🧩 Make Allotment">

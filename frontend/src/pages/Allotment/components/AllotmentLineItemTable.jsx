@@ -60,9 +60,9 @@ const AllotmentLineItemTable = ({
 
     const reqVal = useMemo(() => {
         const explicit = safeNum(requiredValue);
-        if (explicit > 0) return explicit;
+        if (explicit > 0) return explicit + 100;
         const q = roundQty(requiredQuantity);
-        return round2(q * price);
+        return round2(q * price) + 100;
     }, [requiredValue, requiredQuantity, price]);
 
     const balance = useMemo(
@@ -127,7 +127,7 @@ const AllotmentLineItemTable = ({
             const availQty = roundQty(row?.available_quantity);
             const availVal = safeNum(row?.available_value);
 
-            const remainingVal = reqVal > 0 ? Math.max(0, reqVal - totals.value) : Infinity;
+            const remainingVal = reqVal > 0 ? Math.max(0, reqVal - totals.value + 100) : Infinity;
             const remainingQty = roundQty(requiredQuantity) > 0
                 ? Math.max(0, roundQty(requiredQuantity) - totals.qty)
                 : Infinity;
@@ -261,7 +261,7 @@ const AllotmentLineItemTable = ({
         const licenseCoversRequest = (hasAvailQty && availQty >= qty) && (hasAvailVal && availVal >= val);
 
         if (!licenseCoversRequest) {
-            const remainingValue = reqVal > 0 ? Math.max(0, reqVal - totals.value) : Infinity;
+            const remainingValue = reqVal > 0 ? Math.max(0, reqVal - totals.value + 100) : Infinity;
             if (Number.isFinite(remainingValue) && val > remainingValue) {
                 val = remainingValue;
                 if (price > 0) qty = roundQty(val / price);

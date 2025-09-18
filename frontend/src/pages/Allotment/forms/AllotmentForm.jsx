@@ -1,6 +1,7 @@
+// src/pages/Allotment/forms/AllotmentForm.jsx
 import React, {useCallback, useMemo, useState} from "react";
 import {Button, Col, Form, Row, Spinner} from "react-bootstrap";
-import axios from "../../../api/axiosInstance";
+import axios from "../../../api/axiosInstance.js";
 import {toast} from "react-toastify";
 import AsyncCompanySelect from "../../../components/AsyncSelect/AsyncCompanySelect.jsx";
 import AsyncPortSelect from "../../../components/AsyncSelect/AsyncPortSelect.jsx";
@@ -11,42 +12,35 @@ const toNum = (v) => {
 };
 const fmt = (v, digits = 2) => (Number.isFinite(v) ? v.toFixed(digits) : "");
 
-/**
- * Reusable main form for Allotment:
- * - mode: "create" | "edit"  (default: "create")
- * - initial: allotment record when editing (optional for create)
- * - onSaved(entry): called after successful PATCH (edit)
- * - onCreated(entry): called after successful POST (create)
- */
-export default function AllotmentMainForm({
-                                              mode = "create",
-                                              initial = null,
-                                              onSaved,
-                                              onCreated,
-                                          }) {
-    const isCreate = mode === "create";
+export default function AllotmentForm({
+                                          mode,              // "create" | "edit" (optional)
+                                          entry = null,
+                                          onCreated,
+                                          onSaved,
+                                      }) {
+    const inferredMode = mode ?? (entry?.id ? "edit" : "create");
+    const isCreate = inferredMode === "create";
 
     const [data, setData] = useState(() => ({
-        id: initial?.id,
-        company: initial?.company || null,
-        port: initial?.port || null,
-        item_name: initial?.item_name || "",
-        required_quantity: initial?.required_quantity ?? "",
-        unit_value_per_unit: initial?.unit_value_per_unit ?? "",
-        invoice: initial?.invoice || "",
-        estimated_arrival_date: initial?.estimated_arrival_date || "",
-        bl_detail: initial?.bl_detail || "",
-        contact_person: initial?.contact_person || "",
-        contact_number: initial?.contact_number || "",
-        exchange_rate: initial?.exchange_rate ?? "",      // required
-        required_cif_inr: initial?.required_cif_inr ?? "",// keeps in sync with fc
-        required_cif_fc: initial?.required_cif_fc ?? "",  // keeps in sync with inr
+        id: entry?.id,
+        company: entry?.company || null,
+        port: entry?.port || null,
+        item_name: entry?.item_name || "",
+        required_quantity: entry?.required_quantity ?? "",
+        unit_value_per_unit: entry?.unit_value_per_unit ?? "",
+        invoice: entry?.invoice || "",
+        estimated_arrival_date: entry?.estimated_arrival_date || "",
+        bl_detail: entry?.bl_detail || "",
+        contact_person: entry?.contact_person || "",
+        contact_number: entry?.contact_number || "",
+        exchange_rate: entry?.exchange_rate ?? "",       // required for INR calc
+        required_cif_inr: entry?.required_cif_inr ?? "", // ↔ with cif_fc via rate
+        required_cif_fc: entry?.required_cif_fc ?? "",   // the single $ field
     }));
 
     const [saving, setSaving] = useState(false);
     const [errors, setErrors] = useState({});
 
-    // ---------- field helpers ----------
     const setField = useCallback((k, v) => {
         setData((prev) => ({...prev, [k]: v}));
         setErrors((prev) => {
@@ -56,37 +50,60 @@ export default function AllotmentMainForm({
         });
     }, []);
 
-    // keep CIF ₹ / $ synced via exchange_rate
-    const setExchangeRate = (v) => {
-        setField("exchange_rate", v);
-        const rate = toNum(v);
+    // ----- Smart linking helpers -----
+    const recalcFromQtyAndUnit = (qtyRaw, unitRaw) => {
+        const qty = toNum(qtyRaw);
+        const unit = toNum(unitRaw);
+        const rate = toNum(data.exchange_rate);
+        if (qty && qty > 0 && unit != null) {
+            const cifFc = qty * unit;
+            setData((p) => ({...p, required_cif_fc: fmt(cifFc)}));
+            if (rate && rate > 0) {
+                setData((p) => ({...p, required_cif_inr: fmt(cifFc * rate)}));
+            }
+        }
+    };
+
+    const recalcInrFromRate = (rateRaw) => {
+        const rate = toNum(rateRaw);
+        const cifFc = toNum(data.required_cif_fc);
+        const cifInr = toNum(data.required_cif_inr);
+        const qty = toNum(data.required_quantity);
+
         if (rate && rate > 0) {
-            const fc = toNum(data.required_cif_fc);
-            const inr = toNum(data.required_cif_inr);
-            if (fc != null) setData((p) => ({...p, required_cif_inr: fmt(fc * rate)}));
-            else if (inr != null) setData((p) => ({...p, required_cif_fc: fmt(inr / rate)}));
+            // If we already have CIF $, push to ₹
+            if (cifFc != null) {
+                setData((p) => ({...p, required_cif_inr: fmt(cifFc * rate)}));
+            }
+            // If we have qty + CIF ₹ but not $/unit, back-solve (case #3)
+            else if (qty && qty > 0 && cifInr != null) {
+                const newCifFc = cifInr / rate;
+                const unit = newCifFc / qty;
+                setData((p) => ({
+                    ...p,
+                    required_cif_fc: fmt(newCifFc),
+                    unit_value_per_unit: fmt(unit, 4),
+                }));
+            }
         }
     };
 
-    const setCifFc = (v) => {
-        setField("required_cif_fc", v);
+    const recalcFromCifInr = (inrRaw) => {
+        const inr = toNum(inrRaw);
         const rate = toNum(data.exchange_rate);
-        const fc = toNum(v);
-        if (rate && rate > 0 && fc != null) {
-            setData((p) => ({...p, required_cif_inr: fmt(fc * rate)}));
+        const qty = toNum(data.required_quantity);
+        if (inr != null && rate && rate > 0) {
+            const cifFc = inr / rate;
+            const unit = qty && qty > 0 ? cifFc / qty : null;
+            setData((p) => ({
+                ...p,
+                required_cif_fc: fmt(cifFc),
+                ...(unit != null ? {unit_value_per_unit: fmt(unit, 4)} : {}),
+            }));
         }
     };
 
-    const setCifInr = (v) => {
-        setField("required_cif_inr", v);
-        const rate = toNum(data.exchange_rate);
-        const inr = toNum(v);
-        if (rate && rate > 0 && inr != null) {
-            setData((p) => ({...p, required_cif_fc: fmt(inr / rate)}));
-        }
-    };
-
-    // derived unit value = CIF($) / required qty (if both present)
+    // Keep derived unit value if qty + cif_fc available
     const derived = useMemo(() => {
         const rq = toNum(data.required_quantity);
         const fc = toNum(data.required_cif_fc);
@@ -94,14 +111,42 @@ export default function AllotmentMainForm({
         return {unitVal};
     }, [data.required_quantity, data.required_cif_fc]);
 
-    // also show auto "Required $" for UX
-    const autoRequiredUsd = useMemo(() => {
-        const rq = toNum(data.required_quantity);
-        const unit = toNum(
-            Number.isFinite(derived.unitVal) ? derived.unitVal : data.unit_value_per_unit
-        );
-        return rq && unit != null ? (rq * unit) : null;
-    }, [data.required_quantity, data.unit_value_per_unit, derived.unitVal]);
+    // ----- field setters that trigger linking -----
+    const onQtyChange = (v) => {
+        setField("required_quantity", v);
+        recalcFromQtyAndUnit(v, data.unit_value_per_unit);
+    };
+
+    const onUnitChange = (v) => {
+        setField("unit_value_per_unit", v);
+        recalcFromQtyAndUnit(data.required_quantity, v);
+    };
+
+    const onRateChange = (v) => {
+        setField("exchange_rate", v);
+        recalcInrFromRate(v);
+    };
+
+    const onCifFcChange = (v) => {
+        // You can still edit CIF $ directly if needed
+        setField("required_cif_fc", v);
+        const cifFc = toNum(v);
+        const rate = toNum(data.exchange_rate);
+        const qty = toNum(data.required_quantity);
+        if (cifFc != null) {
+            if (rate && rate > 0) {
+                setData((p) => ({...p, required_cif_inr: fmt(cifFc * rate)}));
+            }
+            if (qty && qty > 0) {
+                setData((p) => ({...p, unit_value_per_unit: fmt(cifFc / qty, 4)}));
+            }
+        }
+    };
+
+    const onCifInrChange = (v) => {
+        setField("required_cif_inr", v);
+        recalcFromCifInr(v);
+    };
 
     // ---------- validation ----------
     const validate = () => {
@@ -121,6 +166,7 @@ export default function AllotmentMainForm({
             errs.exchange_rate = "Exchange rate must be > 0";
         }
 
+        // If either CIF field is provided, ensure numeric
         if (String(data.required_cif_fc).trim() !== "" && isNaN(data.required_cif_fc)) {
             errs.required_cif_fc = "Enter valid number";
         }
@@ -128,9 +174,10 @@ export default function AllotmentMainForm({
             errs.required_cif_inr = "Enter valid number";
         }
 
+        // If not derivable, allow manual unit input; else readOnly is okay
         if (!Number.isFinite(derived.unitVal)) {
             if (data.unit_value_per_unit === "" || isNaN(data.unit_value_per_unit)) {
-                errs.unit_value_per_unit = "Enter valid number or provide CIF & rate";
+                errs.unit_value_per_unit = "Enter valid number or provide CIF / Qty";
             } else if (Number(data.unit_value_per_unit) < 0) {
                 errs.unit_value_per_unit = "Must be ≥ 0";
             }
@@ -239,7 +286,7 @@ export default function AllotmentMainForm({
                         step="1"
                         value={data.required_quantity}
                         isInvalid={!!errors.required_quantity}
-                        onChange={(e) => setField("required_quantity", e.target.value)}
+                        onChange={(e) => onQtyChange(e.target.value)}
                     />
                     <Form.Control.Feedback type="invalid">{errors.required_quantity}</Form.Control.Feedback>
                 </Col>
@@ -249,15 +296,12 @@ export default function AllotmentMainForm({
                     <Form.Control
                         size="sm"
                         type="number"
-                        step="0.0001"
-                        value={Number.isFinite(derived.unitVal) ? fmt(derived.unitVal, 4) : data.unit_value_per_unit}
-                        readOnly={Number.isFinite(derived.unitVal)}
+                        step="0.01"
+                        value={data.unit_value_per_unit}
                         isInvalid={!!errors.unit_value_per_unit}
-                        onChange={(e) => setField("unit_value_per_unit", e.target.value)}
+                        onChange={(e) => onUnitChange(e.target.value)}
                     />
-                    <Form.Control.Feedback type="invalid">
-                        {errors.unit_value_per_unit}
-                    </Form.Control.Feedback>
+                    <Form.Control.Feedback type="invalid">{errors.unit_value_per_unit}</Form.Control.Feedback>
                     {Number.isFinite(derived.unitVal) && (
                         <div className="form-text">Auto: CIF ($) ÷ Required Quantity</div>
                     )}
@@ -271,15 +315,26 @@ export default function AllotmentMainForm({
                         step="0.0001"
                         value={data.exchange_rate}
                         isInvalid={!!errors.exchange_rate}
-                        onChange={(e) => setExchangeRate(e.target.value)}
+                        onChange={(e) => onRateChange(e.target.value)}
                         placeholder="e.g., 83.25"
                     />
                     <Form.Control.Feedback type="invalid">{errors.exchange_rate}</Form.Control.Feedback>
                 </Col>
 
+                {/* SINGLE $ FIELD */}
                 <Col md={3}>
-                    <Form.Label>Required $ (auto)</Form.Label>
-                    <Form.Control size="sm" value={fmt(autoRequiredUsd)} readOnly/>
+                    <Form.Label>Required CIF ($)</Form.Label>
+                    <Form.Control
+                        size="sm"
+                        type="number"
+                        step="0.01"
+                        value={data.required_cif_fc}
+                        isInvalid={!!errors.required_cif_fc}
+                        onChange={(e) => onCifFcChange(e.target.value)}
+                        placeholder="Total CIF in USD"
+                    />
+                    <Form.Control.Feedback type="invalid">{errors.required_cif_fc}</Form.Control.Feedback>
+                    <div className="form-text">Auto-calculates from Qty × Unit, or from ₹ / rate.</div>
                 </Col>
 
                 <Col md={3}>
@@ -290,35 +345,16 @@ export default function AllotmentMainForm({
                         step="0.01"
                         value={data.required_cif_inr}
                         isInvalid={!!errors.required_cif_inr}
-                        onChange={(e) => setCifInr(e.target.value)}
+                        onChange={(e) => onCifInrChange(e.target.value)}
                         placeholder="Total CIF in INR"
                     />
                     <Form.Control.Feedback type="invalid">{errors.required_cif_inr}</Form.Control.Feedback>
-                    <div className="form-text">Syncs with CIF ($) when rate is set.</div>
-                </Col>
-
-                <Col md={3}>
-                    <Form.Label>Required CIF ($)</Form.Label>
-                    <Form.Control
-                        size="sm"
-                        type="number"
-                        step="0.01"
-                        value={data.required_cif_fc}
-                        isInvalid={!!errors.required_cif_fc}
-                        onChange={(e) => setCifFc(e.target.value)}
-                        placeholder="Total CIF in USD"
-                    />
-                    <Form.Control.Feedback type="invalid">{errors.required_cif_fc}</Form.Control.Feedback>
-                    <div className="form-text">Syncs with CIF (₹) when rate is set.</div>
+                    <div className="form-text">Synced with CIF ($) via exchange rate.</div>
                 </Col>
 
                 <Col md={3}>
                     <Form.Label>Invoice</Form.Label>
-                    <Form.Control
-                        size="sm"
-                        value={data.invoice}
-                        onChange={(e) => setField("invoice", e.target.value)}
-                    />
+                    <Form.Control size="sm" value={data.invoice} onChange={(e) => setField("invoice", e.target.value)}/>
                 </Col>
 
                 <Col md={3}>
@@ -333,29 +369,20 @@ export default function AllotmentMainForm({
 
                 <Col md={6}>
                     <Form.Label>BL Detail</Form.Label>
-                    <Form.Control
-                        size="sm"
-                        value={data.bl_detail}
-                        onChange={(e) => setField("bl_detail", e.target.value)}
-                    />
+                    <Form.Control size="sm" value={data.bl_detail}
+                                  onChange={(e) => setField("bl_detail", e.target.value)}/>
                 </Col>
 
                 <Col md={3}>
                     <Form.Label>Contact Person</Form.Label>
-                    <Form.Control
-                        size="sm"
-                        value={data.contact_person}
-                        onChange={(e) => setField("contact_person", e.target.value)}
-                    />
+                    <Form.Control size="sm" value={data.contact_person}
+                                  onChange={(e) => setField("contact_person", e.target.value)}/>
                 </Col>
 
                 <Col md={3}>
                     <Form.Label>Contact Number</Form.Label>
-                    <Form.Control
-                        size="sm"
-                        value={data.contact_number}
-                        onChange={(e) => setField("contact_number", e.target.value)}
-                    />
+                    <Form.Control size="sm" value={data.contact_number}
+                                  onChange={(e) => setField("contact_number", e.target.value)}/>
                 </Col>
             </Row>
 
