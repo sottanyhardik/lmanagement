@@ -3,16 +3,6 @@ import React, {useMemo, useState} from "react";
 import {Button, Col, Form, Row} from "react-bootstrap";
 import TradeLinesTable from "../../TradeLinesTable";
 
-/**
- * LinesTab — wraps TradeLinesTable and adds small bulk helpers
- * to mirror the InvoiceForm UX ("copy rate to all" / "copy first row's rate").
- *
- * Props:
- *  - rows, setRows
- *  - direction
- *  - boeId
- *  - errors
- */
 export default function LinesTab({rows, setRows, direction, boeId, errors}) {
     const [bulkRate, setBulkRate] = useState("");
 
@@ -21,7 +11,6 @@ export default function LinesTab({rows, setRows, direction, boeId, errors}) {
         if (!Number.isFinite(r)) return;
         const next = (rows || []).map((it) => ({
             ...it,
-            // QTY mode → rate_inr_per_kg; Value modes → pct
             rate_inr_per_kg: (it.mode || "QTY") === "QTY" ? String(r) : it.rate_inr_per_kg || "0",
             pct: ["CIF_INR", "FOB_INR"].includes(it.mode || "QTY") ? String(r) : it.pct || "0",
         }));
@@ -69,13 +58,7 @@ export default function LinesTab({rows, setRows, direction, boeId, errors}) {
                 </Col>
             </Row>
 
-            <TradeLinesTable
-                rows={rows}
-                setRows={setRows}
-                direction={direction}
-                boeId={boeId}
-                errors={errors}
-            />
+            <TradeLinesTable rows={rows} setRows={setRows} direction={direction} boeId={boeId} errors={errors}/>
         </>
     );
 }

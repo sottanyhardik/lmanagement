@@ -16,7 +16,12 @@ const TradeFilters = ({filters, setFilters}) => {
                         <Form.Select
                             size="sm"
                             value={filters.direction || ""}
-                            onChange={(e) => set({direction: e.target.value || null, ...(e.target.value === "PURCHASE" ? {boe_obj: null} : {})})}
+                            onChange={(e) =>
+                                set({
+                                    direction: e.target.value || null,
+                                    ...(e.target.value === "PURCHASE" ? {boe_obj: null} : {}),
+                                })
+                            }
                         >
                             <option value="">All</option>
                             <option value="PURCHASE">Purchase</option>
@@ -37,7 +42,6 @@ const TradeFilters = ({filters, setFilters}) => {
                     </Form.Group>
                 </Col>
 
-                {/* Hide BOE when filtering for Purchase */}
                 {!isPurchase && (
                     <Col xs={12} md={4}>
                         <Form.Group className="mb-2">
@@ -93,9 +97,7 @@ const TradeFilters = ({filters, setFilters}) => {
                         <Form.Select
                             size="sm"
                             value={String(filters.has_due ?? "")}
-                            onChange={(e) =>
-                                set({has_due: e.target.value === "" ? null : e.target.value === "true"})
-                            }
+                            onChange={(e) => set({has_due: e.target.value === "" ? null : e.target.value === "true"})}
                         >
                             <option value="">All</option>
                             <option value="true">Yes</option>

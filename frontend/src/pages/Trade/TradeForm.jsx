@@ -8,12 +8,8 @@ import TradeInvoiceCore from "../../components/trade/TradeInvoiceCore.jsx";
  * provide them via the parent when you render this page.
  */
 const TradeForm = ({entry, isNew = false, onClose, onSaved}) => {
-    // If this page receives a BOE in `entry.boe`, pass it along for SALE.
-    const mode = entry?.direction || "SALE";
+    const mode = entry?.direction || "PURCHASE";
     const boe = entry?.boe || null;
-
-    // For a pure standalone Trade screen with no BOE, set fetchByBoe={false}
-    // to hide the selector and skip BOE-bound querying.
     const fetchByBoe = !!boe;
 
     return (

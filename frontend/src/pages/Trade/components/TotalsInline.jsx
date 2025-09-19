@@ -25,8 +25,7 @@ export default function TotalsInline({entry = {}, className = ""}) {
     const total =
         entry?.total_amount != null ? Number(entry.total_amount) : subtotal + roundoff;
     const paid = Number(entry?.paid_total || 0);
-    const due =
-        entry?.due_amount != null ? Number(entry.due_amount) : total - paid;
+    const due = entry?.due_amount != null ? Number(entry.due_amount) : total - paid;
 
     return (
         <Row className={`g-3 ${className}`}>

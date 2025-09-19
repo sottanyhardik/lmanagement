@@ -9,7 +9,6 @@ import TotalsInline from "./components/TotalsInline";
  */
 export default function TradeHtmlView({entry}) {
     if (!entry) return null;
-
     const isSale = String(entry.direction || "").toUpperCase() === "SALE";
     const pdfUrl = isSale ? entry.sale_pdf_url : null;
 
@@ -17,20 +16,12 @@ export default function TradeHtmlView({entry}) {
         <div className="p-3 bg-light rounded">
             <div className="d-flex justify-content-between align-items-start mb-2">
                 <div>
-                    <h5 className="mb-1">
-                        {isSale ? "Sale Invoice" : "Purchase"} — {entry.invoice_number || "—"}
-                    </h5>
+                    <h5 className="mb-1">{isSale ? "Sale Invoice" : "Purchase"} — {entry.invoice_number || "—"}</h5>
                     <div className="text-muted small">Date: {entry.invoice_date || "—"}</div>
                 </div>
-
                 {isSale && pdfUrl && (
                     <div>
-                        <a
-                            className="btn btn-sm btn-primary"
-                            href={pdfUrl}
-                            target="_blank"
-                            rel="noreferrer"
-                        >
+                        <a className="btn btn-sm btn-primary" href={pdfUrl} target="_blank" rel="noreferrer">
                             Download PDF
                         </a>
                     </div>
@@ -85,13 +76,8 @@ export default function TradeHtmlView({entry}) {
                 </tbody>
             </Table>
 
-            <TotalsInline
-                subtotal={entry.subtotal_amount}
-                roundoff={entry.roundoff}
-                total={entry.total_amount}
-                paid={entry.paid_total}
-                due={entry.due_amount}
-            />
+            {/* ✅ Correct prop shape */}
+            <TotalsInline entry={entry}/>
         </div>
     );
 }

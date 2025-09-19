@@ -1,4 +1,3 @@
-// src/pages/Trade/form/helpers.js
 export const emptyTrade = {
     direction: "PURCHASE",
     invoice_number: "",
@@ -9,7 +8,6 @@ export const emptyTrade = {
     to_company: null,
     boe: null,
 
-    // 👇 snapshot fields (editable, prefilled from company)
     from_pan: "",
     from_gst: "",
     from_addr_line_1: "",

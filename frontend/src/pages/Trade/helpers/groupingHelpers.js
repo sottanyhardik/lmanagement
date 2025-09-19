@@ -1,5 +1,3 @@
-// src/pages/Trade/helpers/groupingHelpers.js
-
 export function tradeEntryTotals(entry) {
     const total = Number(entry?.total_amount || 0);
     const paid = Number(entry?.paid_total || 0);
@@ -21,9 +19,7 @@ export function tradeTotals(entries) {
 }
 
 export function getTradeGroupLabel(e) {
-    return `${e?.direction || "-"} / ${
-        e?.from_company?.name || e?.to_company?.name || "-"
-    }`;
+    return `${e?.direction || "-"} / ${e?.from_company?.name || e?.to_company?.name || "-"}`;
 }
 
 export default {tradeEntryTotals, tradeTotals, getTradeGroupLabel};

@@ -16,26 +16,20 @@ const num = (v) => {
     return Number.isFinite(n) ? n : 0;
 };
 
-const asId = (opt) =>
-    opt && typeof opt === "object" ? opt.id ?? opt.value ?? null : opt ?? null;
+const asId = (opt) => (opt && typeof opt === "object" ? opt.id ?? opt.value ?? null : opt ?? null);
 
-/** Normalize sr_number to a react-select option-like object */
 const normalizeSrOption = (value) =>
     value
         ? "value" in (value || {})
             ? value
             : {
                 value: value.id ?? value.value,
-                label:
-                    value.label ??
-                    value.display_name ??
-                    String(value.id ?? value.value ?? ""),
+                label: value.label ?? value.display_name ?? String(value.id ?? value.value ?? ""),
                 id: value.id ?? value.value ?? undefined,
-                data: value, // keep full payload for prefills
+                data: value,
             }
         : null;
 
-/** Compute bill amount (unrounded) */
 function computeBillAmount(r) {
     const mode = r.mode || "QTY";
     if (mode === "QTY") return num(r.qty_kg) * num(r.rate_inr_per_kg);
@@ -44,83 +38,53 @@ function computeBillAmount(r) {
     return 0;
 }
 
-/** Keep CIF triad in sync: cif_fc, exch_rate, cif_inr */
 function syncCifTriad(row, src) {
     const cif_fc = num(row.cif_fc);
     const cif_inr = num(row.cif_inr);
-    let exch =
-        row.exch_rate === "" || row.exch_rate == null ? null : num(row.exch_rate);
+    let exch = row.exch_rate === "" || row.exch_rate == null ? null : num(row.exch_rate);
     const hasRate = exch && exch > 0;
 
     if (src === "cif_fc" && hasRate) row.cif_inr = cif_fc * exch;
-    else if (src === "cif_inr" && hasRate)
-        row.cif_fc = exch > 0 ? cif_inr / exch : row.cif_fc;
+    else if (src === "cif_inr" && hasRate) row.cif_fc = exch > 0 ? cif_inr / exch : row.cif_fc;
     else if (src === "exch_rate" && hasRate) {
         if (cif_fc > 0) row.cif_inr = cif_fc * exch;
         else if (cif_inr > 0) row.cif_fc = exch > 0 ? cif_inr / exch : row.cif_fc;
     }
 
-    // If no explicit rate but we have both, infer
     if ((!exch || exch <= 0) && num(row.cif_fc) > 0 && num(row.cif_inr) > 0) {
         row.exch_rate = num(row.cif_inr) / num(row.cif_fc);
     }
     return row;
 }
 
-const TradeLinesTable = ({
-                             rows = [],
-                             setRows, // preferred
-                             onChange, // alias (back-compat)
-                             direction, // (unused, kept for API compatibility)
-                             boeId = null,
-                             errors = {},
-                         }) => {
-    // unify handler
+const TradeLinesTable = ({rows = [], setRows, onChange, direction, boeId = null, errors = {}}) => {
     const applyRows = useCallback(
         (next) => {
             if (typeof setRows === "function") return setRows(next);
             if (typeof onChange === "function") return onChange(next);
-            // eslint-disable-next-line no-console
             console.warn("TradeLinesTable: no setRows/onChange handler provided.");
         },
         [setRows, onChange]
     );
 
-    // ---------- BOE PREFILL (priority) ----------
     useEffect(() => {
         let cancelled = false;
         const prefillFromBOE = async () => {
             if (!boeId) return;
             try {
-                // fetch the BOE ONCE; use its exchange_rate as a robust fallback
                 const {data} = await axios.get(`bill-of-entries/${boeId}/`);
-                console.log("BOE prefill:", data);
-                const exHint = num(data?.exchange_rate); // may be 0/NaN if not present
+                const exHint = num(data?.exchange_rate);
                 const items = data?.item_details || [];
                 if (!Array.isArray(items) || !items.length) return;
 
                 const mapped = items.map((it) => {
-                    // Prefer item values; fill the missing one via exchange rate
                     let cif_fc = num(it.cif_fc);
                     let cif_inr = num(it.cif_inr);
-
-                    // Decide exchange rate:
-                    // 1) Use BOE.exchange_rate if positive
-                    // 2) Else derive from item values (if both present)
-                    // 3) Else leave blank
-                    let exch =
-                        exHint > 0
-                            ? exHint
-                            : cif_fc > 0 && cif_inr > 0
-                                ? cif_inr / cif_fc
-                                : 0;
-
-                    // If exHint known, fill the missing side from the other:
+                    let exch = exHint > 0 ? exHint : cif_fc > 0 && cif_inr > 0 ? cif_inr / cif_fc : 0;
                     if (exch > 0) {
                         if (cif_fc > 0 && cif_inr <= 0) cif_inr = cif_fc * exch;
                         if (cif_inr > 0 && cif_fc <= 0) cif_fc = cif_inr / exch;
                     }
-
                     return {
                         id: undefined,
                         mode: "CIF_INR",
@@ -128,12 +92,9 @@ const TradeLinesTable = ({
                         description: "",
                         qty_kg: num(it.qty).toString(),
                         rate_inr_per_kg: "0",
-
-                        // Value triad (strings for inputs)
                         cif_fc: cif_fc ? cif_fc.toString() : "0",
-                        exch_rate: exch > 0 ? exch.toFixed(4) : "", // show blank if unknown
+                        exch_rate: exch > 0 ? exch.toFixed(4) : "",
                         cif_inr: cif_inr ? cif_inr.toString() : "0",
-
                         fob_inr: "0",
                         pct: "0",
                         amount_inr: 0,
@@ -143,30 +104,22 @@ const TradeLinesTable = ({
                 mapped.forEach((r) => (r.amount_inr = computeBillAmount(r)));
                 if (!cancelled) applyRows(mapped);
             } catch {
-                // ignore silently
+                /* ignore */
             }
         };
-
         prefillFromBOE();
         return () => {
             cancelled = true;
         };
     }, [boeId, applyRows]);
 
-    // ---------- helpers ----------
     const updateRow = useCallback(
         (i, patch, src = null) => {
             const next = [...rows];
             const row = {...(next[i] || {}), ...patch};
-
-            if ("sr_number" in patch) {
-                row.sr_number = normalizeSrOption(patch.sr_number);
-            }
-            if (["cif_fc", "cif_inr", "exch_rate"].includes(src)) {
-                syncCifTriad(row, src);
-            }
+            if ("sr_number" in patch) row.sr_number = normalizeSrOption(patch.sr_number);
+            if (["cif_fc", "cif_inr", "exch_rate"].includes(src)) syncCifTriad(row, src);
             row.amount_inr = computeBillAmount(row);
-
             next[i] = row;
             applyRows(next);
         },
@@ -204,13 +157,11 @@ const TradeLinesTable = ({
     const getErr = (i, key) => errors?.[`lines.${i}.${key}`] || "";
     const invalidCls = (has) => (has ? "is-invalid" : "");
 
-    // ---------- SR select handler (use item payload or fetch once) ----------
     const onSrSelected = useCallback(
         async (i, option) => {
             const normalized = normalizeSrOption(option);
             updateRow(i, {sr_number: normalized});
-
-            if (boeId) return; // if BOE-linked, do not override (prefilled already)
+            if (boeId) return;
 
             const id = asId(normalized);
             if (!id) return;
@@ -227,24 +178,17 @@ const TradeLinesTable = ({
             if (!item) return;
 
             const patch = {};
-            if (item.available_quantity != null)
-                patch.qty_kg = String(num(item.available_quantity));
-            if (item.license_cif_fc_total != null)
-                patch.cif_fc = String(num(item.license_cif_fc_total));
-            if (item.license_cif_inr_total != null)
-                patch.cif_inr = String(num(item.license_cif_inr_total));
-            if (item.license_fob_inr_total != null)
-                patch.fob_inr = String(num(item.license_fob_inr_total));
-            if (item.exchange_rate_hint != null)
-                patch.exch_rate = String(num(item.exchange_rate_hint));
+            if (item.available_quantity != null) patch.qty_kg = String(num(item.available_quantity));
+            if (item.license_cif_fc_total != null) patch.cif_fc = String(num(item.license_cif_fc_total));
+            if (item.license_cif_inr_total != null) patch.cif_inr = String(num(item.license_cif_inr_total));
+            if (item.license_fob_inr_total != null) patch.fob_inr = String(num(item.license_fob_inr_total));
+            if (item.exchange_rate_hint != null) patch.exch_rate = String(num(item.exchange_rate_hint));
             if (patch.cif_fc || patch.cif_inr) patch.mode = "CIF_INR";
-
             updateRow(i, patch);
         },
         [boeId, updateRow]
     );
 
-    // ---------- totals ----------
     const totals = useMemo(() => {
         const acc = {qty: 0, cif_fc: 0, cif_inr: 0, fob_inr: 0, bill: 0};
         (rows || []).forEach((r) => {
@@ -260,8 +204,7 @@ const TradeLinesTable = ({
     }, [rows]);
 
     const showQtyCols = (r) => (r.mode || "QTY") === "QTY";
-    const showValueCols = (r) =>
-        ["CIF_INR", "FOB_INR"].includes(r.mode || "QTY");
+    const showValueCols = (r) => ["CIF_INR", "FOB_INR"].includes(r.mode || "QTY");
 
     return (
         <>
@@ -271,10 +214,8 @@ const TradeLinesTable = ({
                     <th style={{minWidth: 240}}>License Sr</th>
                     <th>Description</th>
                     <th style={{width: 180}}>Mode</th>
-                    {/* QTY mode */}
                     <th className="text-end">Qty (Kg)</th>
                     <th className="text-end">Rate ₹/Kg</th>
-                    {/* Value modes */}
                     <th className="text-end">CIF $</th>
                     <th className="text-end">Exch. Rate</th>
                     <th className="text-end">CIF ₹</th>
@@ -290,7 +231,6 @@ const TradeLinesTable = ({
                     const mode = r.mode || "QTY";
                     return (
                         <tr key={r.id ?? i}>
-                            {/* SR */}
                             <td>
                                 <div className={invalidCls(!!errSr)}>
                                     <AsyncSrNumberSelect
@@ -300,29 +240,20 @@ const TradeLinesTable = ({
                                         placeholder="Search import item (SR)…"
                                     />
                                 </div>
-                                {errSr && (
-                                    <div className="invalid-feedback d-block">{errSr}</div>
-                                )}
+                                {errSr && <div className="invalid-feedback d-block">{errSr}</div>}
                             </td>
 
-                            {/* Desc */}
                             <td>
                                 <Form.Control
                                     size="sm"
                                     value={r.description || ""}
-                                    onChange={(e) =>
-                                        updateRow(i, {description: e.target.value})
-                                    }
+                                    onChange={(e) => updateRow(i, {description: e.target.value})}
                                 />
                             </td>
 
-                            {/* Mode */}
                             <td>
-                                <Form.Select
-                                    size="sm"
-                                    value={mode}
-                                    onChange={(e) => updateRow(i, {mode: e.target.value})}
-                                >
+                                <Form.Select size="sm" value={mode}
+                                             onChange={(e) => updateRow(i, {mode: e.target.value})}>
                                     {MODES.map((m) => (
                                         <option key={m.value} value={m.value}>
                                             {m.label}
@@ -331,7 +262,6 @@ const TradeLinesTable = ({
                                 </Form.Select>
                             </td>
 
-                            {/* QTY mode fields */}
                             <td>
                                 <Form.Control
                                     type="number"
@@ -350,25 +280,20 @@ const TradeLinesTable = ({
                                     size="sm"
                                     className="text-end"
                                     value={r.rate_inr_per_kg || "0"}
-                                    onChange={(e) =>
-                                        updateRow(i, {rate_inr_per_kg: e.target.value})
-                                    }
+                                    onChange={(e) => updateRow(i, {rate_inr_per_kg: e.target.value})}
                                     step="0.01"
                                     min="0"
                                     disabled={!showQtyCols(r)}
                                 />
                             </td>
 
-                            {/* Value mode fields */}
                             <td>
                                 <Form.Control
                                     type="number"
                                     size="sm"
                                     className="text-end"
                                     value={r.cif_fc || "0"}
-                                    onChange={(e) =>
-                                        updateRow(i, {cif_fc: e.target.value}, "cif_fc")
-                                    }
+                                    onChange={(e) => updateRow(i, {cif_fc: e.target.value}, "cif_fc")}
                                     step="0.0001"
                                     min="0"
                                     disabled={!showValueCols(r)}
@@ -381,9 +306,7 @@ const TradeLinesTable = ({
                                     className="text-end"
                                     placeholder="auto"
                                     value={r.exch_rate ?? ""}
-                                    onChange={(e) =>
-                                        updateRow(i, {exch_rate: e.target.value}, "exch_rate")
-                                    }
+                                    onChange={(e) => updateRow(i, {exch_rate: e.target.value}, "exch_rate")}
                                     step="0.0001"
                                     min="0"
                                     disabled={!showValueCols(r)}
@@ -395,9 +318,7 @@ const TradeLinesTable = ({
                                     size="sm"
                                     className="text-end"
                                     value={r.cif_inr || "0"}
-                                    onChange={(e) =>
-                                        updateRow(i, {cif_inr: e.target.value}, "cif_inr")
-                                    }
+                                    onChange={(e) => updateRow(i, {cif_inr: e.target.value}, "cif_inr")}
                                     step="0.01"
                                     min="0"
                                     disabled={!showValueCols(r)}
@@ -428,18 +349,11 @@ const TradeLinesTable = ({
                                 />
                             </td>
 
-                            {/* Bill amount */}
                             <td className="text-end">{computeBillAmount(r).toFixed(2)}</td>
 
-                            {/* Actions */}
                             <td className="text-center">
-                                <Button
-                                    type="button"
-                                    size="sm"
-                                    variant="outline-danger"
-                                    onClick={() => remove(i)}
-                                    title="Remove line"
-                                >
+                                <Button type="button" size="sm" variant="outline-danger" onClick={() => remove(i)}
+                                        title="Remove line">
                                     <FaTrashAlt/>
                                 </Button>
                             </td>
@@ -459,8 +373,7 @@ const TradeLinesTable = ({
 
             <div className="d-flex justify-content-between align-items-center">
                 <Button type="button" size="sm" variant="primary" onClick={add}>
-                    <FaPlus className="me-1"/>
-                    Add Line
+                    <FaPlus className="me-1"/> Add Line
                 </Button>
 
                 <div className="text-end small">
@@ -472,11 +385,7 @@ const TradeLinesTable = ({
                         {"  "} | Bill ₹: <strong>{totals.bill.toFixed(2)}</strong>
                     </div>
                     <div>
-                        Round-off:{" "}
-                        <strong>
-                            {totals.roundoff >= 0 ? "+" : ""}
-                            {totals.roundoff.toFixed(2)}
-                        </strong>
+                        Round-off: <strong>{totals.roundoff >= 0 ? "+" : ""}{totals.roundoff.toFixed(2)}</strong>
                         {"  "} → Final Bill: <strong>₹ {totals.final.toFixed(2)}</strong>
                     </div>
                 </div>

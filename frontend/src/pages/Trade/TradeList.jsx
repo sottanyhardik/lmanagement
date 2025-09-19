@@ -15,7 +15,6 @@ import TotalsInline from "./components/TotalsInline";
 import useTradeListManager from "../../hooks/Trade/useTradeListManager";
 import {tradeEntryTotals, tradeTotals} from "./helpers/groupingHelpers";
 
-// 👉 use the new unified core editor/viewer
 const TradeInvoiceCore = lazy(() => import("../../components/trade/TradeInvoiceCore"));
 
 const Fallback = () => (
@@ -63,11 +62,10 @@ export default function TradeList({initialFilters}) {
 
     const [showNew, setShowNew] = useState(false);
     const onAddNewClick = () => {
-        setNewEntry({direction: "PURCHASE"}); // minimal seed; the core will start blank
+        setNewEntry({direction: "PURCHASE"});
         setShowNew(true);
     };
 
-    // Group by: direction → counterparty → (SALE: BOE | PURCHASE: single hidden bucket)
     const groups = useMemo(() => {
         return (entries || []).reduce((acc, e) => {
             const direction = e?.direction || "— Direction —";
@@ -80,12 +78,8 @@ export default function TradeList({initialFilters}) {
             if (!acc[direction].items[party]) acc[direction].items[party] = {label: party, ports: {}};
 
             if (e?.direction === "SALE") {
-                // Prefer BOE bill_of_entry_number if available
                 const boeLabel =
-                    e?.boe?.bill_of_entry_number ||
-                    e?.boe?.boe_number ||
-                    e?.boe_no ||
-                    "-";
+                    e?.boe?.bill_of_entry_number || e?.boe?.boe_number || e?.boe_no || "-";
                 if (!acc[direction].items[party].ports[boeLabel]) {
                     acc[direction].items[party].ports[boeLabel] = {
                         label: boeLabel,
@@ -95,7 +89,6 @@ export default function TradeList({initialFilters}) {
                 }
                 acc[direction].items[party].ports[boeLabel].entries.push(e);
             } else {
-                // PURCHASE: keep in a hidden bucket (no BOE layer)
                 const key = "__purchase_bucket__";
                 if (!acc[direction].items[party].ports[key]) {
                     acc[direction].items[party].ports[key] = {
@@ -115,7 +108,6 @@ export default function TradeList({initialFilters}) {
     const groupCount = useMemo(() => Object.keys(groups || {}).length, [groups]);
 
     useEffect(() => {
-        // expand all loaded entries by default
         const all = {};
         (entries || []).forEach((e) => {
             if (e?.id != null) all[e.id] = true;
@@ -157,37 +149,34 @@ export default function TradeList({initialFilters}) {
             <div className="d-flex align-items-center justify-content-between w-100">
                 <div className="fw-semibold">Counterparty: {item.label}</div>
                 <div className="text-muted small">
-                    ({count} trade{count !== 1 ? "s" : ""}) • Total ₹{" "}
-                    <Badge bg="secondary">{fmt2(total)}</Badge> • Paid/Received ₹{" "}
-                    <Badge bg="success">{fmt2(paid)}</Badge> • Due ₹ <Badge bg="danger">{fmt2(due)}</Badge>
+                    ({count} trade{count !== 1 ? "s" : ""}) • Total ₹ <Badge bg="secondary">{fmt2(total)}</Badge> •
+                    Paid/Received ₹ <Badge bg="success">{fmt2(paid)}</Badge> • Due ₹{" "}
+                    <Badge bg="danger">{fmt2(due)}</Badge>
                 </div>
             </div>
         );
     };
 
-    // PURCHASE: no "BOE:" header; SALE: show "BOE: <label>"
     const renderPortHeader = ({port, count}) => {
         const {total, paid, due} = tradeTotals(port.entries || []);
-
         if (port.direction !== "SALE") {
             return (
                 <div className="d-flex align-items-center justify-content-between w-100">
                     <div className="fw-semibold">Trades</div>
                     <div className="text-muted small">
-                        ({count} item{count > 1 ? "s" : ""}) • Total ₹ <Badge bg="secondary">{fmt2(total)}</Badge>{" "}
-                        • Paid/Received ₹ <Badge bg="success">{fmt2(paid)}</Badge> • Due ₹{" "}
+                        ({count} item{count > 1 ? "s" : ""}) • Total ₹ <Badge bg="secondary">{fmt2(total)}</Badge> •
+                        Paid/Received ₹ <Badge bg="success">{fmt2(paid)}</Badge> • Due ₹{" "}
                         <Badge bg="danger">{fmt2(due)}</Badge>
                     </div>
                 </div>
             );
         }
-
         return (
             <div className="d-flex align-items-center justify-content-between w-100">
                 <div className="fw-semibold">BOE: {port.label || "-"}</div>
                 <div className="text-muted small">
-                    ({count} item{count > 1 ? "s" : ""}) • Total ₹ <Badge bg="secondary">{fmt2(total)}</Badge>{" "}
-                    • Paid/Received ₹ <Badge bg="success">{fmt2(paid)}</Badge> • Due ₹{" "}
+                    ({count} item{count > 1 ? "s" : ""}) • Total ₹ <Badge bg="secondary">{fmt2(total)}</Badge> •
+                    Paid/Received ₹ <Badge bg="success">{fmt2(paid)}</Badge> • Due ₹{" "}
                     <Badge bg="danger">{fmt2(due)}</Badge>
                 </div>
             </div>
@@ -201,23 +190,13 @@ export default function TradeList({initialFilters}) {
                 <Card.Header className="bg-white border-bottom" onClick={toggleEntry} style={{cursor: "pointer"}}>
                     <div className="d-flex flex-wrap align-items-center justify-content-between">
                         <div className="d-flex flex-wrap align-items-center small text-nowrap">
-                            <div className="me-3">
-                                <strong>Invoice #:</strong> {entry.invoice_number || "-"}
-                            </div>
-                            <div className="me-3">
-                                <strong>Date:</strong> {entry.invoice_date || "-"}
-                            </div>
-                            <div className="me-3">
-                                <strong>Direction:</strong> {entry.direction}
-                            </div>
+                            <div className="me-3"><strong>Invoice #:</strong> {entry.invoice_number || "-"}</div>
+                            <div className="me-3"><strong>Date:</strong> {entry.invoice_date || "-"}</div>
+                            <div className="me-3"><strong>Direction:</strong> {entry.direction}</div>
                         </div>
                         <div className="text-end">
-                            <Badge bg="secondary" className="me-2">
-                                Total ₹ {fmt2(total)}
-                            </Badge>
-                            <Badge bg="success" className="me-2">
-                                Settled ₹ {fmt2(paid)}
-                            </Badge>
+                            <Badge bg="secondary" className="me-2">Total ₹ {fmt2(total)}</Badge>
+                            <Badge bg="success" className="me-2">Settled ₹ {fmt2(paid)}</Badge>
                             <Badge bg="danger">Due ₹ {fmt2(due)}</Badge>
                         </div>
                     </div>
@@ -289,7 +268,7 @@ export default function TradeList({initialFilters}) {
                 labels={{
                     direction: "Direction",
                     company_objs: "Company",
-                    boe: "BOE",
+                    boe_obj: "BOE",
                     date_from: "From",
                     date_to: "To",
                     invoice_number: "Invoice #",
@@ -326,9 +305,7 @@ export default function TradeList({initialFilters}) {
                 allExpanded={false}
                 expanded={expanded}
                 toggle={(id) => setExpanded((prev) => ({...prev, [id]: !prev[id]}))}
-                selection={
-                    Array.isArray(selectedIds) ? {selectedIds, toggleSelect, toggleSelectAll} : null
-                }
+                selection={Array.isArray(selectedIds) ? {selectedIds, toggleSelect, toggleSelectAll} : null}
                 renderCompanyHeader={renderCompanyHeader}
                 renderItemHeader={renderItemHeader}
                 renderPortHeader={renderPortHeader}

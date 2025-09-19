@@ -5,7 +5,10 @@ import {toast} from "react-toastify";
 import axios from "../../api/axiosInstance";
 
 const todayISO = () => new Date().toISOString().slice(0, 10);
-const n2 = (v) => Number.parseFloat(v || 0);
+const n2 = (v) => {
+    const n = Number.parseFloat(v);
+    return Number.isFinite(n) ? n : 0;
+};
 const fmt2 = (v) =>
     Number(v || 0).toLocaleString("en-IN", {minimumFractionDigits: 2, maximumFractionDigits: 2});
 
@@ -28,24 +31,28 @@ export default function TradePaymentsTable({rows = [], onChange, tradeId, onAfte
     const [newAmount, setNewAmount] = useState("");
     const [newNote, setNewNote] = useState("");
 
+    const refetch = async () => {
+        if (!tradeId) return;
+        try {
+            setLoading(true);
+            const {data} = await axios.get("trade-payments/", {params: {trade: tradeId}});
+            const list = Array.isArray(data?.results) ? data.results : Array.isArray(data) ? data : [];
+            setItems(list);
+            onChange?.(list);
+        } catch {
+            // ignore
+        } finally {
+            setLoading(false);
+        }
+    };
+
     useEffect(() => {
         setItems(Array.isArray(rows) ? rows : []);
     }, [rows]);
 
     useEffect(() => {
-        if (!tradeId) return;
-        (async () => {
-            try {
-                setLoading(true);
-                const {data} = await axios.get("trade-payments/", {params: {trade: tradeId}});
-                const list = Array.isArray(data?.results) ? data.results : Array.isArray(data) ? data : [];
-                setItems(list);
-            } catch {
-                /* ignore */
-            } finally {
-                setLoading(false);
-            }
-        })();
+        refetch();
+        // eslint-disable-next-line react-hooks/exhaustive-deps
     }, [tradeId]);
 
     const totals = useMemo(() => ({sum: items.reduce((a, it) => a + n2(it.amount), 0)}), [items]);
@@ -71,13 +78,14 @@ export default function TradePaymentsTable({rows = [], onChange, tradeId, onAfte
     };
 
     const handleAdd = async () => {
-        if (!newAmount || isNaN(n2(newAmount))) {
+        const amt = n2(newAmount);
+        if (amt <= 0) {
             toast.error("Enter a valid amount");
             return;
         }
         const payload = {
             date: newDate || todayISO(),
-            amount: String(newAmount),
+            amount: String(amt.toFixed(2)),
             note: newNote || "",
         };
 
@@ -92,10 +100,7 @@ export default function TradePaymentsTable({rows = [], onChange, tradeId, onAfte
             setLoading(true);
             await axios.post("trade-payments/", {...payload, trade_id: tradeId});
             toast.success("Payment added");
-            const {data} = await axios.get("trade-payments/", {params: {trade: tradeId}});
-            const list = Array.isArray(data?.results) ? data.results : Array.isArray(data) ? data : [];
-            setItems(list);
-            onChange?.(list);
+            await refetch();
             onAfterServerChange?.(); // refresh parent entry
             setNewAmount("");
             setNewNote("");
@@ -120,10 +125,11 @@ export default function TradePaymentsTable({rows = [], onChange, tradeId, onAfte
             setLoading(true);
             await axios.patch(`trade-payments/${row.id}/`, {
                 date: row.date,
-                amount: String(row.amount || 0),
+                amount: String(n2(row.amount).toFixed(2)),
                 note: row.note || "",
             });
             toast.success("Updated");
+            await refetch();
             onAfterServerChange?.();
         } catch (e) {
             toast.error(e?.response?.data?.detail || "Failed to update");
@@ -145,9 +151,7 @@ export default function TradePaymentsTable({rows = [], onChange, tradeId, onAfte
             setLoading(true);
             await axios.delete(`trade-payments/${row.id}/`);
             toast.success("Deleted");
-            const next = items.filter((_, idx) => idx !== i);
-            setItems(next);
-            onChange?.(next);
+            await refetch();
             onAfterServerChange?.();
         } catch (e) {
             toast.error(e?.response?.data?.detail || "Failed to delete");
