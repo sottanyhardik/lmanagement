@@ -10,6 +10,11 @@ from django.utils.functional import cached_property
 alpha = RegexValidator(r'^[a-zA-Z ]*$', 'Only alpha characters are allowed.')
 
 
+def company_upload_path(instance, filename):
+    # Store company files under company_<id>/
+    return f"companies/{instance.id}/{filename}"
+
+
 class AuditModel(models.Model):
     created_on = models.DateTimeField(auto_now_add=True)
     created_by = models.ForeignKey(
@@ -52,6 +57,49 @@ class CompanyModel(AuditModel):
     address = models.TextField(null=True, blank=True)
     address_line_1 = models.TextField(null=True, blank=True)
     address_line_2 = models.TextField(null=True, blank=True)
+    # ✅ Branding / Legal Docs
+    logo = models.ImageField(upload_to=company_upload_path, null=True, blank=True)
+    signature = models.ImageField(upload_to=company_upload_path, null=True, blank=True)
+    stamp = models.ImageField(upload_to=company_upload_path, null=True, blank=True)
+    bill_colour = models.CharField(max_length=20, default="#333")  # hex color
+    # ✅ Banking fields
+    bank_account_number = models.CharField(
+        max_length=30,
+        null=True,
+        blank=True,
+        verbose_name="Bank Account Number"
+    )
+    bank_name = models.CharField(
+        max_length=255,
+        null=True,
+        blank=True,
+        verbose_name="Bank Name"
+    )
+    ifsc_code = models.CharField(
+        max_length=11,
+        null=True,
+        blank=True,
+        validators=[
+            RegexValidator(
+                regex=r'^[A-Z]{4}0[A-Z0-9]{6}$',
+                message="Enter a valid IFSC code."
+            )
+        ],
+        verbose_name="IFSC Code"
+    )
+
+    ACCOUNT_TYPE_CHOICES = [
+        ("SAVINGS", "Savings"),
+        ("CURRENT", "Current"),
+        ("OD", "Overdraft"),
+    ]
+    account_type = models.CharField(
+        max_length=20,
+        choices=ACCOUNT_TYPE_CHOICES,
+        null=True,
+        blank=True,
+        verbose_name="Account Type"
+    )
 
     def __str__(self):
         return self.name if self.name else self.iec
