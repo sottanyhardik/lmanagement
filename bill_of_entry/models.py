@@ -74,7 +74,7 @@ class BillOfEntryModel(AuditModel):
 
     @cached_property
     def get_absolute_url(self):
-        return reverse('bill-of-entry-detail', kwargs={'boe': self.bill_of_entry_number})
+        return reverse('bill-of-entry-detail', kwargs={'pk': self.pk})
 
     @cached_property
     def item_details_cached(self):
