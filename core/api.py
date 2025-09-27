@@ -149,11 +149,11 @@ class FetchBOEData(APIView):
 
             data_list = BillOfEntryModel.objects.filter(
                 Q(is_fetch=False) | Q(appraisement=None) | Q(ooc_date=None) | Q(ooc_date='N.A.')
-            ).exclude(failed__gte=5).order_by('-bill_of_entry_date')[:3]
+            ).exclude(failed__gte=5).order_by('bill_of_entry_date')
 
             triggered_ids = []
             for data in data_list:
-                fetch_data_to_model.delay(cookies, csrftoken, port_dict, {}, captcha, data.pk)
+                fetch_data_to_model(cookies, csrftoken, port_dict, {}, captcha, data.pk)
                 triggered_ids.append(data.pk)
 
             return Response({
