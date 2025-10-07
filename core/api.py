@@ -153,7 +153,7 @@ class FetchBOEData(APIView):
 
             triggered_ids = []
             for data in data_list:
-                fetch_data_to_model(cookies, csrftoken, port_dict, {}, captcha, data.pk)
+                fetch_data_to_model.delay(cookies, csrftoken, port_dict, captcha, data.pk)
                 triggered_ids.append(data.pk)
 
             return Response({
