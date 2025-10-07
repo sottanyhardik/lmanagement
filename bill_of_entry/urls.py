@@ -11,12 +11,12 @@ router.register(r'invoices', InvoiceViewSet, basename='invoice')
 
 urlpatterns = [
     # urls.py
-    path("bill-of-entries/Export-excel/", views.ExportBOEExcelView.as_view(), name="export_boe_excel"),
-    path('bill-of-entries/Export/pdf', views.BillOfEntryExportView.as_view(), name='bill-of-entry-Export'),
-    path('bill-of-entries/bulk-delete/', BillOfEntryBulkDeleteView.as_view(), name='bill-of-entry-bulk-delete'),
-    path('invoices/<int:pk>/pdf/', InvoicePDFView.as_view(), name='invoice-pdf'),
-    path('bill-of-entries/<int:pk>/generate/', views.GenerateTransferLetterAPI.as_view(),
-         name='bill-of-entry-tl'),
+    # # path("bill-of-entries/Export-excel/", views.ExportBOEExcelView.as_view(), name="export_boe_excel"),
+    # # path('bill-of-entries/Export/pdf', views.BillOfEntryExportView.as_view(), name='bill-of-entry-Export'),
+    # # path('bill-of-entries/bulk-delete/', BillOfEntryBulkDeleteView.as_view(), name='bill-of-entry-bulk-delete'),
+    # # path('invoices/<int:pk>/pdf/', InvoicePDFView.as_view(), name='invoice-pdf'),
+    # # path('bill-of-entries/<int:pk>/generate/', views.GenerateTransferLetterAPI.as_view(),
+    #      name='bill-of-entry-tl'),
 
     path('', include(router.urls)),
 
