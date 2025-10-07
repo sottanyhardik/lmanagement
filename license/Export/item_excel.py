@@ -27,6 +27,7 @@ class LicenseImportItemsXLSX(View):
           1) Debited totals (CIF FC, CIF INR)
           2) Premium Total and Net Profit/Loss = Premium Total − Purchase Amount
       • NEW: Alternating background color per license block (banded by license)
+      • NEW: Port Name and License Date added immediately after License No.
     """
 
     # ---------------- Queryset ----------------
@@ -237,17 +238,20 @@ class LicenseImportItemsXLSX(View):
         ws = wb.active
         ws.title = "License Import Items"
 
-        # Column map
+        # Column map (updated: added port and license_date after lic_no)
         COLS = {
-            "lic_no": 1, "expiry": 2, "exporter": 3, "norms": 4, "open_cif": 5, "bal_cif": 6,
-            "fob_inr": 7, "purchase": 8, "hs": 9, "desc": 10, "qty": 11, "allot": 12,
-            "boe_no": 13, "boe_date": 14, "boe_comp": 15, "boe_qty": 16,
-            "boe_cif_fc": 17, "boe_cif_inr": 18, "boe_pct": 19, "boe_perkg": 20,
-            "boe_prem": 21, "net_pl": 22,
+            "lic_no": 1, "port": 2, "license_date": 3, "expiry": 4, "exporter": 5, "norms": 6,
+            "open_cif": 7, "bal_cif": 8, "fob_inr": 9, "purchase": 10,
+            "hs": 11, "desc": 12, "qty": 13, "allot": 14,
+            "boe_no": 15, "boe_date": 16, "boe_comp": 17, "boe_qty": 18,
+            "boe_cif_fc": 19, "boe_cif_inr": 20, "boe_pct": 21, "boe_perkg": 22,
+            "boe_prem": 23, "net_pl": 24,
         }
 
         header = [
             "License No.",
+            "Port Name",
+            "License Date",
             "License Expiry Date",
             "License Exporter",
             "License Norms",
@@ -338,6 +342,8 @@ class LicenseImportItemsXLSX(View):
             fob_inr_val = self._sum_fob_inr_from_export(lic)
             exporter_name = getattr(getattr(lic, "exporter", None), "name", "") or ""
             license_number = getattr(lic, "license_number", "") or ""
+            port_name = getattr(getattr(lic, "port", None), "name", "") or ""
+            license_date_val = getattr(lic, "license_date", None)
 
             items = list(lic.import_license.all() if hasattr(lic, "import_license") else [])
             license_first_row = None
@@ -347,8 +353,11 @@ class LicenseImportItemsXLSX(View):
                 # base row
                 expiry_str = lic.license_expiry_date.strftime("%d-%b-%Y") if getattr(lic, "license_expiry_date",
                                                                                      None) and idx == 0 else ""
+                license_date_str = license_date_val.strftime("%d-%b-%Y") if license_date_val and idx == 0 else ""
                 row = [""] * len(header)
                 row[COLS["lic_no"] - 1] = license_number if idx == 0 else ""
+                row[COLS["port"] - 1] = port_name if idx == 0 else ""
+                row[COLS["license_date"] - 1] = license_date_str if idx == 0 else ""
                 row[COLS["expiry"] - 1] = expiry_str
                 row[COLS["exporter"] - 1] = exporter_name if idx == 0 else ""
                 row[COLS["norms"] - 1] = norms if idx == 0 else ""
@@ -468,11 +477,32 @@ class LicenseImportItemsXLSX(View):
                         cell.alignment = al_left
                 row_idx += 1
 
-        # Column widths
+        # Column widths (updated indices)
         widths = {
-            1: 22, 2: 18, 3: 28, 4: 28, 5: 16, 6: 16, 7: 16, 8: 18, 9: 14,
-            10: 40, 11: 12, 12: 48, 13: 18, 14: 14, 15: 32, 16: 12, 17: 14,
-            18: 14, 19: 12, 20: 14, 21: 16, 22: 18,
+            1: 22,  # License No.
+            2: 20,  # Port Name
+            3: 16,  # License Date
+            4: 18,  # Expiry
+            5: 28,  # Exporter
+            6: 28,  # Norms
+            7: 16,  # Opening CIF
+            8: 16,  # Balance CIF
+            9: 16,  # FOB INR
+            10: 18, # Purchase Amount
+            11: 14, # HS Code
+            12: 40, # Description
+            13: 12, # Quantity
+            14: 48, # Allotments
+            15: 18, # BOE No.
+            16: 14, # BOE Date
+            17: 32, # BOE Company
+            18: 12, # BOE Qty
+            19: 14, # BOE CIF FC
+            20: 14, # BOE CIF INR
+            21: 12, # % Premium
+            22: 14, # Premium per Kg
+            23: 16, # Premium Amount
+            24: 18, # Net P/L
         }
         for idx, w in widths.items():
             ws.column_dimensions[get_column_letter(idx)].width = w
