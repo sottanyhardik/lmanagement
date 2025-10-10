@@ -1,6 +1,8 @@
-import django_tables2 as dt2
-from . import models
 import itertools
+
+import django_tables2 as dt2
+
+from . import models
 
 
 class CompanyClassTable(dt2.Table):
@@ -21,8 +23,8 @@ class CompanyClassTable(dt2.Table):
 
 class SionNormClassTable(dt2.Table):
     counter = dt2.Column(empty_values=(), orderable=False)
-    edit = dt2.TemplateColumn('<a href="/sion/{{ record.id }}/update/"><i class="mdi mdi-grease-pencil"></i></a>')
-    view = dt2.TemplateColumn('<a href="/sion/{{ record.id }}/"><i class="mdi mdi-share"></i></a>')
+    edit = dt2.TemplateColumn('<a href="/Sion/{{ record.id }}/update/"><i class="mdi mdi-grease-pencil"></i></a>')
+    view = dt2.TemplateColumn('<a href="/Sion/{{ record.id }}/"><i class="mdi mdi-share"></i></a>')
     norm_class = dt2.Column(order_by=('id'))
 
     class Meta:
@@ -58,11 +60,9 @@ class ItemNameTable(dt2.Table):
     class Meta:
         model = models.ItemNameModel
         per_page = 50
-        fields = ('counter', 'name','head', 'edit')
+        fields = ('counter', 'name', 'head', 'edit')
         attrs = {"class": "table table-bordered table-striped table-hover dataTable js-exportable dark-bg"}
 
     def render_counter(self):
         self.row_counter = getattr(self, 'row_counter', itertools.count(start=1))
         return next(self.row_counter)
-
-

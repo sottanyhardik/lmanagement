@@ -143,7 +143,8 @@ License Report *
 /IMG/
 /NR/
 /Qr/
-/Reports/
 *.pdf
 *.xlsx
 *.sql
+db_update_*
+/docs/

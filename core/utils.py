@@ -1,12 +1,19 @@
 from datetime import datetime
-from io import BytesIO
 
+import num2words
 from django.http import HttpResponse
 from django.template.loader import get_template
 from django.utils.dateparse import parse_datetime, parse_date
 from django_tables2 import SingleTableView
 from django_tables2.export import ExportMixin
 from xhtml2pdf import pisa
+
+
+def number_to_words(amount):
+    try:
+        return num2words.num2words(amount, to='currency', lang='en_IN').replace('euro', 'rupees').capitalize()
+    except Exception:
+        return ""
 
 
 class PagedFilteredTableView(ExportMixin, SingleTableView):
@@ -32,14 +39,12 @@ class PagedFilteredTableView(ExportMixin, SingleTableView):
 
 def render_to_pdf(template_src, context_dict={}):
     template = get_template(template_src)
-    html  = template.render(context_dict)
-    result = BytesIO()
-    pdf = pisa.pisaDocument(BytesIO(html.encode("ISO-8859-1")), result)
-    if not pdf.err:
-        return HttpResponse(result.getvalue(), content_type='application/pdf')
-    return None
-
-
+    html = template.render(context_dict)
+    response = HttpResponse(content_type='application/pdf')
+    pisa_status = pisa.CreatePDF(html, dest=response)
+    if pisa_status.err:
+        return HttpResponse('Error rendering PDF', status=500)
+    return response
 
 
 def safe_parse_datetime(value):
@@ -66,6 +71,15 @@ def safe_parse_datetime(value):
         pass
     return None
 
+
 def safe_parse_date(value):
     dt = safe_parse_datetime(value)
     return dt.date() if dt else None
+
+
+def get_entity_prefix(entity_name):
+    words = entity_name.strip().split()
+    if len(words) > 1:
+        return ''.join(word[0] for word in words).upper()
+    else:
+        return entity_name[:3].upper()

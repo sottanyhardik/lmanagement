@@ -1,19 +1,11 @@
-from django.db.models import Q
 import django_filters
 from django.db import models
-from django.forms import Select
-from django_filters import DateFromToRangeFilter
-
-from core.filter_helper import RangeWidget
-from core.models import CompanyModel, PortModel
-from . import models as bill_of_entry
+from django.db.models import Q
 
 BOOLEAN_CHOICES = (
     (True, 'Yes'),
     (False, 'No')
 )
-
-from django_filters.fields import Lookup
 
 
 class ListFilter(django_filters.Filter):
@@ -40,58 +32,81 @@ class ListBOEFilter(django_filters.Filter):
             return queryset
 
 
+from .models import BillOfEntryModel
+
+
 class BillOfEntryFilter(django_filters.FilterSet):
-    company = django_filters.ModelMultipleChoiceFilter(
-        field_name='company', label='Company Name',
-        queryset=CompanyModel.objects.filter(bill_of_entry__isnull=False).distinct())
-    exclude_company_name = django_filters.ModelMultipleChoiceFilter(
-        field_name='company__name', exclude=True, label='Exclude Company Name',
-        queryset=CompanyModel.objects.filter(company_allotments__isnull=False).distinct())
+    from_date = django_filters.DateFilter(field_name="bill_of_entry_date", lookup_expr='gte')
+    to_date = django_filters.DateFilter(field_name="bill_of_entry_date", lookup_expr='lte')
+    company__in = django_filters.CharFilter(method='filter_company_in')
+    exclude_company__in = django_filters.CharFilter(method='filter_exclude_company_in')
 
-    port = django_filters.ModelMultipleChoiceFilter(
-        field_name='port__code', label='Port Code',
-        queryset=PortModel.objects.filter(boe_port__isnull=False).distinct())
+    port__in = django_filters.CharFilter(method='filter_port_in')
+    exclude_port__in = django_filters.CharFilter(method='filter_exclude_port_in')
 
-    is_ge = django_filters.BooleanFilter(method='check_self', label='All')
+    is_ge = django_filters.BooleanFilter(method='check_self', label='GE only')
     item_details__sr_number__license__license_number = ListFilter(
-        field_name='item_details__sr_number__license__license_number', label='License Numbers')
-    bill_of_entry_date = DateFromToRangeFilter(
-        widget=RangeWidget(attrs={'placeholder': 'DD/MM/YYYY', 'format': 'dd/mm/yyyy', 'type': 'date'}))
-    is_invoice = django_filters.BooleanFilter(method='check_is_invoice', label='Is Invoice')
+        field_name='item_details__sr_number__license__license_number', label='License Numbers'
+    )
+    is_invoice = django_filters.BooleanFilter(method='check_is_invoice', label='Has Invoice')
     is_ooc = django_filters.BooleanFilter(method='check_is_ooc', label='Is OOC')
     bill_of_entry_number = ListBOEFilter(
-        field_name='bill_of_entry_number', label='BOE Numbers')
+        field_name='bill_of_entry_number', label='BOE Numbers'
+    )
 
     class Meta:
-        model = bill_of_entry.BillOfEntryModel
-        fields = ['company', 'exclude_company_name', 'bill_of_entry_number', 'port', 'product_name', 'is_ge',
-                  'item_details__sr_number__license__license_number', 'appraisement']
-        widgets = {
-            'company': Select(attrs={'class': 'form-control'}),
-        }
+        model = BillOfEntryModel
+        fields = [
+            'company', 'bill_of_entry_number',
+            'port', 'product_name', 'is_ge',
+            'item_details__sr_number__license__license_number'
+        ]
         filter_overrides = {
             models.CharField: {
                 'filter_class': django_filters.CharFilter,
-                'extra': lambda f: {
-                    'lookup_expr': 'icontains',
-                },
+                'extra': lambda f: {'lookup_expr': 'icontains'},
             },
             models.TextField: {
                 'filter_class': django_filters.CharFilter,
-                'extra': lambda f: {
-                    'lookup_expr': 'icontains',
-                },
+                'extra': lambda f: {'lookup_expr': 'icontains'},
             }
         }
 
+    def filter_company_in(self, queryset, name, value):
+        if not value:
+            return queryset
+        ids = [v for v in value.split(',') if v]
+        return queryset.filter(company_id__in=ids)
+
+    def filter_exclude_company_in(self, queryset, name, value):
+        if not value:
+            return queryset
+        ids = [v for v in value.split(',') if v]
+        return queryset.exclude(company_id__in=ids)
+
+    def filter_port_in(self, queryset, name, value):
+        if not value:
+            return queryset
+        ids = [v for v in value.split(',') if v]
+        return queryset.filter(port_id__in=ids)
+
+    def filter_exclude_port_in(self, queryset, name, value):
+        if not value:
+            return queryset
+        ids = [v for v in value.split(',') if v]
+        return queryset.exclude(port_id__in=ids)
+
     def check_self(self, queryset, name, value):
-        return queryset.filter(item_details__sr_number__license__purchase_status='GE').distinct()
+        if value:
+            return queryset.filter(item_details__sr_number__license__purchase_status='GE').distinct()
+        return queryset
 
     def check_is_invoice(self, queryset, name, value):
-        if value:
-            return queryset.exclude(invoice_no=None)
-        else:
-            return queryset.filter(invoice_no=None)
+        if str(value).lower() == 'true':
+            return queryset.exclude(invoice_no__isnull=True).exclude(invoice_no__exact='')
+        elif str(value).lower() == 'false':
+            return queryset.filter(Q(invoice_no__isnull=True) | Q(invoice_no__exact=''))
+        return queryset
 
     def check_is_ooc(self, queryset, name, value):
         if value:

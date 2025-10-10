@@ -289,8 +289,8 @@ class LicenseBiscuitReportTable(LicenseReportTable):
     pomace_cif = DecimalColumnWithTotal(verbose_name='Pomace CIF',
                                         accessor='cif_value_balance_biscuits.veg_oil.cif_pomace_oil', orderable=False)
     ten_restriction = DecimalColumnWithTotal(verbose_name='10% Balance',
-                                              accessor='get_per_cif.tenRestriction',
-                                              orderable=False)
+                                             accessor='get_per_cif.tenRestriction',
+                                             orderable=False)
     juice_hsn = PrefixMixin.prefixed('get_biscuit_juice.hs_code__hs_code', verbose_name='JUICE HSN Code',
                                      orderable=False)
     juice_pd = dt2.Column(verbose_name='Juice PD', accessor='get_biscuit_juice.description', orderable=False)
@@ -405,11 +405,16 @@ class LicenseConfectioneryReportTable(LicenseReportTable):
     twoRestriction = DecimalColumnWithTotal(verbose_name='2% Balance',
                                             accessor='get_per_cif.twoRestriction',
                                             orderable=False)
+    pp_hsn = PrefixMixin.prefixed('get_pp.hs_code__hs_code', verbose_name='PP HSN', orderable=False)
+    pp_pd = dt2.Column(verbose_name='PP PD', accessor='get_pp.description', orderable=False)
     pp_qty = DecimalColumnWithTotal(verbose_name='PP QTY', accessor='get_pp.available_quantity_sum', orderable=False)
+    pnp_hsn = PrefixMixin.prefixed('get_paper_and_paper.hs_code__hs_code', verbose_name='P&P HSN', orderable=False)
+    pnp_pd = dt2.Column(verbose_name='P&P PD', accessor='get_paper_and_paper.description', orderable=False)
+    pnp_qty = DecimalColumnWithTotal(verbose_name='P&P QTY', accessor='get_paper_and_paper.available_quantity_sum',
+                                     orderable=False)
+
     get_aluminium = DecimalColumnWithTotal(verbose_name='Aluminium Foil QTY',
                                            accessor='get_aluminium.available_quantity_sum', orderable=False)
-    pnp_qty = DecimalColumnWithTotal(verbose_name='Paper & Paper QTY',
-                                     accessor='get_paper_and_paper.available_quantity_sum', orderable=False)
     condition_sheet = dt2.Column(verbose_name='Condition Sheet', accessor='condition_sheet', orderable=False)
     owner = dt2.Column(verbose_name='Owner', accessor='current_owner__name', orderable=False)
 

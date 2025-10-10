@@ -1,11 +1,12 @@
 from django.db import models
-
 # Create your models here.
 from django.db.models import Sum
 from django.db.models.signals import post_save, post_delete
 from django.dispatch import receiver
 from django.urls import reverse
 from django.utils.functional import cached_property
+
+from core.models import AuditModel
 
 Credit = 'C'
 Debit = 'D'
@@ -24,11 +25,14 @@ ROW_TYPE = (
 )
 
 
-class AllotmentModel(models.Model):
+class AllotmentModel(AuditModel):
     company = models.ForeignKey('core.CompanyModel', related_name='company_allotments', on_delete=models.CASCADE)
     type = models.CharField(max_length=2, choices=ROW_TYPE, default=ALLOTMENT)
     required_quantity = models.FloatField(default=0)
     unit_value_per_unit = models.FloatField(default=0)
+    exchange_rate = models.FloatField(default=0)  # INR per 1 $
+    required_cif_inr = models.FloatField(default=0)  # total CIF in INR
+    required_cif_fc = models.FloatField(default=0)
     item_name = models.CharField(max_length=255)
     contact_person = models.CharField(max_length=255, null=True, blank=True)
     contact_number = models.CharField(max_length=255, null=True, blank=True)
@@ -39,16 +43,9 @@ class AllotmentModel(models.Model):
                              related_name="allotments")
     related_company = models.ForeignKey('core.CompanyModel', related_name='related_company', on_delete=models.CASCADE,
                                         null=True, blank=True)
-    created_on = models.DateField(auto_created=True, null=True, blank=True)
-    created_by = models.ForeignKey('auth.User', on_delete=models.CASCADE, null=True, blank=True,
-                                   related_name='allotment_created')
-    modified_on = models.DateField(auto_now=True)
-    modified_by = models.ForeignKey('auth.User', on_delete=models.CASCADE, null=True, blank=True,
-                                    related_name='allotment_updated')
 
     class Meta:
         ordering = ['estimated_arrival_date', ]
-
 
     def __str__(self):
         if self.invoice:
@@ -57,10 +54,6 @@ class AllotmentModel(models.Model):
         else:
             return "{0} {1} {2}".format(self.item_name, self.company.name,
                                         str(self.required_quantity))
-
-    @cached_property
-    def required_value(self):
-        return round(self.required_quantity * self.unit_value_per_unit, 0)
 
     @cached_property
     def dfia_list(self):
@@ -91,8 +84,14 @@ class AllotmentModel(models.Model):
         else:
             return 0
 
+    @cached_property
+    def port_code(self):
+        p = getattr(self.item.license, "port", None)
+        # If FK -> PortModel, return its code; if it’s already a string, return it.
+        return (getattr(p, "code", p) or "")
 
-class AllotmentItems(models.Model):
+
+class AllotmentItems(AuditModel):
     item = models.ForeignKey('license.LicenseImportItemsModel', on_delete=models.CASCADE,
                              related_name='allotment_details', null=True, blank=True)
     allotment = models.ForeignKey('allotment.AllotmentModel', on_delete=models.CASCADE,
@@ -117,7 +116,6 @@ class AllotmentItems(models.Model):
     @cached_property
     def ledger(self):
         return self.item.license.ledger_date
-
 
     @cached_property
     def product_description(self):
@@ -175,4 +173,4 @@ def update_stock(sender, instance, **kwargs):
 def delete_stock(sender, instance, *args, **kwargs):
     item = instance.item
     from bill_of_entry.tasks import update_balance_values_task
-    update_balance_values_task.delay(item.id)
+    update_balance_values_task(item.id)

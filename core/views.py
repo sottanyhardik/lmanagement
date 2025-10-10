@@ -7,8 +7,11 @@ from django.http import HttpResponse
 from django.http import HttpResponseRedirect
 from django.shortcuts import redirect
 from django.urls import reverse
+from django.utils.decorators import method_decorator
 from django.views import View
-from django.views.generic import TemplateView, CreateView, UpdateView, DetailView
+from django.views.decorators.cache import never_cache
+from django.views.generic import CreateView, UpdateView, DetailView
+from django.views.generic import TemplateView
 from extra_views import UpdateWithInlinesView, InlineFormSetFactory
 from tablib import Dataset
 
@@ -19,12 +22,16 @@ from .models import MEISMODEL
 from .scripts.ledger import create_object
 
 
+@method_decorator(never_cache, name="dispatch")
 class DashboardView(TemplateView):
-    template_name = 'blank.html'
+    """
+    Serves the React app's index.html (frontend/dist/index.html).
+    """
+    template_name = "index.html"
 
     def get_context_data(self, **kwargs):
-        context = super(DashboardView, self).get_context_data(**kwargs)
-        context['page_title'] = "Dashboard"
+        context = super().get_context_data(**kwargs)
+        # Add context vars if needed later
         return context
 
 

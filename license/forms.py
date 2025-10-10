@@ -1,153 +1,158 @@
 from django import forms
+
 from core import models as core_model, custom_widgets
 from . import models as license_model
 
 
-class ExportItemsForm(forms.ModelForm):
-    norm_class = forms.ModelChoiceField(
-        queryset=core_model.SionNormClassModel.objects.all(),
-        widget=custom_widgets.NormWidget,
-        required=False
-    )
+class BaseStyledForm(forms.ModelForm):
+    """
+    Base form that:
+      • sets HTML5 date inputs for *date* fields
+      • adds 'form-control' to all widgets
+      • sets textarea rows to 1 by default
+    """
 
+    def __init__(self, *args, **kwargs):
+        super().__init__(*args, **kwargs)
+        for name, field in self.fields.items():
+            # HTML5 date input for any field containing 'date' in its name
+            if 'date' in name:
+                field.widget.input_type = 'date'
+
+            # Add bootstrap class safely
+            existing = field.widget.attrs.get('class', '')
+            field.widget.attrs['class'] = (existing + ' form-control').strip()
+
+            # Compact textareas
+            if isinstance(field.widget, forms.Textarea):
+                field.widget.attrs.setdefault('rows', '1')
+
+
+class ExportItemsForm(BaseStyledForm):
+    # Declared with .none() to satisfy type-checkers at class level; set real queryset in __init__
+    norm_class = forms.ModelChoiceField(
+        queryset=core_model.SionNormClassModel.objects.none(),
+        widget=custom_widgets.NormWidget,
+        required=False,
+    )
     item = forms.ModelChoiceField(
-        queryset=core_model.ItemNameModel.objects.all(),
+        queryset=core_model.ItemNameModel.objects.none(),
         widget=custom_widgets.ItemWidget,
-        required=False
+        required=False,
     )
 
     class Meta:
         model = license_model.LicenseExportItemModel
-        fields = ['item', 'norm_class', 'duty_type', 'net_quantity', 'old_quantity', 'unit',
-                  'fob_fc', 'fob_inr', 'currency', 'fob_exchange_rate', 'value_addition', 'cif_fc', 'cif_inr']
+        fields = [
+            'item', 'norm_class', 'duty_type', 'net_quantity', 'old_quantity', 'unit',
+            'fob_fc', 'fob_inr', 'currency', 'fob_exchange_rate', 'value_addition',
+            'cif_fc', 'cif_inr',
+        ]
 
     def __init__(self, *args, **kwargs):
-        super(ExportItemsForm, self).__init__(*args, **kwargs)
-        for field_name, field in self.fields.items():
-            if 'date' in field_name:
-                field.widget.input_type = 'date'
-            if field.widget.attrs.get('class'):
-                field.widget.attrs['class'] += ' form-control'
-            else:
-                field.widget.attrs['class'] = 'form-control'
-            if 'Textarea' in str(field.widget):
-                field.widget.attrs['rows'] = '1'
+        super().__init__(*args, **kwargs)
+        # Real querysets (runtime, DB-aware)
+        self.fields['norm_class'].queryset = core_model.SionNormClassModel.objects.all()
+        self.fields['item'].queryset = core_model.ItemNameModel.objects.all()
 
 
-class ImportItemsForm(forms.ModelForm):
+class ImportItemsForm(BaseStyledForm):
     hs_code = forms.ModelChoiceField(
-        queryset=core_model.HSCodeModel.objects.all(),
+        queryset=core_model.HSCodeModel.objects.none(),
         widget=custom_widgets.HSCodeSingleWidget,
-        required=False
+        required=False,
     )
-
-    item = forms.ModelChoiceField(
-        queryset=core_model.ItemNameModel.objects.all(),
+    items = forms.ModelChoiceField(
+        queryset=core_model.ItemNameModel.objects.none(),
         widget=custom_widgets.ItemWidget,
-        required=False
+        required=False,
     )
 
     class Meta:
         model = license_model.LicenseImportItemsModel
-        fields = ['serial_number', 'hs_code', 'item','description', 'quantity', 'old_quantity', 'cif_fc', 'comment', 'is_restrict']
+        fields = [
+            'serial_number', 'hs_code', 'items', 'description', 'quantity', 'old_quantity',
+            'cif_fc', 'comment', 'is_restrict',
+        ]
 
     def __init__(self, *args, **kwargs):
-        super(ImportItemsForm, self).__init__(*args, **kwargs)
-        for field_name, field in self.fields.items():
-            if 'date' in field_name:
-                field.widget.input_type = 'date'
-            if field.widget.attrs.get('class'):
-                field.widget.attrs['class'] += ' form-control'
-            else:
-                field.widget.attrs['class'] = 'form-control'
-            if 'serial_number' in field_name:
+        super().__init__(*args, **kwargs)
+
+        # Real querysets
+        self.fields['hs_code'].queryset = core_model.HSCodeModel.objects.all()
+        self.fields['items'].queryset = core_model.ItemNameModel.objects.all()
+
+        # Extra CSS classes like your original
+        for name, field in self.fields.items():
+            if 'serial_number' in name:
                 field.widget.attrs['class'] += ' span1'
-            if 'hs_code' in field_name or 'quantity' in field_name or 'unit' in field_name:
+            if any(k in name for k in ['hs_code', 'quantity', 'unit']):
                 field.widget.attrs['class'] += ' span2'
-            if 'Textarea' in str(field.widget):
-                field.widget.attrs['rows'] = '1'
 
 
-class LicenseDetailsForm(forms.ModelForm):
+class LicenseDetailsForm(BaseStyledForm):
     port = forms.ModelChoiceField(
-        queryset=core_model.PortModel.objects.all(),
+        queryset=core_model.PortModel.objects.none(),
         widget=custom_widgets.PortWidget,
-        required=False
+        required=False,
     )
     exporter = forms.ModelChoiceField(
-        queryset=core_model.CompanyModel.objects.all(),
+        queryset=core_model.CompanyModel.objects.none(),
         widget=custom_widgets.CompanyWidget,
-        required=False
+        required=False,
     )
 
     class Meta:
         model = license_model.LicenseDetailsModel
-        fields = ['scheme_code', 'notification_number', 'license_number', 'license_date', 'license_expiry_date',
-                  'file_number', 'exporter', 'port', 'registration_number', 'registration_date', 'user_restrictions',
-                  'user_comment', 'purchase_status', 'is_au', 'is_not_registered', 'user_comment',
-                  'ge_file_number','is_mnm','condition_sheet']
+        fields = [
+            'scheme_code', 'notification_number', 'license_number', 'license_date',
+            'license_expiry_date', 'file_number', 'exporter', 'port',
+            'registration_number', 'registration_date', 'user_restrictions', 'user_comment',
+            'purchase_status', 'is_au', 'is_not_registered', 'user_comment',
+            'ge_file_number', 'is_mnm', 'condition_sheet',
+        ]
 
     def __init__(self, *args, **kwargs):
-        super(LicenseDetailsForm, self).__init__(*args, **kwargs)
-        for field_name, field in self.fields.items():
-            if 'date' in field_name:
-                field.widget.input_type = 'date'
-            if field.widget.attrs.get('class'):
-                field.widget.attrs['class'] += ' form-control'
-            else:
-                field.widget.attrs['class'] = 'form-control'
-            if 'Textarea' in str(field.widget):
-                field.widget.attrs['rows'] = '1'
+        super().__init__(*args, **kwargs)
+        self.fields['port'].queryset = core_model.PortModel.objects.all()
+        self.fields['exporter'].queryset = core_model.CompanyModel.objects.all()
 
 
-class LicenseDocumentForm(forms.ModelForm):
+class LicenseDocumentForm(BaseStyledForm):
     class Meta:
         model = license_model.LicenseDocumentModel
         fields = ['license', 'type', 'file']
 
-    def __init__(self, *args, **kwargs):
-        super(LicenseDocumentForm, self).__init__(*args, **kwargs)
-        for field_name, field in self.fields.items():
-            if 'date' in field_name:
-                field.widget.input_type = 'date'
-            if field.widget.attrs.get('class'):
-                field.widget.attrs['class'] += ' form-control'
-            else:
-                field.widget.attrs['class'] = 'form-control'
-            if 'Textarea' in str(field.widget):
-                field.widget.attrs['rows'] = '1'
 
-
-class LicenseInwardOutwardForm(forms.ModelForm):
+class LicenseInwardOutwardForm(BaseStyledForm):
     license = forms.ModelChoiceField(
-        queryset=license_model.LicenseDetailsModel.objects.all(),
+        queryset=license_model.LicenseDetailsModel.objects.none(),
         widget=custom_widgets.LicenseWidget,
-        required=False
+        required=False,
     )
     copy = forms.BooleanField(initial=True, required=False)
     tl = forms.BooleanField(initial=True, required=False)
     status = forms.ModelChoiceField(
-        queryset=license_model.StatusModel.objects.all(),
-        initial=3
+        queryset=license_model.StatusModel.objects.none(),
+        required=True,
+        initial=3,  # ensure PK 3 exists
     )
     office = forms.ModelChoiceField(
-        queryset=license_model.OfficeModel.objects.all(),
-        initial=1
+        queryset=license_model.OfficeModel.objects.none(),
+        required=True,
+        initial=1,  # ensure PK 1 exists
     )
 
     class Meta:
         model = license_model.LicenseInwardOutwardModel
-        fields = ['date', 'license', 'status', 'office', 'description', 'amd_sheets_number', 'copy', 'annexure', 'tl',
-                  'aro', 'along_with']
+        fields = [
+            'date', 'license', 'status', 'office', 'description',
+            'amd_sheets_number', 'copy', 'annexure', 'tl',
+            'aro', 'along_with',
+        ]
 
     def __init__(self, *args, **kwargs):
-        super(LicenseInwardOutwardForm, self).__init__(*args, **kwargs)
-        for field_name, field in self.fields.items():
-            if 'date' in field_name:
-                field.widget.input_type = 'date'
-            if field.widget.attrs.get('class'):
-                field.widget.attrs['class'] += ' form-control'
-            else:
-                field.widget.attrs['class'] = 'form-control'
-            if 'Textarea' in str(field.widget):
-                field.widget.attrs['rows'] = '1'
+        super().__init__(*args, **kwargs)
+        self.fields['license'].queryset = license_model.LicenseDetailsModel.objects.all()
+        self.fields['status'].queryset = license_model.StatusModel.objects.all()
+        self.fields['office'].queryset = license_model.OfficeModel.objects.all()

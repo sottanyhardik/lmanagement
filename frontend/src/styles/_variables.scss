@@ -1,0 +1,18 @@
+// Brand
+$primary: #e16123;
+$primary-hover: #c9521d;
+$primary-text: #ffffff;
+
+// Body
+$body-bg: #f7f7f7;
+$body-color: #242424;
+
+// Components
+$card-bg: #f7f7f7;
+
+// Bootstrap theme colors map (extend if needed)
+$theme-colors: (
+        "primary": $primary,
+        "dark": $body-color,
+        "light": $primary-text
+);

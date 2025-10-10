@@ -106,7 +106,7 @@
                         <td {% if not allotment.allotment_details.all.exists %}class="pending"{% endif %}>{{ allotment.port }}</td>
                         <td {% if not allotment.allotment_details.all.exists %}class="pending"{% endif %}>{{ allotment.required_quantity|intcomma }}</td>
                         <td {% if not allotment.allotment_details.all.exists %}class="pending"{% endif %}>{{ allotment.unit_value_per_unit|intcomma }}</td>
-                        <td {% if not allotment.allotment_details.all.exists %}class="pending"{% endif %}>{{ allotment.required_value|intcomma }}</td>
+                        <td {% if not allotment.allotment_details.all.exists %}class="pending"{% endif %}>{{ allotment.required_cif_fc|intcomma }}</td>
                         <td {% if not allotment.allotment_details.all.exists %}class="pending"{% endif %}>{{ allotment.item_name }}</td>
                         <td {% if not allotment.allotment_details.all.exists %}class="pending"{% endif %}>
                             {% if allotment.invoice %}{{ allotment.invoice }}{% else %}-{% endif %}</td>

@@ -1,0 +1,48 @@
+.sticky-header {
+    position: sticky;
+    top: 60px; /* adjust based on your navbar */
+    z-index: 1010;
+    background: #ffffff;
+    border-bottom: 1px solid #dee2e6;
+    padding: 8px 12px;
+}
+
+.badge + .badge {
+    margin-left: 6px;
+}
+
+/* Sticky headers/footers inside a scroll container */
+.table-scroll {
+    max-height: 420px; /* tweak per your layout */
+    overflow: auto;
+}
+
+/* Sticky header */
+.table-scroll thead th {
+    position: sticky;
+    top: 0;
+    z-index: 2;
+    background: var(--bs-body-bg, #fff);
+}
+
+/* Sticky footer (totals) */
+.table-scroll tfoot {
+    position: sticky;
+    bottom: 0;
+    z-index: 1;
+    background: var(--bs-body-bg, #fff);
+    box-shadow: 0 -1px 0 rgba(0, 0, 0, .05);
+}
+
+/* Tabular numbers for aligned digits */
+.tnum {
+    font-variant-numeric: tabular-nums;
+}
+
+/* Small helper spacing for the “Max” chip beside inputs */
+.input-with-chip {
+    display: grid;
+    grid-template-columns: 1fr auto;
+    gap: .375rem;
+    align-items: center;
+}

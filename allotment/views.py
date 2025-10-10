@@ -3,7 +3,7 @@ from shutil import make_archive
 
 import pandas as pd
 from django.db.models import Sum, F
-from django.http import JsonResponse, HttpResponse
+from django.http import JsonResponse
 from django.shortcuts import get_object_or_404, redirect
 from django.urls import reverse
 from django.views.generic import DetailView, CreateView, UpdateView, FormView
@@ -13,7 +13,6 @@ from easy_pdf.views import PDFTemplateResponseMixin
 
 from allotment.scripts.aro import generate_tl_software
 from core.models import TransferLetterModel
-from core.scripts.script import render_to_pdf
 from core.utils import PagedFilteredTableView
 from license import models as license_models
 from . import forms, tables, filters
@@ -136,8 +135,8 @@ def allotment_data(request, pk):
     previous_allotment_cif_fc = previous_allotment_cif_fc - alloted_item_cif_fc
     new_allotment_quantity = previous_allotment_quantity + requested_allotment_quantity
     new_allotment_cif_fc = previous_allotment_cif_fc + requested_allotment_value
-    if round(allotment.required_value + 3, 2) < round(new_allotment_cif_fc, 2) or round(allotment.required_quantity,
-                                                                                        2) < round(
+    if round(allotment.required_cif_fc + 3, 2) < round(new_allotment_cif_fc, 2) or round(allotment.required_quantity,
+                                                                                         2) < round(
         new_allotment_quantity, 2):
         return JsonResponse({'message': 'Please Reduce Allotment Exceed Required',
                              'status': False}, safe=False)
@@ -196,26 +195,35 @@ class AllotmentDeleteItemsView(TemplateResponseMixin, ContextMixin, View):
         return context
 
 
-class SendAllotmentView(PDFTemplateResponseMixin, DetailView):
-    model = allotments.AllotmentModel
-    template_name = 'allotment/send.html'
+# old_views.py
 
-    def get(self, request, *args, **kwargs):
-        object = self.get_object()
-        context = {
-            "object": self.get_object()
-        }
-        pdf = render_to_pdf('allotment/send.html', context)
-        if pdf:
-            response = HttpResponse(pdf, content_type='application/pdf')
-            filename = "Allotment_%s.pdf" % (str(object.id))
-            content = "inline; filename=%s" % (filename)
-            download = request.GET.get("download")
-            if download:
-                content = "attachment; filename=%s" % (filename)
-            response['Content-Disposition'] = content
-            return response
-        return HttpResponse("Not found")
+
+def _to_float(v, default=0.0):
+    try:
+        return float(v or default)
+    except (TypeError, ValueError):
+        return default
+
+
+# old_views.py
+from django.http import HttpResponse
+from django.views.generic import DetailView
+from allotment import models as allotments
+
+
+def _to_float(v, default=0.0):
+    try:
+        return float(v or default)
+    except (TypeError, ValueError):
+        return default
+
+
+def _fmt_date(d):
+    # Handles date, datetime, or already-string safely
+    try:
+        return d.strftime("%d/%m/%Y")
+    except Exception:
+        return "" if d is None else str(d)
 
 
 class CardView(DetailView):
@@ -238,7 +246,7 @@ class DownloadPendingAllotmentView(PDFTemplateResponseMixin, FilterView):
     def get_context_data(self, **kwargs):
         context = super().get_context_data(**kwargs)
         total = 0
-        total_list = [total + int(data.required_value) for data in self.get_queryset()]
+        total_list = [total + int(data.required_cif_fc) for data in self.get_queryset()]
         queryset = self.get_queryset().values('item_name').order_by('item_name').annotate(
             total_qty=Sum('required_quantity'), value=Sum(F('required_quantity') * F('unit_value_per_unit'))).distinct()
         context['queryset'] = queryset
@@ -400,7 +408,7 @@ class PandasDownloadPendingAllotmentView(PDFTemplateResponseMixin, FilterView):
     def get_context_data(self, **kwargs):
         context = super().get_context_data(**kwargs)
         total = 0
-        total_list = [total + int(data.required_value) for data in self.get_queryset()]
+        total_list = [total + int(data.required_cif_fc) for data in self.get_queryset()]
         queryset = self.get_queryset().values('item_name').order_by('item_name').annotate(
             total_qty=Sum('required_quantity'), value=Sum(F('required_quantity') * F('unit_value_per_unit'))).distinct()
         context['queryset'] = queryset
@@ -410,9 +418,9 @@ class PandasDownloadPendingAllotmentView(PDFTemplateResponseMixin, FilterView):
         df = pd.DataFrame(list(
             self.get_queryset().values('modified_on', 'port__code', 'required_quantity', 'unit_value_per_unit',
                                        'item_name', 'invoice', 'bl_detail', 'estimated_arrival_date')))
-        df = df.assign(required_value=round(df['required_quantity'] * df['unit_value_per_unit'], 2))
+        df = df.assign(required_cif_fc=round(df['required_quantity'] * df['unit_value_per_unit'], 2))
         context['df'] = df.groupby(['item_name']).agg(
-            {'required_quantity': 'sum', 'unit_value_per_unit': 'mean', 'required_value': 'sum'}).to_html(
+            {'required_quantity': 'sum', 'unit_value_per_unit': 'mean', 'required_cif_fc': 'sum'}).to_html(
             classes='table')
         return context
 

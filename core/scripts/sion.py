@@ -1,5 +1,6 @@
-from bs4 import BeautifulSoup
 import requests
+from bs4 import BeautifulSoup
+
 from core import models
 from core.models import SIONExportModel, SIONImportModel, ItemNameModel
 
@@ -70,7 +71,7 @@ def request_sion_class_heads(head):
                 break
             elif head.tcurrent == 1:
                 head.tcurrent = head.tcurrent + 1
-                next_url = '/standard-input-output-norms-export-product0{0}.aspx'.format(head.tcurrent)
+                next_url = '/standard-input-output-norms-Export-product0{0}.aspx'.format(head.tcurrent)
                 head.url = head.url.replace('.aspx', next_url)
                 r = requests.get(head.url)
                 data = r.text
@@ -80,7 +81,7 @@ def request_sion_class_heads(head):
                 url_split = head.url.split('/')
                 del url_split[-1]
                 merge_url = '/'.join(url_split)
-                next_url = '/standard-input-output-norms-export-product0{0}.aspx'.format(head.tcurrent)
+                next_url = '/standard-input-output-norms-Export-product0{0}.aspx'.format(head.tcurrent)
                 head.url = merge_url + next_url
                 r = requests.get(head.url)
                 data = r.text

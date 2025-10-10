@@ -72,12 +72,6 @@ class SIONImportForm(forms.ModelForm):
 
 
 class SionNormClassForm(forms.ModelForm):
-    item = forms.ModelChoiceField(
-        queryset=models.ItemNameModel.objects.all(),
-        widget=custom_widgets.ItemWidget,
-        required=False
-    )
-
     head_norm = forms.ModelChoiceField(
         queryset=models.HeadSIONNormsModel.objects.all(),
         widget=custom_widgets.HeadNormWidget,
@@ -86,7 +80,7 @@ class SionNormClassForm(forms.ModelForm):
 
     class Meta:
         model = models.SionNormClassModel
-        fields = ['head_norm', 'norm_class', 'item', 'url']
+        fields = ['head_norm', 'norm_class', 'description']
 
     def __init__(self, *args, **kwargs):
         super(SionNormClassForm, self).__init__(*args, **kwargs)
