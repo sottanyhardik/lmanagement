@@ -1,6 +1,6 @@
 // src/pages/Trade/TradeList.jsx
 import React, {lazy, Suspense, useEffect, useMemo, useState} from "react";
-import {Badge, Card, Collapse, Container, Tab, Tabs} from "react-bootstrap";
+import {Badge, Button, Card, Collapse, Container, Tab, Tabs} from "react-bootstrap";
 
 import ListControls from "../../components/generic/ListControls";
 import StatsBar from "../../components/generic/StatsBar";
@@ -185,20 +185,46 @@ export default function TradeList({initialFilters}) {
 
     const renderEntryCard = ({entry, expanded, toggleEntry}) => {
         const {total, paid, due} = tradeEntryTotals(entry);
+
+        // click handler for explicit edit button
+        const openForEdit = (ev) => {
+            ev?.stopPropagation?.();
+            // ensure expanded
+            setExpanded((prev) => ({...prev, [entry.id]: true}));
+            // ensure the list refresh uses saved id when editor saves - request the editor open on trade tab
+            // We'll pass initialActiveTab="trade" to the editor below
+        };
+
         return (
             <Card key={entry.id} className="mb-3 shadow-sm border border-secondary">
-                <Card.Header className="bg-white border-bottom" onClick={toggleEntry} style={{cursor: "pointer"}}>
-                    <div className="d-flex flex-wrap align-items-center justify-content-between">
-                        <div className="d-flex flex-wrap align-items-center small text-nowrap">
-                            <div className="me-3"><strong>Invoice #:</strong> {entry.invoice_number || "-"}</div>
-                            <div className="me-3"><strong>Date:</strong> {entry.invoice_date || "-"}</div>
-                            <div className="me-3"><strong>Direction:</strong> {entry.direction}</div>
+                <Card.Header className="bg-white border-bottom d-flex align-items-center justify-content-between">
+                    <div onClick={toggleEntry} style={{cursor: "pointer", flex: 1}}>
+                        <div className="d-flex flex-wrap align-items-center justify-content-between">
+                            <div className="d-flex flex-wrap align-items-center small text-nowrap">
+                                <div className="me-3"><strong>Invoice #:</strong> {entry.invoice_number || "-"}</div>
+                                <div className="me-3"><strong>Date:</strong> {entry.invoice_date || "-"}</div>
+                                <div className="me-3"><strong>Direction:</strong> {entry.direction}</div>
+                            </div>
+                            <div className="text-end">
+                                <Badge bg="secondary" className="me-2">Total ₹ {fmt2(total)}</Badge>
+                                <Badge bg="success" className="me-2">Settled ₹ {fmt2(paid)}</Badge>
+                                <Badge bg="danger">Due ₹ {fmt2(due)}</Badge>
+                            </div>
                         </div>
-                        <div className="text-end">
-                            <Badge bg="secondary" className="me-2">Total ₹ {fmt2(total)}</Badge>
-                            <Badge bg="success" className="me-2">Settled ₹ {fmt2(paid)}</Badge>
-                            <Badge bg="danger">Due ₹ {fmt2(due)}</Badge>
-                        </div>
+                    </div>
+
+                    <div className="ms-2 d-flex align-items-center">
+                        {/* Explicit Edit button always visible */}
+                        <Button size="sm" variant="outline-primary" className="me-2" onClick={openForEdit} title="Edit">
+                            Edit
+                        </Button>
+
+                        {/* Optionally a quick link to sale PDF if present */}
+                        {entry.direction === "SALE" && entry.sale_pdf_url && (
+                            <a className="btn btn-sm btn-outline-secondary" href={entry.sale_pdf_url} target="_blank" rel="noreferrer">
+                                View PDF
+                            </a>
+                        )}
                     </div>
                 </Card.Header>
 
@@ -212,7 +238,12 @@ export default function TradeList({initialFilters}) {
                                         boe={entry.boe || null}
                                         initialTrade={entry}
                                         fetchByBoe={entry.direction === "SALE"}
-                                        onSaved={() => updateSingleEntry(entry.id)}
+                                        onSaved={(saved) => {
+                                            // prefer returned saved id (if any), else fallback to current entry id
+                                            updateSingleEntry(saved?.id ?? entry.id);
+                                        }}
+                                        // Request the editor to open the "trade" tab when mounted
+                                        initialActiveTab="trade"
                                     />
                                 </Suspense>
                             </Tab>
@@ -286,6 +317,13 @@ export default function TradeList({initialFilters}) {
                             boe: null,
                             initialTrade: null,
                             fetchByBoe: false,
+                            onSaved: (saved) => {
+                                setShowNew(false);
+                                setNewEntry(null);
+                                fetchData(false, 1);
+                            },
+                            // when creating new we want the trade tab active
+                            initialActiveTab: "trade",
                         }}
                         onClose={() => {
                             setShowNew(false);
