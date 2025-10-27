@@ -61,8 +61,8 @@ class LicenseImportItemsXLSX(View):
         rel = getattr(lic, "export_license", None)
         for ei in (rel.all() if rel is not None else []):
             val = (
-                    str(getattr(ei, "norm_class_name", "") or "") or
-                    str(getattr(getattr(ei, "norm_class", None), "name", "") or getattr(ei, "norm_class", "") or "")
+                str(getattr(ei, "norm_class_name", "") or "") or
+                str(getattr(getattr(ei, "norm_class", None), "name", "") or getattr(ei, "norm_class", "") or "")
             )
             if val and val not in values:
                 values.append(val)
@@ -207,7 +207,7 @@ class LicenseImportItemsXLSX(View):
             if not boe_map[bid]["company"] and comp:
                 boe_map[bid]["company"] = comp
 
-        allotment_items = list(getattr(ii, "allotment_details").all())
+        allotment_items = list(getattr(ii, "allotment_details").all()) if hasattr(ii, "allotment_details") else []
         for ai in allotment_items:
             allo = ai.allotment
             if hasattr(allo, "bill_of_entry"):
@@ -303,19 +303,18 @@ class LicenseImportItemsXLSX(View):
 
         def style_row(r, band_fill, numeric_cols=()):
             """Apply fonts/borders/alignment and band fill to row r."""
-            for c in range(1, len(header) + 1):
-                cell = ws.cell(row=r, column=c)
+            for col_idx in range(1, len(header) + 1):
+                cell = ws.cell(row=r, column=col_idx)
                 cell.font = body_font
                 cell.border = border_all
-                # number formats
-                if c in numeric_cols:
+                # number formats for numeric columns (apply even if formula string is present)
+                if col_idx in numeric_cols:
                     cell.alignment = al_right
-                    # percent col special case
-                    if c == COLS["boe_pct"]:
+                    if col_idx == COLS["boe_pct"]:
                         cell.number_format = "0.00%"
                     else:
-                        if isinstance(cell.value, (float, int)):
-                            cell.number_format = "0.00"
+                        # default numeric format (works for both numeric value & formula result)
+                        cell.number_format = "0.00"
                 else:
                     cell.alignment = al_left
                 # apply band fill
@@ -331,12 +330,19 @@ class LicenseImportItemsXLSX(View):
             band_fill = fill_band_a if band_toggle else fill_band_b
 
             norms = self._norm_classes_from_export(lic)
-            bal_cif = getattr(lic, "get_balance_cif", None)
-            bal_cif_val = bal_cif() if callable(bal_cif) else getattr(lic, "get_balance_cif", None)
-            try:
-                bal_cif_val = round(float(bal_cif_val), 2) if bal_cif_val is not None else None
-            except Exception:
-                pass
+            bal_cif_attr = getattr(lic, "get_balance_cif", None)
+            if callable(bal_cif_attr):
+                try:
+                    bal_cif_val = bal_cif_attr()
+                    bal_cif_val = round(float(bal_cif_val), 2) if bal_cif_val is not None else None
+                except Exception:
+                    bal_cif_val = None
+            else:
+                try:
+                    bal_cif_val = round(float(bal_cif_attr), 2) if bal_cif_attr is not None else None
+                except Exception:
+                    bal_cif_val = bal_cif_attr
+
             open_cif_val = self._opening_cif_of(lic)
             purchase_val = self._purchase_amount_of(lic)
             fob_inr_val = self._sum_fob_inr_from_export(lic)
@@ -345,7 +351,8 @@ class LicenseImportItemsXLSX(View):
             port_name = getattr(getattr(lic, "port", None), "name", "") or ""
             license_date_val = getattr(lic, "license_date", None)
 
-            items = list(lic.import_license.all() if hasattr(lic, "import_license") else [])
+            items_qs = getattr(lic, "import_license", None)
+            items = list(items_qs.all()) if items_qs is not None else []
             license_first_row = None
             boe_rows_for_license = []
 
@@ -384,10 +391,10 @@ class LicenseImportItemsXLSX(View):
                 row_idx += 1
 
                 # allotments with NO BOE
-                allotment_items = list(getattr(ii, "allotment_details").all())
+                allotment_items = list(getattr(ii, "allotment_details").all()) if hasattr(ii, "allotment_details") else []
                 for ai in allotment_items:
                     allo = ai.allotment
-                    has_boe = hasattr(allo, "bill_of_entry") and allo.bill_of_entry.exists()
+                    has_boe = hasattr(allo, "bill_of_entry") and getattr(allo.bill_of_entry, "exists", lambda: False)()
                     if not has_boe:
                         line = self._allotment_line(ai)
                         ws.append([""] * (COLS["allot"] - 1) + [line] + [""] * (len(header) - COLS["allot"]))
@@ -403,18 +410,20 @@ class LicenseImportItemsXLSX(View):
                 boe_list = self._build_boe_list_for_item(lic, ii)
                 for v in boe_list:
                     date_str = v["date"].strftime("%d-%b-%Y") if v["date"] else ""
-                    ws.append([""] * (COLS["boe_no"] - 1) + [
+                    # create a full row starting at BOE columns
+                    boe_row = [""] * (COLS["boe_no"] - 1) + [
                         v["no"],
                         date_str,
                         v["company"],
                         v["qty"],
                         v["cif_fc"],
                         v["cif_inr"],
-                        0,  # % Premium
-                        0,  # Premium per Kg
+                        0.0,  # % Premium (as decimal)
+                        0.0,  # Premium per Kg
                         None,  # Premium Amount (formula below)
                         "",  # Net P/L (summary rows only)
-                    ])
+                    ]
+                    ws.append(boe_row)
                     # number formats & band fill
                     style_row(
                         row_idx,
@@ -433,7 +442,7 @@ class LicenseImportItemsXLSX(View):
                         f"=IF({perkg_cell}>0,{qty_cell}*{perkg_cell},IF({pct_cell}>0,{cif_inr_cell}*{pct_cell},0))"
                     )
                     prem_cell.number_format = "0.00"
-                    boe_rows_for_license.append(row_idx)
+                    boe_rows_for_license.append(r)
                     row_idx += 1
 
             # ---- Summary rows (kept in yellow, not banded) ----
@@ -455,6 +464,8 @@ class LicenseImportItemsXLSX(View):
                     cell.fill = fill_total
                     cell.border = border_all
                     cell.alignment = al_right if c in (COLS["boe_cif_fc"], COLS["boe_cif_inr"]) else al_left
+                    if c in (COLS["boe_cif_fc"], COLS["boe_cif_inr"]):
+                        cell.number_format = "0.00"
                 row_idx += 1
 
                 # Premium total + Net P/L
@@ -463,7 +474,10 @@ class LicenseImportItemsXLSX(View):
                 ws.cell(row=r_tot2, column=COLS["lic_no"]).value = "Premium & Net"
                 ws.cell(row=r_tot2, column=COLS["boe_prem"]).value = f"=SUM({col_prem}{r1}:{col_prem}{rN})"
                 prem_total_cell = f"{get_column_letter(COLS['boe_prem'])}{r_tot2}"
-                purch_cell = f"{get_column_letter(COLS['purchase'])}{license_first_row}" if license_first_row else "0"
+                if license_first_row:
+                    purch_cell = f"{get_column_letter(COLS['purchase'])}{license_first_row}"
+                else:
+                    purch_cell = "0"
                 ws.cell(row=r_tot2, column=COLS["net_pl"]).value = f"=IFERROR({prem_total_cell}-{purch_cell},\"\")"
                 for c in range(1, len(header) + 1):
                     cell = ws.cell(row=r_tot2, column=c)

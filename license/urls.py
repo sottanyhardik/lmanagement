@@ -11,6 +11,7 @@ from .api import (
     LicensePurchaseViewSet,
 )
 from .views.import_items_views import LicenseImportItemsViewSet
+from .views.reports_views import LicenseReportView
 
 router = DefaultRouter()
 router.register(r"license-import-items", LicenseImportItemsViewSet, basename="license-import-items")
@@ -19,7 +20,7 @@ router.register(r"licenses", LicenseDetailsViewSet)
 
 urlpatterns = [
     path("license-import-items/select/", LicenseImportItemsSelectView.as_view(), name="license-import-items-select"),
-    path("licenses/export/pdf/", LicenseImportItemsUltraWidePDF.as_view(), name="license-details-pdf"),
+    path("licenses/export/", LicenseReportView.as_view(), name="license-report-pdf"),
     path("licenses/export/excel/", LicenseImportItemsXLSX.as_view(), name="licenses-export-xlsx"),
     path("licenses/biscuit-report/<str:party>/<str:status_flag>/", BiscuitReportAPIView.as_view(),
          name="biscuit-report"),
