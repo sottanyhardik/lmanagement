@@ -1,5 +1,6 @@
 from decimal import Decimal
 
+from django.conf import settings
 from django.db import models
 from django.db.models import Sum, IntegerField
 from django.db.models.functions import Coalesce
@@ -86,12 +87,6 @@ class LicenseDetailsModel(models.Model):
     is_individual = models.BooleanField(default=False)
     ge_file_number = models.IntegerField(default=0)
     fob = models.IntegerField(default=0, null=True, blank=True)
-    created_on = models.DateField(auto_created=True, null=True, blank=True)
-    created_by = models.ForeignKey('auth.User', on_delete=models.PROTECT, null=True, blank=True,
-                                   related_name='dfia_created')
-    modified_on = models.DateField(auto_now=True)
-    modified_by = models.ForeignKey('auth.User', on_delete=models.PROTECT, null=True, blank=True,
-                                    related_name='dfia_updated')
     billing_rate = models.FloatField(default=0)
     billing_amount = models.FloatField(default=0)
     admin_search_fields = ('license_number',)
