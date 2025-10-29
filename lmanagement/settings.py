@@ -13,10 +13,6 @@ https://docs.djangoproject.com/en/2.2/ref/settings/
 import os
 import django as django
 
-from urllib.parse import quote
-
-django.utils.http.urlquote = quote
-
 # Build paths inside the project like this: os.path.join(BASE_DIR, ...)
 
 BASE_DIR = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
@@ -35,7 +31,7 @@ ALLOWED_HOSTS = ['167.71.233.211', 'localhost', '127.0.0.1']
 # Application definition
 
 INSTALLED_APPS = [
-    'django.contrib.admin',
+    'accounts.apps.AccountsConfig',
     'django.contrib.auth',
     'django.contrib.contenttypes',
     'django.contrib.sessions',
@@ -51,9 +47,6 @@ INSTALLED_APPS = [
     'bill_of_entry.apps.BillOfEntryConfig',
     'allotment.apps.AllotmentConfig',
     'license_movement.apps.LicenseMovementConfig',
-    'report.apps.ReportConfig',
-    'ebrc.apps.EbrcConfig',
-    'shipping_bill.apps.ShippingBillConfig',
     'django.contrib.humanize',
     'mathfilters',
 ]
@@ -220,3 +213,5 @@ DEFAULT_AUTO_FIELD = 'django.db.models.AutoField'
 
 EXPIRY_DAY = 60
 # INTERNAL_IPS = ALLOWED_HOSTS
+
+AUTH_USER_MODEL = "accounts.User"

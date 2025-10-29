@@ -1,3 +1,4 @@
+from django.conf import settings
 from django.db import models
 
 # Create your models here.
@@ -39,12 +40,6 @@ class AllotmentModel(models.Model):
                              related_name="allotments")
     related_company = models.ForeignKey('core.CompanyModel', related_name='related_company', on_delete=models.CASCADE,
                                         null=True, blank=True)
-    created_on = models.DateField(auto_created=True, null=True, blank=True)
-    created_by = models.ForeignKey('auth.User', on_delete=models.CASCADE, null=True, blank=True,
-                                   related_name='allotment_created')
-    modified_on = models.DateField(auto_now=True)
-    modified_by = models.ForeignKey('auth.User', on_delete=models.CASCADE, null=True, blank=True,
-                                    related_name='allotment_updated')
 
     class Meta:
         ordering = ['estimated_arrival_date', ]
