@@ -4,10 +4,10 @@ Django settings for lmanagement project.
 
 import os
 from pathlib import Path
-from urllib.parse import quote
 
 import django
 from decouple import config  # optional; keep if you use it elsewhere
+
 
 # -----------------------------------------------------------
 # BASE PATHS
@@ -32,8 +32,6 @@ ALLOWED_HOSTS = [
 INSTALLED_APPS = [
     # Django core
     'django.contrib.admin',
-    'accounts.apps.AccountsConfig',
-
     'django.contrib.auth',
     'django.contrib.contenttypes',
     'django.contrib.sessions',
@@ -54,14 +52,13 @@ INSTALLED_APPS = [
     'django_vite',
 
     # Project apps
+    'accounts.apps.AccountsConfig',
     'core.apps.CoreConfig',
     'license.apps.LicenseConfig',
     'bill_of_entry.apps.BillOfEntryConfig',
     'allotment.apps.AllotmentConfig',
     'license_movement.apps.LicenseMovementConfig',
     'trade.apps.TradeConfig',
-    'django.contrib.humanize',
-    'mathfilters',
 ]
 
 # -----------------------------------------------------------

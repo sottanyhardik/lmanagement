@@ -3,7 +3,7 @@ set -Eeuo pipefail
 
 # ─── Configuration ─────────────────────────────────────────────────────────────
 REMOTE_USER="django"
-REMOTE_HOST="143.110.186.184"
+REMOTE_HOST="143.244.139.121"
 REMOTE_DB_NAME="lmanagement"
 REMOTE_DB_USER="lmanagement"
 REMOTE_DB_PASSWORD="lmanagement"
