@@ -1,7 +1,5 @@
 # Create your models here.
-
-from django.contrib.auth.models import AbstractUser
-from django.contrib.auth.models import User
+from django.conf import settings
 from django.core.validators import RegexValidator
 from django.db import models
 from django.urls import reverse
@@ -18,12 +16,12 @@ def company_upload_path(instance, filename):
 class AuditModel(models.Model):
     created_on = models.DateTimeField(auto_now_add=True)
     created_by = models.ForeignKey(
-        User, null=True, blank=True, on_delete=models.SET_NULL,
+        settings.AUTH_USER_MODEL, null=True, blank=True, on_delete=models.SET_NULL,
         related_name="%(class)s_created"
     )
     modified_on = models.DateTimeField(auto_now=True)
     modified_by = models.ForeignKey(
-        User, null=True, blank=True, on_delete=models.SET_NULL,
+        settings.AUTH_USER_MODEL, null=True, blank=True, on_delete=models.SET_NULL,
         related_name="%(class)s_updated"
     )
 

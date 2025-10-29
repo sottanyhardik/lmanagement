@@ -9,8 +9,6 @@ from urllib.parse import quote
 import django
 from decouple import config  # optional; keep if you use it elsewhere
 
-django.utils.http.urlquote = quote
-
 # -----------------------------------------------------------
 # BASE PATHS
 # -----------------------------------------------------------
@@ -34,6 +32,8 @@ ALLOWED_HOSTS = [
 INSTALLED_APPS = [
     # Django core
     'django.contrib.admin',
+    'accounts.apps.AccountsConfig',
+
     'django.contrib.auth',
     'django.contrib.contenttypes',
     'django.contrib.sessions',
@@ -59,10 +59,9 @@ INSTALLED_APPS = [
     'bill_of_entry.apps.BillOfEntryConfig',
     'allotment.apps.AllotmentConfig',
     'license_movement.apps.LicenseMovementConfig',
-    'report.apps.ReportConfig',
-    'ebrc.apps.EbrcConfig',
-    'shipping_bill.apps.ShippingBillConfig',
     'trade.apps.TradeConfig',
+    'django.contrib.humanize',
+    'mathfilters',
 ]
 
 # -----------------------------------------------------------
@@ -277,3 +276,4 @@ CORS_ALLOW_HEADERS = list({
     "user-agent",
     "x-requested-with",
 })
+AUTH_USER_MODEL = "accounts.User"

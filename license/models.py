@@ -124,16 +124,6 @@ class LicenseDetailsModel(models.Model):
     ge_file_number = models.IntegerField(default=0)
 
     fob = models.IntegerField(default=0, null=True, blank=True)
-
-    created_on = models.DateField(auto_created=True, null=True, blank=True)  # left as-is (no schema change)
-    created_by = models.ForeignKey(
-        "auth.User", on_delete=models.PROTECT, null=True, blank=True, related_name="dfia_created"
-    )
-    modified_on = models.DateField(auto_now=True)
-    modified_by = models.ForeignKey(
-        "auth.User", on_delete=models.PROTECT, null=True, blank=True, related_name="dfia_updated"
-    )
-
     billing_rate = models.FloatField(default=0)
     billing_amount = models.FloatField(default=0)
 
